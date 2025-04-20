@@ -1,0 +1,570 @@
+import React, { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import {
+  Plus,
+  Search,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Calendar,
+  User,
+  Tag,
+  Filter,
+  ArrowUpDown,
+  GripVertical,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useProgramContext } from "@/context/ProgramContext";
+import { format } from "date-fns";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { useTasks, Task, Phase, TaskStatus } from "@/context/TasksContext";
+
+// Mock phase data
+// interface Phase {
+//   id: string;
+//   name: string;
+//   color: string;
+//   startDate: string;
+//   endDate: string;
+//   status: 'not_started' | 'in_progress' | 'completed';
+// }
+
+// Mock task data
+// interface Task {
+//   id: string;
+//   title: string;
+//   description: string;
+//   dueDate: string;
+//   status: 'todo' | 'in_progress' | 'completed';
+//   priority: 'low' | 'medium' | 'high';
+//   assignee: string;
+//   phaseId: string;
+//   phaseName: string;
+//   tags: string[];
+//   isOverdue: boolean;
+//   programId: string;
+//   forAllTeams: boolean;
+// }
+
+const TasksPage: React.FC = () => {
+  const { selectedProgram } = useProgramContext();
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeView, setActiveView] = useState<"list" | "board">("board");
+
+  // Use the TasksContext
+  const {
+    tasks,
+    phases,
+    filteredTasks,
+    tasksByStatus,
+    searchQuery,
+    setSearchQuery,
+    selectedStatuses,
+    setSelectedStatuses,
+    selectedPriorities,
+    setSelectedPriorities,
+    selectedPhase,
+    setSelectedPhase,
+    getPhaseById,
+    updateTaskStatus,
+    priorityColors,
+    statusIcons,
+    today
+  } = useTasks();
+
+  // Handle drag end for the kanban board
+  const handleDragEnd = (result: any) => {
+    const { destination, source, draggableId } = result;
+
+    // If the item was dropped outside a droppable area
+    if (!destination) {
+      return;
+    }
+
+    // If the item was dropped in the same place
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    // Update the task status based on the destination droppable ID
+    const newStatus = destination.droppableId as TaskStatus;
+    updateTaskStatus(draggableId, newStatus);
+  };
+
+  if (!selectedProgram) {
+    return (
+      <div className="container mx-auto py-12 text-center">
+        <h1 className="text-2xl font-bold mb-4">No Program Selected</h1>
+        <p className="text-gray-500 mb-6">Please select a program to view its tasks.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Program Tasks</h1>
+          <p className="text-gray-500">{selectedProgram.name}</p>
+        </div>
+
+      </div>
+
+      {/* View toggle and filters */}
+      <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+        <div className="flex gap-2">
+          <Button
+            variant={activeView === "board" ? "default" : "outline"}
+            onClick={() => setActiveView("board")}
+            className="flex-1 md:flex-none"
+          >
+            Kanban Board
+          </Button>
+          <Button
+            variant={activeView === "list" ? "default" : "outline"}
+            onClick={() => setActiveView("list")}
+            className="flex-1 md:flex-none"
+          >
+            List View
+          </Button>
+        </div>
+        <div className="flex gap-2 flex-1 md:flex-none md:w-1/3">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search tasks..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className={showFilters ? "bg-gray-100" : ""}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </Button>
+        </div>
+      </div>
+
+      {/* Phase selection */}
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Program Phase Timeline</CardTitle>
+          <CardDescription>Click on a phase to filter tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col space-y-2">
+            {/* Phase Timeline Bar */}
+            <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
+              {phases.map((phase) => {
+                // Calculate width based on phase duration (for actual implementation, use date calculation)
+                const width = `${100 / phases.length}%`;
+
+                return (
+                  <div
+                    key={phase.id}
+                    className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
+                      ${selectedPhase === phase.id ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
+                    `}
+                    style={{
+                      width,
+                      backgroundColor: phase.color,
+                      opacity: phase.status === 'not_started' ? 0.5 : 1
+                    }}
+                    onClick={() => setSelectedPhase(selectedPhase === String(phase.id) ? null : String(phase.id))}
+                  >
+                    <span className="text-white font-medium text-sm">
+                      {phase.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters */}
+      {showFilters && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-medium mb-3">Task Status</h3>
+                <div className="space-y-2">
+                  {(['todo', 'in_progress', 'completed'] as TaskStatus[]).map(status => (
+                    <div key={status} className="flex items-center">
+                      <Checkbox
+                        id={`status-${status}`}
+                        checked={selectedStatuses.includes(status)}
+                        onCheckedChange={(checked) => {
+                          const newStatuses = checked
+                            ? [...selectedStatuses, status]
+                            : selectedStatuses.filter(s => s !== status);
+                          setSelectedStatuses(newStatuses);
+                        }}
+                      />
+                      <label htmlFor={`status-${status}`} className="ml-2 capitalize">
+                        {status.replace('_', ' ')}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium mb-3">Priority</h3>
+                <div className="space-y-2">
+                  {['high', 'medium', 'low'].map(priority => (
+                    <div key={priority} className="flex items-center">
+                      <Checkbox
+                        id={`priority-${priority}`}
+                        checked={selectedPriorities.includes(priority)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedPriorities([...selectedPriorities, priority]);
+                          } else {
+                            setSelectedPriorities(selectedPriorities.filter(p => p !== priority));
+                          }
+                        }}
+                      />
+                      <label htmlFor={`priority-${priority}`} className="ml-2 text-sm">
+                        <Badge className={priorityColors[priority]}>
+                          {priority}
+                        </Badge>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedPhase && (
+        <div className="mb-6 p-3 bg-blue-50 rounded-md flex items-center">
+          <div
+            className="w-3 h-3 rounded-full mr-2"
+            style={{ backgroundColor: getPhaseById(selectedPhase)?.color }}
+          ></div>
+          <p className="text-sm">
+            <span className="font-medium">Filtered by:</span> {getPhaseById(selectedPhase)?.name} phase
+          </p>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedPhase(null)}>
+            Clear
+          </Button>
+        </div>
+      )}
+
+      {/* Task content */}
+      <Tabs defaultValue="all">
+        <TabsList className="mb-6">
+          <TabsTrigger value="all">All Tasks</TabsTrigger>
+          <TabsTrigger value="my-tasks">My Tasks</TabsTrigger>
+          <TabsTrigger value="overdue">Overdue</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all">
+          {filteredTasks.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-lg font-medium text-gray-900">No tasks found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {selectedPhase
+                  ? `There are no tasks in the ${getPhaseById(selectedPhase)?.name} phase matching your filters.`
+                  : "Try adjusting your search or filters to find what you're looking for."
+                }
+              </p>
+            </div>
+          ) : activeView === "board" ? (
+            // Kanban Board View
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* To Do Column */}
+                <div>
+                  <div className="flex items-center mb-4">
+                    <Clock className="h-4 w-4 text-gray-500 mr-2" />
+                    <h2 className="font-medium">To Do</h2>
+                    <Badge className="ml-2">{tasksByStatus.todo.length}</Badge>
+                  </div>
+                  <Droppable droppableId="todo">
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="bg-gray-50 rounded-lg p-3 min-h-[300px]"
+                      >
+                        {tasksByStatus.todo.map((task, index) => (
+                          <Draggable
+                            key={task.id}
+                            draggableId={task.id}
+                            index={index}
+                          >
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`mb-3 ${snapshot.isDragging ? 'opacity-70' : ''}`}
+                              >
+                                <TaskCard task={task} dragHandleProps={provided.dragHandleProps} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+
+                {/* In Progress Column */}
+                <div>
+                  <div className="flex items-center mb-4">
+                    <Clock className="h-4 w-4 text-blue-500 mr-2" />
+                    <h2 className="font-medium">In Progress</h2>
+                    <Badge className="ml-2">{tasksByStatus.in_progress.length}</Badge>
+                  </div>
+                  <Droppable droppableId="in_progress">
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="bg-gray-50 rounded-lg p-3 min-h-[300px]"
+                      >
+                        {tasksByStatus.in_progress.map((task, index) => (
+                          <Draggable
+                            key={task.id}
+                            draggableId={task.id}
+                            index={index}
+                          >
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`mb-3 ${snapshot.isDragging ? 'opacity-70' : ''}`}
+                              >
+                                <TaskCard task={task} dragHandleProps={provided.dragHandleProps} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+
+                {/* Completed Column */}
+                <div>
+                  <div className="flex items-center mb-4">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+                    <h2 className="font-medium">Completed</h2>
+                    <Badge className="ml-2">{tasksByStatus.completed.length}</Badge>
+                  </div>
+                  <Droppable droppableId="completed">
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="bg-gray-50 rounded-lg p-3 min-h-[300px]"
+                      >
+                        {tasksByStatus.completed.map((task, index) => (
+                          <Draggable
+                            key={task.id}
+                            draggableId={task.id}
+                            index={index}
+                          >
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`mb-3 ${snapshot.isDragging ? 'opacity-70' : ''}`}
+                              >
+                                <TaskCard task={task} dragHandleProps={provided.dragHandleProps} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              </div>
+            </DragDropContext>
+          ) : (
+            // List View
+            <div>
+              {/* Tasks by Status */}
+              {(['todo', 'in_progress', 'completed'] as TaskStatus[]).map(status => {
+                const statusTasks = filteredTasks.filter(task => task.status === status);
+                if (statusTasks.length === 0) return null;
+
+                return (
+                  <div key={status} className="mb-8">
+                    <div className="flex items-center mb-4">
+                      {statusIcons[status]}
+                      <h2 className="text-lg font-medium ml-2">
+                        {status === 'todo' ? 'To Do' :
+                         status === 'in_progress' ? 'In Progress' :
+                         status.charAt(0).toUpperCase() + status.slice(1)}
+                      </h2>
+                      <Badge className="ml-2">{statusTasks.length}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      {statusTasks.map(task => (
+                        <TaskCard key={task.id} task={task} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="my-tasks">
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <User className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-lg font-medium text-gray-900">My Tasks</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Personal task assignment is coming soon.
+            </p>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="overdue">
+          {filteredTasks.filter(task => task.isOverdue).length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
+              <h3 className="mt-2 text-lg font-medium text-gray-900">No Overdue Tasks</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                All tasks are on track. Great job!
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {filteredTasks
+                .filter(task => task.isOverdue)
+                .map(task => (
+                  <TaskCard key={task.id} task={task} />
+                ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+// Task Card Component
+const TaskCard = ({
+  task,
+  dragHandleProps = {}
+}: {
+  task: Task,
+  dragHandleProps?: any
+}) => {
+  const { priorityColors, statusIcons } = useTasks();
+
+  // Calculate days remaining
+  const dueDate = new Date(task.dueDate);
+  const today = new Date();
+  const diffTime = dueDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b">
+            {dragHandleProps ? (
+              <div className="flex items-center">
+                <div {...dragHandleProps} className="cursor-grab mr-2">
+                  <GripVertical className="h-4 w-4 text-gray-400" />
+                </div>
+                <div className="flex items-center">
+                  {statusIcons[task.status]}
+                  <span className="ml-2 font-medium">{task.title || task.name || "Untitled Task"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center">
+                {statusIcons[task.status]}
+                <span className="ml-2 font-medium">{task.title || task.name || "Untitled Task"}</span>
+              </div>
+            )}
+            <Badge className={priorityColors[task.priority]}>
+              {task.priority}
+            </Badge>
+          </div>
+
+          <div className="p-4">
+            <p className="text-sm text-gray-600 mb-4">
+              {task.description}
+            </p>
+
+            <div className="flex items-center justify-between mb-2 text-sm">
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-1 text-gray-500" />
+                <span className={`${task.isOverdue ? 'text-red-600' : 'text-gray-600'}`}>
+                  {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                </span>
+              </div>
+
+              <div className="text-gray-600">
+                <User className="h-4 w-4 inline mr-1" />
+                {task.assignee}
+              </div>
+            </div>
+
+            {diffDays > 0 && (
+              <div className="text-xs text-gray-500">
+                {diffDays} {diffDays === 1 ? 'day' : 'days'} remaining
+              </div>
+            )}
+
+            {task.isOverdue && (
+              <div className="text-xs text-red-600 font-medium">
+                Overdue by {Math.abs(diffDays)} {Math.abs(diffDays) === 1 ? 'day' : 'days'}
+              </div>
+            )}
+          </div>
+
+          <div className="px-4 pb-4 flex flex-wrap gap-1">
+            {task.tags.map(tag => (
+              <Badge key={tag} variant="outline" className="text-xs">
+                <Tag className="h-3 w-3 mr-1" />
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default TasksPage;
