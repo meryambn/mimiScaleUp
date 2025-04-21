@@ -15,17 +15,20 @@ import { useProgramContext } from "@/context/ProgramContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const Dashboard: React.FC = () => {
-  const { selectedProgram, setSelectedProgram, programs } = useProgramContext();
+  const { selectedProgram, updateProgram } = useProgramContext();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isMentor = user?.role === 'mentor';
 
   const navigateTo = (path: string) => {
     setLocation(path);
   };
 
-  const handleStatusChange = (newStatus: "draft" | "active" | "completed") => {
+  const handleStatusChange = (newStatus: "active" | "completed" | "draft") => {
     if (!selectedProgram) return;
 
     // Mettre à jour le programme sélectionné
@@ -34,17 +37,11 @@ const Dashboard: React.FC = () => {
       status: newStatus
     };
 
-    // Mettre à jour le programme dans le contexte
-    setSelectedProgram(updatedProgram);
-
-    // Stocker les programmes mis à jour dans le localStorage
-    const updatedPrograms = programs.map(program =>
-      program.id === selectedProgram.id ? updatedProgram : program
-    );
-    localStorage.setItem('programs', JSON.stringify(updatedPrograms));
+    // Utiliser la fonction updateProgram du contexte pour mettre à jour le programme
+    updateProgram(updatedProgram);
 
     // Afficher une notification
-    const statusText = newStatus === "draft" ? "brouillon" : newStatus === "active" ? "actif" : "terminé";
+    const statusText = newStatus === "active" ? "actif" : newStatus === "completed" ? "terminé" : "brouillon";
     toast({
       title: "Statut mis à jour",
       description: `Le programme est maintenant ${statusText}.`,
@@ -67,19 +64,21 @@ const Dashboard: React.FC = () => {
                 Programme actuel: <span className="font-medium">{selectedProgram.name}</span>
                 <Badge
                   className="ml-2"
-                  variant={selectedProgram.status === "draft" ? "outline" : selectedProgram.status === "active" ? "secondary" : "default"}
+                  variant={selectedProgram.status === "active" ? "secondary" : selectedProgram.status === "draft" ? "outline" : "default"}
                 >
-                  {selectedProgram.status === "draft" ? "Brouillon" : selectedProgram.status === "active" ? "Actif" : "Terminé"}
+                  {selectedProgram.status === "active" ? "Actif" : selectedProgram.status === "draft" ? "Brouillon" : "Terminé"}
                 </Badge>
               </div>
             )}
           </div>
-          <Link href="/programs/create">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau programme
-            </Button>
-          </Link>
+          {!isMentor && (
+            <Link href="/programs/create">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau programme
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -105,42 +104,44 @@ const Dashboard: React.FC = () => {
                   <p className="text-sm font-medium text-gray-500">Statut</p>
                   <div className="flex items-center space-x-2 mt-1">
                     <Badge
-                      variant={selectedProgram.status === "draft" ? "outline" : selectedProgram.status === "active" ? "secondary" : "default"}
+                      variant={selectedProgram.status === "active" ? "secondary" : selectedProgram.status === "draft" ? "outline" : "default"}
                     >
-                      {selectedProgram.status === "draft" ? "Brouillon" : selectedProgram.status === "active" ? "Actif" : "Terminé"}
+                      {selectedProgram.status === "active" ? "Actif" : selectedProgram.status === "draft" ? "Brouillon" : "Terminé"}
                     </Badge>
-                    <div className="flex space-x-1">
-                      {selectedProgram.status !== "draft" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStatusChange("draft")}
-                          className="text-xs h-7 px-2"
-                        >
-                          Brouillon
-                        </Button>
-                      )}
-                      {selectedProgram.status !== "active" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStatusChange("active")}
-                          className="text-xs h-7 px-2"
-                        >
-                          Activer
-                        </Button>
-                      )}
-                      {selectedProgram.status !== "completed" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStatusChange("completed")}
-                          className="text-xs h-7 px-2"
-                        >
-                          Terminer
-                        </Button>
-                      )}
-                    </div>
+                    {!isMentor && (
+                      <div className="flex space-x-1">
+                        {selectedProgram.status !== "active" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusChange("active")}
+                            className="text-xs h-7 px-2"
+                          >
+                            Activer
+                          </Button>
+                        )}
+                        {selectedProgram.status !== "completed" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusChange("completed")}
+                            className="text-xs h-7 px-2"
+                          >
+                            Terminé
+                          </Button>
+                        )}
+                        {selectedProgram.status !== "draft" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusChange("draft")}
+                            className="text-xs h-7 px-2"
+                          >
+                            Brouillon
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -205,18 +206,20 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom Section - Mentor Management */}
-          <div className="mt-6">
-            <Card className="dashboard-card">
-              <CardHeader>
-                <CardTitle>Réseau de mentors</CardTitle>
-                <CardDescription>Gérer les mentors du programme</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MentorManagement showAssignmentControls />
-              </CardContent>
-            </Card>
-          </div>
+          {/* Bottom Section - Mentor Management - Only visible for admins */}
+          {!isMentor && (
+            <div className="mt-6">
+              <Card className="dashboard-card">
+                <CardHeader>
+                  <CardTitle>Réseau de mentors</CardTitle>
+                  <CardDescription>Gérer les mentors du programme</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MentorManagement showAssignmentControls />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       ) : (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-5">

@@ -8,6 +8,7 @@ import { useProgramContext } from "@/context/ProgramContext";
 import { format, isValid, parseISO } from "date-fns";
 import { Program, Phase } from "@/types/program";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 interface ProgramCardProps {
   id: string;
@@ -116,6 +117,8 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
 
 const Programs: React.FC = () => {
   const { programs, selectedProgramId, setSelectedProgramId } = useProgramContext();
+  const { user } = useAuth();
+  const isMentor = user?.role === 'mentor';
 
   // Filter programs by status
   const draftPrograms = programs.filter(program => program.status === "draft");
@@ -133,42 +136,46 @@ const Programs: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-semibold text-gray-900">Programmes</h1>
-          <Link href="/programs/create">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau programme
-            </Button>
-          </Link>
+          {!isMentor && (
+            <Link href="/programs/create">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau programme
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-5">
-        {/* Programmes en brouillon */}
-        <div className="mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Brouillons</h2>
-          {draftPrograms.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-              <p className="text-gray-500">Aucun programme en brouillon</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {draftPrograms.map((program) => (
-                <ProgramCard
-                  key={program.id}
-                  id={program.id}
-                  name={program.name}
-                  description={program.description}
-                  startDate={new Date(program.startDate).toLocaleDateString()}
-                  endDate={new Date(program.endDate).toLocaleDateString()}
-                  phases={program.phases || []}
-                  status={program.status}
-                  onSelect={() => setSelectedProgramId(program.id)}
-                  program={program}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Programmes en brouillon - visible uniquement pour les admins */}
+        {!isMentor && (
+          <div className="mb-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Brouillons</h2>
+            {draftPrograms.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
+                <p className="text-gray-500">Aucun programme en brouillon</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {draftPrograms.map((program) => (
+                  <ProgramCard
+                    key={program.id}
+                    id={program.id}
+                    name={program.name}
+                    description={program.description}
+                    startDate={new Date(program.startDate).toLocaleDateString()}
+                    endDate={new Date(program.endDate).toLocaleDateString()}
+                    phases={program.phases || []}
+                    status={program.status}
+                    onSelect={() => setSelectedProgramId(program.id)}
+                    program={program}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Programmes actifs */}
         <div className="mb-6">

@@ -61,7 +61,7 @@ interface ProgramState {
     requiredDocuments: string[];
   };
   mentors: any[];
-  status: 'draft' | 'active';
+  status: 'draft' | 'active' | 'completed';
 }
 
 // Add type definition for the window object
@@ -413,7 +413,7 @@ const CreateProgram: React.FC = () => {
       requiredDocuments: []
     },
     mentors: [],
-    status: 'draft'
+    status: 'active'
   });
   const [programPhases, setProgramPhases] = useState<PhaseDetails[]>([]);
   const [applicationForm, setApplicationForm] = useState<any>({

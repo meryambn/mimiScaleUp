@@ -23,3 +23,47 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Thin scrollbar that only appears on hover */
+.thin-scrollbar {
+  overflow-y: auto;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: transparent transparent; /* Firefox: thumb color, track color */
+  -ms-overflow-style: -ms-autohiding-scrollbar; /* IE and Edge */
+  transition: scrollbar-color 0.3s ease;
+}
+
+/* Show scrollbar on hover for Firefox */
+.thin-scrollbar:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent; /* Firefox: thumb color, track color */
+}
+
+/* For WebKit browsers (Chrome, Safari) */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px; /* Very thin scrollbar */
+  background-color: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.thin-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3); /* Semi-transparent white */
+}
+
+/* Hide scrollbar completely */
+.hide-scrollbar {
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* For WebKit browsers (Chrome, Safari) */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

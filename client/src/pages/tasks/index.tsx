@@ -14,16 +14,13 @@ import {
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
-  Plus,
   Search,
   CheckCircle2,
   Clock,
   AlertCircle,
   Calendar,
   User,
-  Tag,
   Filter,
-  ArrowUpDown,
   GripVertical,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useProgramContext } from "@/context/ProgramContext";
 import { format } from "date-fns";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import { useTasks, Task, Phase, TaskStatus } from "@/context/TasksContext";
+import { useTasks, Task, TaskStatus } from "@/context/TasksContext";
 
 // Mock phase data
 // interface Phase {
@@ -68,7 +65,6 @@ const TasksPage: React.FC = () => {
 
   // Use the TasksContext
   const {
-    tasks,
     phases,
     filteredTasks,
     tasksByStatus,
@@ -83,8 +79,7 @@ const TasksPage: React.FC = () => {
     getPhaseById,
     updateTaskStatus,
     priorityColors,
-    statusIcons,
-    today
+    statusIcons
   } = useTasks();
 
   // Handle drag end for the kanban board
@@ -307,7 +302,6 @@ const TasksPage: React.FC = () => {
                   <div className="flex items-center mb-4">
                     <Clock className="h-4 w-4 text-gray-500 mr-2" />
                     <h2 className="font-medium">To Do</h2>
-                    <Badge className="ml-2">{tasksByStatus.todo.length}</Badge>
                   </div>
                   <Droppable droppableId="todo">
                     {(provided) => (
@@ -344,7 +338,6 @@ const TasksPage: React.FC = () => {
                   <div className="flex items-center mb-4">
                     <Clock className="h-4 w-4 text-blue-500 mr-2" />
                     <h2 className="font-medium">In Progress</h2>
-                    <Badge className="ml-2">{tasksByStatus.in_progress.length}</Badge>
                   </div>
                   <Droppable droppableId="in_progress">
                     {(provided) => (
@@ -381,7 +374,6 @@ const TasksPage: React.FC = () => {
                   <div className="flex items-center mb-4">
                     <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
                     <h2 className="font-medium">Completed</h2>
-                    <Badge className="ml-2">{tasksByStatus.completed.length}</Badge>
                   </div>
                   <Droppable droppableId="completed">
                     {(provided) => (
@@ -431,7 +423,6 @@ const TasksPage: React.FC = () => {
                          status === 'in_progress' ? 'In Progress' :
                          status.charAt(0).toUpperCase() + status.slice(1)}
                       </h2>
-                      <Badge className="ml-2">{statusTasks.length}</Badge>
                     </div>
                     <div className="grid grid-cols-1 gap-4">
                       {statusTasks.map(task => (
@@ -487,7 +478,7 @@ const TaskCard = ({
   task: Task,
   dragHandleProps?: any
 }) => {
-  const { priorityColors, statusIcons } = useTasks();
+  const { statusIcons } = useTasks();
 
   // Calculate days remaining
   const dueDate = new Date(task.dueDate);
@@ -516,9 +507,7 @@ const TaskCard = ({
                 <span className="ml-2 font-medium">{task.title || task.name || "Untitled Task"}</span>
               </div>
             )}
-            <Badge className={priorityColors[task.priority]}>
-              {task.priority}
-            </Badge>
+
           </div>
 
           <div className="p-4">
@@ -526,17 +515,12 @@ const TaskCard = ({
               {task.description}
             </p>
 
-            <div className="flex items-center justify-between mb-2 text-sm">
+            <div className="flex items-center mb-2 text-sm">
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-1 text-gray-500" />
                 <span className={`${task.isOverdue ? 'text-red-600' : 'text-gray-600'}`}>
                   {format(new Date(task.dueDate), 'MMM d, yyyy')}
                 </span>
-              </div>
-
-              <div className="text-gray-600">
-                <User className="h-4 w-4 inline mr-1" />
-                {task.assignee}
               </div>
             </div>
 
@@ -553,14 +537,7 @@ const TaskCard = ({
             )}
           </div>
 
-          <div className="px-4 pb-4 flex flex-wrap gap-1">
-            {task.tags.map(tag => (
-              <Badge key={tag} variant="outline" className="text-xs">
-                <Tag className="h-3 w-3 mr-1" />
-                {tag}
-              </Badge>
-            ))}
-          </div>
+
         </div>
       </CardContent>
     </Card>

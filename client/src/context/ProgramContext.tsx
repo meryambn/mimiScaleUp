@@ -252,7 +252,7 @@ const examplePrograms: Program[] = [
     description: "Un programme en cours de création",
     startDate: "2023-09-01",
     endDate: "2024-03-31",
-    status: "draft",
+    status: "active",
     phases: [
       {
         id: "phase1",
@@ -306,6 +306,7 @@ interface ProgramContextType {
   resetProgramCreation: () => void;
   setSelectedProgram: (program: Program) => void;
   createProgram: (program: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateProgram: (updatedProgram: Program) => void;
 }
 
 const ProgramContext = createContext<ProgramContextType | undefined>(undefined);
@@ -551,6 +552,29 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
     return newProgram.id;
   };
 
+  // Fonction pour mettre à jour un programme existant
+  const updateProgram = (updatedProgram: Program) => {
+    // Mettre à jour le programme dans la liste des programmes
+    const updatedPrograms = programs.map(program =>
+      program.id === updatedProgram.id ? updatedProgram : program
+    );
+
+    // Mettre à jour l'état des programmes
+    setPrograms(updatedPrograms);
+
+    // Stocker les programmes mis à jour dans le localStorage
+    localStorage.setItem('programs', JSON.stringify(updatedPrograms));
+
+    // Si le programme mis à jour est le programme sélectionné, mettre à jour l'ID sélectionné
+    if (selectedProgramId === updatedProgram.id) {
+      // Forcer une mise à jour du programme sélectionné
+      setSelectedProgramId(null);
+      setTimeout(() => {
+        setSelectedProgramId(updatedProgram.id);
+      }, 10);
+    }
+  };
+
   return (
     <ProgramContext.Provider
       value={{
@@ -562,7 +586,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
         setCurrentStep,
         resetProgramCreation,
         setSelectedProgram,
-        createProgram
+        createProgram,
+        updateProgram
       }}
     >
       {children}

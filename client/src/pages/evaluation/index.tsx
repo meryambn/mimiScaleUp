@@ -11,10 +11,13 @@ import {
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Program } from "@shared/schema";
-import { Plus, FileSpreadsheet, ArrowRight, Clipboard, CheckCircle2 } from "lucide-react";
+import { Plus, FileSpreadsheet, ArrowRight, Clipboard, CheckCircle2, Star } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const EvaluationPage: React.FC = () => {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const isMentor = user?.role === 'mentor';
 
   // Fetch programs
   const { data: programs = [] } = useQuery<Program[]>({
@@ -30,88 +33,91 @@ const EvaluationPage: React.FC = () => {
             Manage evaluation criteria and conduct startup assessments
           </p>
         </div>
-        
-        <Button onClick={() => setLocation("/evaluation/create")}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Evaluation Framework
-        </Button>
+
+        {!isMentor && (
+          <Button onClick={() => setLocation("/evaluation/create")}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Evaluation Framework
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Evaluation Criteria</CardTitle>
-            <CardDescription>
-              Define how startups will be evaluated in your programs
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-primary" />
+        {!isMentor && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Create Evaluation Criteria</CardTitle>
+              <CardDescription>
+                Define how startups will be evaluated in your programs
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="text-sm">
+                    Create custom evaluation criteria with different scoring methods like numerical scores, rating scales, yes/no questions, or text feedback.
+                  </div>
                 </div>
-                <div className="text-sm">
-                  Create custom evaluation criteria with different scoring methods like numerical scores, rating scales, yes/no questions, or text feedback.
+                <div className="flex items-start gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Clipboard className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="text-sm">
+                    Set weights for each criterion to automatically calculate overall scores for ranking startups.
+                  </div>
                 </div>
               </div>
-              <div className="flex items-start gap-2">
-                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Clipboard className="h-3.5 w-3.5 text-primary" />
-                </div>
-                <div className="text-sm">
-                  Set weights for each criterion to automatically calculate overall scores for ranking startups.
-                </div>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => setLocation("/evaluation/create")}
-            >
-              Create Framework
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
+            </CardContent>
+            <CardFooter>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setLocation("/evaluation/create")}
+              >
+                Create Framework
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
-            <CardTitle>Conduct Evaluations</CardTitle>
+            <CardTitle>{isMentor ? "Évaluer les équipes" : "Conduct Evaluations"}</CardTitle>
             <CardDescription>
-              Assess startups based on your evaluation criteria
+              {isMentor ? "Évaluez les équipes selon les critères définis" : "Assess startups based on your evaluation criteria"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Star className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <div className="text-sm">
+                  {isMentor ? "Attribuez des scores aux équipes selon différents critères et fournissez des commentaires détaillés." : "Easily evaluate startups using your custom frameworks. Track progress and view completion status."}
+                </div>
+              </div>
               <div className="flex items-start gap-2">
                 <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <div className="text-sm">
-                  Easily evaluate startups using your custom frameworks. Track progress and view completion status.
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Plus className="h-3.5 w-3.5 text-primary" />
-                </div>
-                <div className="text-sm">
-                  Collect feedback from multiple evaluators and aggregate scores for comprehensive assessment.
+                  {isMentor ? "Suivez la progression des équipes à travers les différentes phases du programme." : "Collect feedback from multiple evaluators and aggregate scores for comprehensive assessment."}
                 </div>
               </div>
             </div>
           </CardContent>
           <CardFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
-              onClick={() => setLocation("/evaluation/startups")}
-              disabled={true}
+              onClick={() => setLocation("/teams")}
             >
-              Start Evaluation
+              {isMentor ? "Voir les équipes" : "Start Evaluation"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -119,7 +125,7 @@ const EvaluationPage: React.FC = () => {
       </div>
 
       <h2 className="text-xl font-semibold mt-6">Program Evaluation Frameworks</h2>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {programs.length > 0 ? (
           programs.map((program) => (
@@ -127,7 +133,7 @@ const EvaluationPage: React.FC = () => {
               <CardHeader>
                 <CardTitle className="text-lg">{program.name}</CardTitle>
                 <CardDescription>
-                  {program.startDate && new Date(program.startDate).toLocaleDateString()} - 
+                  {program.startDate && new Date(program.startDate).toLocaleDateString()} -
                   {program.endDate && new Date(program.endDate).toLocaleDateString()}
                 </CardDescription>
               </CardHeader>

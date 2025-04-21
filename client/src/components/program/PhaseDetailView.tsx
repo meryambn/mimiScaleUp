@@ -917,9 +917,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-medium">{deliverable.name}</h4>
-                    {deliverable.required && (
-                      <Badge variant="secondary" className="text-xs">Obligatoire</Badge>
-                    )}
+
                   </div>
                   <p className="text-sm text-gray-600">{deliverable.description}</p>
                   <div className="flex items-center gap-4 text-sm text-gray-500">

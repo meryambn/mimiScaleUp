@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useProgramContext } from './ProgramContext';
-import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Clock } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 // Interfaces
@@ -108,7 +108,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           status: mappedStatus
         };
       });
-      
+
       setPhases(mappedPhases);
     } else {
       // Use default phases if no program is selected
@@ -146,7 +146,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const handleProgramCreated = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { programId, program } = customEvent.detail;
-      
+
       // Update phases from the new program
       if (program && program.phases && Array.isArray(program.phases)) {
         const mappedPhases = program.phases.map((phase: any) => {
@@ -168,17 +168,17 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
           return {
             id: phase.id.toString(),
-            name: phase.name, 
+            name: phase.name,
             color: phase.color,
             startDate: formatDate(phase.startDate),
             endDate: formatDate(phase.endDate),
             status: mappedStatus
           };
         });
-        
+
         setPhases(mappedPhases);
       }
-      
+
       // Update tasks from the new program
       if (program && program.tasks && Array.isArray(program.tasks)) {
         // Add all tasks from the new program
@@ -196,13 +196,13 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           assignee: task.assignee || 'Unassigned',
           isOverdue: new Date(task.dueDate) < new Date(today)
         }));
-        
+
         setTasks(prevTasks => [...prevTasks, ...programTasks]);
       }
     };
-    
+
     document.addEventListener('program-created', handleProgramCreated);
-    
+
     return () => {
       document.removeEventListener('program-created', handleProgramCreated);
     };
@@ -217,7 +217,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-01-25",
       status: "completed",
       priority: "high",
-      assignee: "Program Manager",
+      assignee: "Assigné",
       phaseId: "phase-1",
       phaseName: "Application",
       tags: ["profile", "onboarding"],
@@ -232,7 +232,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-02-10",
       status: "completed",
       priority: "high",
-      assignee: "Program Manager",
+      assignee: "Assigné",
       phaseId: "phase-1",
       phaseName: "Application",
       tags: ["research", "market"],
@@ -247,7 +247,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-02-20",
       status: "completed",
       priority: "high",
-      assignee: "Program Director",
+      assignee: "Assigné",
       phaseId: "phase-2",
       phaseName: "Selection",
       tags: ["pitch", "presentation"],
@@ -262,7 +262,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-03-20",
       status: "completed",
       priority: "medium",
-      assignee: "Program Manager",
+      assignee: "Assigné",
       phaseId: "phase-3",
       phaseName: "Onboarding",
       tags: ["mentors", "networking"],
@@ -277,7 +277,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-04-01",
       status: "in_progress",
       priority: "medium",
-      assignee: "Technical Advisor",
+      assignee: "Assigné",
       phaseId: "phase-3",
       phaseName: "Onboarding",
       tags: ["product", "planning"],
@@ -292,7 +292,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-04-07",
       status: "todo",
       priority: "medium",
-      assignee: "Program Manager",
+      assignee: "Assigné",
       phaseId: "phase-3",
       phaseName: "Onboarding",
       tags: ["reporting", "progress"],
@@ -307,7 +307,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-04-15",
       status: "todo",
       priority: "high",
-      assignee: "Product Lead",
+      assignee: "Assigné",
       phaseId: "phase-3",
       phaseName: "Onboarding",
       tags: ["product", "mvp"],
@@ -322,7 +322,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       dueDate: "2023-05-25",
       status: "todo",
       priority: "high",
-      assignee: "Program Director",
+      assignee: "Assigné",
       phaseId: "phase-5",
       phaseName: "Demo Day",
       tags: ["presentation", "demo"],
@@ -340,13 +340,13 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Filter tasks based on selected filters, search query, and program
   const filteredTasks = tasks.filter(task => {
     if (!task) return false;
-    
+
     // Safe check for title and description
     const title = task.title || task.name || '';
     const description = task.description || '';
-    
-    const matchesSearch = searchQuery === '' || 
-                        title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+
+    const matchesSearch = searchQuery === '' ||
+                        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = selectedStatuses.length === 0 || (task.status && selectedStatuses.includes(task.status));
     const matchesPriority = selectedPriorities.length === 0 || (task.priority && selectedPriorities.includes(task.priority));
@@ -369,7 +369,7 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Function to update a task's status
   const updateTaskStatus = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(prev => prev.map(task => 
+    setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, status: newStatus } : task
     ));
   };
@@ -381,25 +381,25 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       ...task,
       id: newTaskId
     };
-    
+
     setTasks(prevTasks => [...prevTasks, newTask]);
     return newTaskId;
   };
-  
+
   // Function to add multiple tasks at once
   const addTasks = (tasksToAdd: Omit<Task, 'id'>[]): string[] => {
     const newTaskIds: string[] = [];
-    
+
     const newTasks = tasksToAdd.map(task => {
       const newTaskId = uuidv4();
       newTaskIds.push(newTaskId);
-      
+
       return {
         ...task,
         id: newTaskId
       };
     });
-    
+
     setTasks(prevTasks => [...prevTasks, ...newTasks]);
     return newTaskIds;
   };
@@ -453,4 +453,4 @@ export const useTasks = (): TasksContextType => {
     throw new Error('useTasks must be used within a TasksProvider');
   }
   return context;
-}; 
+};

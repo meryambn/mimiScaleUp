@@ -1,17 +1,17 @@
 import React from 'react';
-import { Calendar, Clock, MapPin, Users, Video } from 'lucide-react';
+import { Calendar, Clock, MapPin, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useMeetings } from '@/context/MeetingsContext';
 
 const UpcomingMeetingsWidget: React.FC = () => {
-  const { 
-    upcomingMeetings, 
-    formatDate, 
-    formatTime 
+  const {
+    upcomingMeetings,
+    formatDate,
+    formatTime
   } = useMeetings();
-  
+
   // Get only the first 4 upcoming meetings
   const displayMeetings = upcomingMeetings.slice(0, 4);
 
@@ -38,16 +38,7 @@ const UpcomingMeetingsWidget: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-medium">{meeting.title}</h4>
-                    <Badge 
-                      className={`mt-1 ${
-                        meeting.type === 'workshop' ? 'bg-purple-100 text-purple-800' : 
-                        meeting.type === 'one-on-one' ? 'bg-blue-100 text-blue-800' : 
-                        meeting.type === 'group' ? 'bg-green-100 text-green-800' : 
-                        'bg-orange-100 text-orange-800'
-                      }`}
-                    >
-                      {meeting.type.replace('-', ' ')}
-                    </Badge>
+
                   </div>
                   <Button variant="ghost" size="sm">
                     Join
@@ -58,7 +49,7 @@ const UpcomingMeetingsWidget: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Clock className="h-4 w-4" />
                     <span>
-                      {formatDate(meeting.date, meeting.time)}, {formatTime(meeting.time)} ({meeting.duration} min)
+                      {formatDate(meeting.date, meeting.time)}, {formatTime(meeting.time)}
                     </span>
                   </div>
 
@@ -76,10 +67,7 @@ const UpcomingMeetingsWidget: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4" />
-                    <span>{meeting.attendees.length} attendees</span>
-                  </div>
+
                 </div>
               </div>
             ))}
@@ -90,4 +78,4 @@ const UpcomingMeetingsWidget: React.FC = () => {
   );
 };
 
-export default UpcomingMeetingsWidget; 
+export default UpcomingMeetingsWidget;

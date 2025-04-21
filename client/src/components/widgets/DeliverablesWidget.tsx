@@ -6,13 +6,13 @@ import { format, isBefore, isToday } from 'date-fns';
 import { useDeliverables } from '@/context/DeliverablesContext';
 
 const DeliverablesWidget: React.FC = () => {
-  const { 
-    upcomingDeliverables, 
-    getStatusBadgeClass, 
+  const {
+    upcomingDeliverables,
+    getStatusBadgeClass,
     getStatusText,
-    getSubmissionTypeIcon 
+    getSubmissionTypeIcon
   } = useDeliverables();
-  
+
   // Get only the first 5 deliverables for display
   const displayDeliverables = upcomingDeliverables.slice(0, 5);
   const today = new Date();
@@ -31,17 +31,17 @@ const DeliverablesWidget: React.FC = () => {
           </div>
         ) : (
           displayDeliverables.map((deliverable) => {
-            const isLate = isBefore(new Date(deliverable.dueDate), today) && 
-                          !isToday(new Date(deliverable.dueDate)) && 
+            const isLate = isBefore(new Date(deliverable.dueDate), today) &&
+                          !isToday(new Date(deliverable.dueDate)) &&
                           deliverable.status === 'pending';
-            
+
             return (
-              <div 
-                key={deliverable.id} 
+              <div
+                key={deliverable.id}
                 className={cn(
                   "p-3 rounded-lg border",
-                  isLate ? "border-red-200 bg-red-50" : 
-                  deliverable.status === 'submitted' ? "border-green-200 bg-green-50" : 
+                  isLate ? "border-red-200 bg-red-50" :
+                  deliverable.status === 'submitted' ? "border-green-200 bg-green-50" :
                   "border-gray-200 hover:bg-gray-50 transition-colors"
                 )}
               >
@@ -54,14 +54,7 @@ const DeliverablesWidget: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
-                    <Badge className={cn("flex items-center gap-1",
-                      deliverable.submissionType === 'file' ? "bg-blue-100 text-blue-800" :
-                      deliverable.submissionType === 'link' ? "bg-purple-100 text-purple-800" :
-                      "bg-gray-100 text-gray-800"
-                    )}>
-                      {getSubmissionTypeIcon(deliverable.submissionType)}
-                      <span>{deliverable.submissionType}</span>
-                    </Badge>
+
                     <div className="flex items-center text-sm">
                       {isLate ? (
                         <AlertCircle className="h-4 w-4 text-red-500" />
@@ -72,8 +65,8 @@ const DeliverablesWidget: React.FC = () => {
                       )}
                       <span className={cn(
                         "ml-1.5",
-                        isLate ? "text-red-600" : 
-                        deliverable.status === 'submitted' ? "text-green-600" : 
+                        isLate ? "text-red-600" :
+                        deliverable.status === 'submitted' ? "text-green-600" :
                         "text-amber-600"
                       )}>
                         {getStatusText(deliverable.status, deliverable.dueDate)}
@@ -90,4 +83,4 @@ const DeliverablesWidget: React.FC = () => {
   );
 };
 
-export default DeliverablesWidget; 
+export default DeliverablesWidget;

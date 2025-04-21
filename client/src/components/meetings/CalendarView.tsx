@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
-  MapPin, 
-  Users, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MapPin,
   VideoIcon,
   Check,
   AlertCircle
@@ -19,33 +18,29 @@ import { fr } from 'date-fns/locale';
 interface CalendarViewProps {
   meetings: Meeting[];
   getPhaseById: (phaseId: string) => any;
-  formatAttendees: (attendees: string[]) => string;
-  today: string;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ 
-  meetings, 
-  getPhaseById,
-  formatAttendees,
-  today 
+const CalendarView: React.FC<CalendarViewProps> = ({
+  meetings,
+  getPhaseById
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  
+
   // Navigation functions
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  
+
   // Get days in month
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  
+
   // Get day names in French
-  const dayNames = Array.from({ length: 7 }, (_, i) => 
+  const dayNames = Array.from({ length: 7 }, (_, i) =>
     format(new Date(2021, 0, i + 3), 'EEEEEE', { locale: fr })
   );
-  
+
   // Get meetings for a specific day
   const getMeetingsForDay = (day: Date) => {
     return meetings.filter(meeting => {
@@ -55,10 +50,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   // Get meetings for selected date
-  const selectedDateMeetings = selectedDate 
+  const selectedDateMeetings = selectedDate
     ? getMeetingsForDay(selectedDate)
     : [];
-  
+
   return (
     <div className="space-y-4">
       {/* Calendar Header */}
@@ -70,9 +65,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           <Button variant="outline" size="sm" onClick={prevMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setCurrentMonth(new Date())}
           >
             Aujourd'hui
@@ -82,34 +77,34 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           </Button>
         </div>
       </div>
-      
+
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1">
         {/* Day names */}
         {dayNames.map((day, i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className="text-center font-medium text-sm py-2 text-gray-500"
           >
             {day.toUpperCase()}
           </div>
         ))}
-        
+
         {/* Empty cells for days before the start of the month */}
         {Array.from({ length: monthStart.getDay() }, (_, i) => (
           <div key={`empty-start-${i}`} className="h-24 bg-gray-50 rounded-md"></div>
         ))}
-        
+
         {/* Days of the month */}
         {daysInMonth.map(day => {
           const dayMeetings = getMeetingsForDay(day);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isCurrentDay = isToday(day);
-          
+
           return (
-            <div 
-              key={day.toString()} 
+            <div
+              key={day.toString()}
               className={`
                 h-24 p-1 border rounded-md overflow-hidden
                 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50 text-gray-400'}
@@ -126,20 +121,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 `}>
                   {format(day, 'd')}
                 </span>
-                {dayMeetings.length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {dayMeetings.length}
-                  </Badge>
-                )}
+
               </div>
-              
+
               {/* Show first 2 meetings for the day */}
               <div className="space-y-1">
                 {dayMeetings.slice(0, 2).map(meeting => (
-                  <div 
+                  <div
                     key={meeting.id}
                     className="text-xs p-1 rounded truncate"
-                    style={{ 
+                    style={{
                       backgroundColor: getPhaseById(meeting.phaseId)?.color + '20',
                       color: getPhaseById(meeting.phaseId)?.color
                     }}
@@ -156,13 +147,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
           );
         })}
-        
+
         {/* Empty cells for days after the end of the month */}
         {Array.from({ length: 6 - monthEnd.getDay() }, (_, i) => (
           <div key={`empty-end-${i}`} className="h-24 bg-gray-50 rounded-md"></div>
         ))}
       </div>
-      
+
       {/* Selected Day Details */}
       {selectedDate && (
         <Card className="mt-6">
@@ -171,11 +162,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               <h3 className="text-lg font-bold">
                 {format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr })}
               </h3>
-              <Badge variant={selectedDateMeetings.length > 0 ? "default" : "outline"}>
+              <span className="text-sm text-gray-500">
                 {selectedDateMeetings.length} réunion{selectedDateMeetings.length !== 1 ? 's' : ''}
-              </Badge>
+              </span>
             </div>
-            
+
             {selectedDateMeetings.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 Aucune réunion prévue pour cette date
@@ -185,8 +176,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 {selectedDateMeetings
                   .sort((a, b) => a.time.localeCompare(b.time))
                   .map(meeting => (
-                    <div 
-                      key={meeting.id} 
+                    <div
+                      key={meeting.id}
                       className="p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex justify-between items-start">
@@ -197,15 +188,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                             {meeting.time} ({meeting.duration} min)
                           </div>
                         </div>
-                        <Badge variant={meeting.isOnline ? "outline" : "secondary"} className="ml-2">
-                          {meeting.type.replace('-', ' ')}
-                        </Badge>
+
                       </div>
-                      
+
                       <div className="mt-2 text-sm text-gray-600">
                         {meeting.description || "Aucune description fournie."}
                       </div>
-                      
+
                       <div className="mt-2 flex flex-col space-y-1 text-sm">
                         <div className="flex items-center">
                           <MapPin className="h-3 w-3 mr-1 text-gray-500" />
@@ -219,10 +208,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                             )}
                           </span>
                         </div>
-                        <div className="flex items-center">
-                          <Users className="h-3 w-3 mr-1 text-gray-500" />
-                          <span>{formatAttendees(meeting.attendees)}</span>
-                        </div>
+
                         <div className="flex items-center">
                           {meeting.isCompleted ? (
                             <Check className="h-3 w-3 mr-1 text-green-500" />
@@ -237,10 +223,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                           </span>
                         </div>
                       </div>
-                      
-                      <div 
+
+                      <div
                         className="mt-2 px-2 py-1 text-xs font-medium rounded-full inline-flex items-center"
-                        style={{ 
+                        style={{
                           backgroundColor: getPhaseById(meeting.phaseId)?.color + '20',
                           color: getPhaseById(meeting.phaseId)?.color
                         }}

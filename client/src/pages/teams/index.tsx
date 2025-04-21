@@ -131,12 +131,12 @@ const TeamsPage = () => {
       const parsedStartups = JSON.parse(storedStartups);
 
       // Vérifier si l'équipe existe déjà dans localStorage
-      const existingIndex = parsedStartups.findIndex(s => String(s.id) === String(teamId));
+      const existingIndex = parsedStartups.findIndex((s: any) => String(s.id) === String(teamId));
 
       let updatedStartups;
       if (existingIndex >= 0) {
         // Mettre à jour l'équipe existante
-        updatedStartups = parsedStartups.map(s =>
+        updatedStartups = parsedStartups.map((s: any) =>
           String(s.id) === String(teamId) ? { ...s, currentPhase: newPhase } : s
         );
       } else if (teamToUpdate) {

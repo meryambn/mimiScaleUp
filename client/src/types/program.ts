@@ -142,7 +142,7 @@ export interface Program {
   description: string;
   startDate: string;
   endDate: string;
-  status: "draft" | "active" | "completed";
+  status: "active" | "completed" | "draft";
   phases: Phase[];
   evaluationCriteria: EvaluationCriterion[];
   eligibilityCriteria?: EligibilityCriteria;

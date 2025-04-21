@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e43e32" />
+      <stop offset="100%" stop-color="#ff7e75" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg)" />
+  
+  <!-- Abstract data visualization elements -->
+  <rect x="200" y="300" width="100" height="300" fill="white" fill-opacity="0.8" />
+  <rect x="350" y="200" width="100" height="400" fill="white" fill-opacity="0.8" />
+  <rect x="500" y="150" width="100" height="450" fill="white" fill-opacity="0.8" />
+  <rect x="650" y="250" width="100" height="350" fill="white" fill-opacity="0.8" />
+  <rect x="800" y="350" width="100" height="250" fill="white" fill-opacity="0.8" />
+  
+  <!-- Line chart -->
+  <path d="M200 500 L350 450 L500 300 L650 350 L800 400 L950 250" stroke="white" stroke-width="5" fill="none" />
+  <circle cx="200" cy="500" r="8" fill="white" />
+  <circle cx="350" cy="450" r="8" fill="white" />
+  <circle cx="500" cy="300" r="8" fill="white" />
+  <circle cx="650" cy="350" r="8" fill="white" />
+  <circle cx="800" cy="400" r="8" fill="white" />
+  <circle cx="950" cy="250" r="8" fill="white" />
+  
+  <!-- Title -->
+  <text x="600" y="700" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="white" text-anchor="middle">Analytique Avancée</text>
+</svg>

@@ -283,9 +283,6 @@ const DeliverableCard: React.FC<{ deliverable: Deliverable }> = ({ deliverable }
           >
             {deliverable.phaseName}
           </div>
-          <Badge className="bg-gray-100 text-gray-800">
-            Deliverable
-          </Badge>
         </div>
         <CardTitle className="text-md mt-2">{deliverable.name}</CardTitle>
       </CardHeader>
@@ -297,10 +294,7 @@ const DeliverableCard: React.FC<{ deliverable: Deliverable }> = ({ deliverable }
           <span>Due: {format(new Date(deliverable.dueDate), 'MMM d, yyyy')}</span>
         </div>
 
-        <div className="flex items-center text-xs text-gray-500">
-          <User className="h-3.5 w-3.5 mr-1" />
-          <span>Assigned by: {deliverable.assignedBy}</span>
-        </div>
+
       </CardContent>
       <CardFooter className="pt-2 flex flex-col items-stretch">
         <div className="flex items-center justify-between w-full text-xs text-gray-500 mb-3">
@@ -308,9 +302,7 @@ const DeliverableCard: React.FC<{ deliverable: Deliverable }> = ({ deliverable }
             {getSubmissionTypeIcon(deliverable.submissionType)}
             <span className="ml-1 capitalize">{deliverable.submissionType}</span>
           </div>
-          {deliverable.required && (
-            <Badge variant="outline" className="text-xs">Required</Badge>
-          )}
+
         </div>
 
         <Button className="w-full" variant="outline">
@@ -335,9 +327,7 @@ const DeliverableRowCard: React.FC<{ deliverable: Deliverable }> = ({ deliverabl
               style={{ backgroundColor: getPhaseColor(deliverable.phaseId) }}
             />
             <span className="text-sm text-gray-500">{deliverable.phaseName}</span>
-            <Badge className="ml-3 bg-gray-100 text-gray-800">
-              Deliverable
-            </Badge>
+
           </div>
 
           <h3 className="text-lg font-medium mb-1">{deliverable.name}</h3>
@@ -349,19 +339,13 @@ const DeliverableRowCard: React.FC<{ deliverable: Deliverable }> = ({ deliverabl
               <span>Due: {format(new Date(deliverable.dueDate), 'MMM d, yyyy')}</span>
             </div>
 
-            <div className="flex items-center">
-              <User className="h-3.5 w-3.5 mr-1" />
-              <span>Assigned by: {deliverable.assignedBy}</span>
-            </div>
 
             <div className="flex items-center">
               {getSubmissionTypeIcon(deliverable.submissionType)}
               <span className="ml-1 capitalize">{deliverable.submissionType}</span>
             </div>
 
-            {deliverable.required && (
-              <Badge variant="outline" className="text-xs">Required</Badge>
-            )}
+
           </div>
         </div>
 

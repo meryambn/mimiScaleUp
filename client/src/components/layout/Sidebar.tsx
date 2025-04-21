@@ -196,7 +196,7 @@ const Sidebar: React.FC = () => {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="flex-1 flex flex-col overflow-y-auto thin-scrollbar">
         <div className="px-3 py-2">
           <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider px-2 py-1">
             Principal

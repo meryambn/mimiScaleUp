@@ -28,16 +28,16 @@ const CreateTestTeamPage = () => {
   }, [selectedProgramId, programs]);
 
   // Fonction pour générer des livrables pour chaque phase du programme
-  const generateDeliverablesForProgram = (program) => {
+  const generateDeliverablesForProgram = (program: any) => {
     if (!program || !program.phases || !Array.isArray(program.phases)) {
       return [];
     }
 
-    let deliverables = [];
+    let deliverables: any[] = [];
     let id = 1;
 
     // Pour chaque phase du programme, créer des livrables spécifiques
-    program.phases.forEach(phase => {
+    program.phases.forEach((phase: any) => {
       // Livrables pour la phase d'Idéation ou équivalent (première phase)
       if (phase.name.includes('Idéation') || program.phases.indexOf(phase) === 0) {
         deliverables.push({
@@ -117,7 +117,7 @@ const CreateTestTeamPage = () => {
   };
 
   // Fonction pour déterminer le type d'évaluation en fonction de l'ID du critère
-  const getEvaluationType = (criterionId) => {
+  const getEvaluationType = (criterionId: any) => {
     // Forcer le type en fonction de l'ID du critère
     const id = parseInt(criterionId);
     if (id % 4 === 0) return 'numeric';
@@ -128,20 +128,20 @@ const CreateTestTeamPage = () => {
   };
 
   // Fonction pour générer des critères d'évaluation pour chaque phase du programme
-  const generateEvaluationCriteriaForProgram = (program) => {
+  const generateEvaluationCriteriaForProgram = (program: any) => {
     if (!program || !program.phases || !Array.isArray(program.phases)) {
       return [];
     }
 
-    let criteria = [];
+    let criteria: any[] = [];
     let id = 1;
 
     // Pour chaque phase du programme, créer des critères d'évaluation spécifiques
-    program.phases.forEach(phase => {
+    program.phases.forEach((phase: any) => {
       // Vérifier si la phase a déjà des critères d'évaluation définis
       if (phase.evaluationCriteria && Array.isArray(phase.evaluationCriteria) && phase.evaluationCriteria.length > 0) {
         // Utiliser les critères existants, mais ajouter la propriété 'phase'
-        phase.evaluationCriteria.forEach(criterion => {
+        phase.evaluationCriteria.forEach((criterion: any) => {
           const type = getEvaluationType(id);
           criteria.push({
             ...criterion,
@@ -340,7 +340,7 @@ const CreateTestTeamPage = () => {
 
     // Afficher les critères dans la console pour déboguer
     console.log('Critères générés pour le programme:', criteria);
-    criteria.forEach(criterion => {
+    criteria.forEach((criterion: any) => {
       console.log(`Critère ${criterion.id} - ${criterion.name} - Type: ${criterion.type}`);
     });
 

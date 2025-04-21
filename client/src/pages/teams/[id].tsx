@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'wouter';
+import { useAuth } from '@/context/AuthContext';
 
 // Fonction pour naviguer sans rechargement de page
 const navigateWithoutReload = (path: string): void => {
@@ -58,6 +59,8 @@ const StartupDetailPage = () => {
   const [selectedPhase, setSelectedPhase] = useState<string>("");
   const { selectedProgram } = useProgramContext();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isMentor = user?.role === 'mentor';
 
   // Check localStorage for teams first
   const [localStartup, setLocalStartup] = useState<any>(null);
@@ -991,35 +994,39 @@ const StartupDetailPage = () => {
               teamName={startup.name}
               teamMembers={startup.team || startup.members || []}
             />
-            {isInFinalPhase && !isWinner ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-amber-100 text-amber-800 hover:bg-amber-200"
-                onClick={handleSelectWinner}
-              >
-                <Trophy className="h-4 w-4 mr-2" />
-                Sélectionner comme gagnant
-              </Button>
-            ) : isWinner ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-green-100 text-green-800"
-                disabled
-              >
-                <Trophy className="h-4 w-4 mr-2" />
-                Gagnant sélectionné
-              </Button>
-            ) : (
-              <Button size="sm" onClick={handleNextPhase}>
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Next Phase
-              </Button>
+            {!isMentor && (
+              <>
+                {isInFinalPhase && !isWinner ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-amber-100 text-amber-800 hover:bg-amber-200"
+                    onClick={handleSelectWinner}
+                  >
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Sélectionner comme gagnant
+                  </Button>
+                ) : isWinner ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-green-100 text-green-800"
+                    disabled
+                  >
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Gagnant sélectionné
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={handleNextPhase}>
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Next Phase
+                  </Button>
+                )}
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
             )}
-            <Button variant="destructive" size="sm">
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
         </CardHeader>
       </Card>

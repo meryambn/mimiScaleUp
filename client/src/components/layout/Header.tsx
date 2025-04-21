@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Bell, Menu, MessageSquare, HelpCircle, ChevronDown } from "lucide-react";
+import { Bell, Menu, MessageSquare, HelpCircle, ChevronDown, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import ProgramSelector from "@/components/program/ProgramSelector";
 import MessagesDialog from "@/components/messages/MessagesDialog";
+import { useAuth } from "@/context/AuthContext";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -22,6 +23,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const [location] = useLocation();
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const { user, logout } = useAuth();
 
   // Charger le compteur de messages non lus depuis localStorage
   React.useEffect(() => {
@@ -115,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                   <AvatarImage src="" />
                   <AvatarFallback className="bg-primary-100 text-primary-800">AU</AvatarFallback>
                 </Avatar>
-                <span className="font-medium hidden md:inline-block">Admin User</span>
+                <span className="font-medium hidden md:inline-block">{user?.name || 'Utilisateur'}</span>
                 <ChevronDown className="h-4 w-4 text-gray-500" />
               </Button>
             </DropdownMenuTrigger>
@@ -123,7 +125,10 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               <DropdownMenuItem className="cursor-pointer">Profil</DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer">Paramètres du compte</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer text-red-600">Déconnexion</DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer text-red-600" onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Déconnexion
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

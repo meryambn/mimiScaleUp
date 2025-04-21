@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useProgramContext } from "@/context/ProgramContext";
 import { Mentor, InsertMentor, ProgramMentor } from "@shared/schema";
+import { useAuth } from "@/context/AuthContext";
 import MentorCard from "./MentorCard";
 import MentorForm, { MentorFormDialog } from "./MentorForm";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,8 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
   const { selectedProgram, setSelectedProgram } = useProgramContext();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isMentor = user?.role === 'mentor';
 
   // Create mentor
   const createMentor = useCallback((mentorData: InsertMentor) => {
@@ -291,7 +294,21 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
             <TabsTrigger value="assigned">Assignés</TabsTrigger>
           </TabsList>
         </Tabs>
+        {!isMentor && showAssignmentControls && (
+          <Button onClick={() => setShowAddForm(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Ajouter un mentor
+          </Button>
+        )}
       </div>
+
+      {showAddForm && (
+        <MentorFormDialog
+          open={showAddForm}
+          onOpenChange={setShowAddForm}
+          onSubmit={handleMentorFormSubmit}
+        />
+      )}
 
 
 
@@ -301,7 +318,7 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
             key={mentor.id}
             mentor={mentor}
             /* Removed onEdit */
-            onDelete={activeTab === "assigned" ? () => unassignMentor(mentor.id) : activeTab === "all" ? () => deleteMentor(mentor.id) : undefined}
+            onDelete={isMentor ? undefined : (activeTab === "assigned" ? () => unassignMentor(mentor.id) : activeTab === "all" ? () => deleteMentor(mentor.id) : undefined)}
             deleteButtonText={activeTab === "assigned" ? "Retirer" : "Supprimer"}
             onAssign={undefined}
             onUnassign={undefined}

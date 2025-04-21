@@ -17,13 +17,11 @@ import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
   ListFilter,
-  Plus,
   Search,
   List,
   CalendarIcon,
   Clock,
   MapPin,
-  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -46,7 +44,6 @@ const MeetingsPage: React.FC = () => {
     selectedPhase,
     setSelectedPhase,
     getPhaseById,
-    formatAttendees,
     today
   } = useMeetings();
 
@@ -216,8 +213,6 @@ const MeetingsPage: React.FC = () => {
         <CalendarView
           meetings={filteredMeetings}
           getPhaseById={getPhaseById}
-          formatAttendees={formatAttendees}
-          today={today}
         />
       ) : (
         <Tabs defaultValue="upcoming">
@@ -256,7 +251,7 @@ const MeetingsPage: React.FC = () => {
                           </div>
                           <div className="flex items-center mt-2 text-gray-700">
                             <Clock className="h-4 w-4 mr-1" />
-                            {meeting.time} ({meeting.duration} min)
+                            {meeting.time}
                           </div>
                           <div
                             className="mt-2 px-2 py-1 text-xs font-medium rounded-full inline-flex items-center"
@@ -271,9 +266,7 @@ const MeetingsPage: React.FC = () => {
                         <div className="flex-1 p-4 md:p-6">
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                             <h3 className="text-lg font-semibold">{meeting.title}</h3>
-                            <Badge variant={meeting.isOnline ? "outline" : "secondary"} className="mt-2 md:mt-0">
-                              {meeting.type.replace('-', ' ')}
-                            </Badge>
+
                           </div>
 
                           <p className="mt-2 text-gray-600">
@@ -288,10 +281,7 @@ const MeetingsPage: React.FC = () => {
                                 {meeting.isOnline && <span className="ml-2 text-sm text-blue-600">Réunion en ligne</span>}
                               </div>
                             </div>
-                            <div className="flex items-start">
-                              <Users className="h-4 w-4 mr-2 text-gray-500 mt-0.5" />
-                              <div>{formatAttendees(meeting.attendees)}</div>
-                            </div>
+
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -355,7 +345,7 @@ const MeetingsPage: React.FC = () => {
                           </div>
                           <div className="flex items-center mt-2 text-gray-700">
                             <Clock className="h-4 w-4 mr-1" />
-                            {meeting.time} ({meeting.duration} min)
+                            {meeting.time}
                           </div>
                           <div
                             className="mt-2 px-2 py-1 text-xs font-medium rounded-full inline-flex items-center"
@@ -370,9 +360,7 @@ const MeetingsPage: React.FC = () => {
                         <div className="flex-1 p-4 md:p-6">
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                             <h3 className="text-lg font-semibold">{meeting.title}</h3>
-                            <Badge variant={meeting.isOnline ? "outline" : "secondary"} className="mt-2 md:mt-0">
-                              {meeting.type.replace('-', ' ')}
-                            </Badge>
+
                           </div>
 
                           <p className="mt-2 text-gray-600">
@@ -387,10 +375,7 @@ const MeetingsPage: React.FC = () => {
                                 {meeting.isOnline && <span className="ml-2 text-sm text-blue-600">Réunion en ligne</span>}
                               </div>
                             </div>
-                            <div className="flex items-start">
-                              <Users className="h-4 w-4 mr-2 text-gray-500 mt-0.5" />
-                              <div>{formatAttendees(meeting.attendees)}</div>
-                            </div>
+
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
