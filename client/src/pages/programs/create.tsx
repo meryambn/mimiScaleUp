@@ -1951,7 +1951,12 @@ const CreateProgram: React.FC = () => {
                   Définissez les phases de votre programme.
                 </p>
               </div>
-              <Button onClick={() => setExpandedPhase(null)}>Tout réduire</Button>
+              <button
+                onClick={() => setExpandedPhase(null)}
+                style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+              >
+                Tout réduire
+              </button>
             </div>
             <div className="relative">
               {/* Timeline line */}
@@ -1987,27 +1992,23 @@ const CreateProgram: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
+                        <button
+                          style={{ backgroundColor: 'white', color: '#ef4444', border: '1px solid #e5e7eb', padding: '4px', borderRadius: '4px', cursor: 'pointer', height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRemovePhase(phase.id);
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
+                        </button>
+                        <button
+                          style={{ backgroundColor: 'transparent', color: '#9333ea', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                           {expandedPhase === phase.id ?
                             <ChevronUp className="h-4 w-4" /> :
                             <ChevronDown className="h-4 w-4" />
                           }
-                        </Button>
+                        </button>
                       </div>
                     </CardHeader>
 
@@ -2027,8 +2028,8 @@ const CreateProgram: React.FC = () => {
 
             {/* Add Phase Button */}
             <div className="flex justify-center">
-              <Button
-                className="w-full max-w-md"
+              <button
+                style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none', width: '100%', maxWidth: '400px', margin: '0 auto' }}
                 onClick={() => {
                   const newPhase = {
                     id: Date.now().toString(),
@@ -2047,7 +2048,7 @@ const CreateProgram: React.FC = () => {
                 }}
               >
                 <Plus className="mr-2 h-4 w-4" /> Ajouter une phase
-              </Button>
+              </button>
             </div>
           </div>
         );
@@ -2092,31 +2093,31 @@ const CreateProgram: React.FC = () => {
 
             <div className="flex justify-between mt-8">
               {currentStep > 1 && (
-                <Button
-                  variant="outline"
+                <button
                   onClick={handlePreviousStep}
+                  style={{ backgroundColor: '#e43e32', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Précédent
-                </Button>
+                </button>
               )}
               <div className="flex space-x-4">
                 {currentStep === 4 && (
                   <>
-                    <Button
-                      variant="outline"
+                    <button
                       onClick={saveDraft}
+                      style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
                     >
                       Enregistrer le brouillon
-                    </Button>
-                    <Button
-                      variant="outline"
+                    </button>
+                    <button
                       onClick={saveAsTemplate}
+                      style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
                     >
                       Enregistrer comme modèle
-                    </Button>
+                    </button>
                   </>
                 )}
-                <Button
+                <button
                   onClick={() => {
                     if (currentStep === 4) {
                       createProgram({
@@ -2127,9 +2128,10 @@ const CreateProgram: React.FC = () => {
                       handleNextStep();
                     }
                   }}
+                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
                 >
                   {currentStep === 4 ? 'Créer le programme' : 'Suivant'}
-                </Button>
+                </button>
               </div>
             </div>
           </div>

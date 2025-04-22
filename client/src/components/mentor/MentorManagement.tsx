@@ -1,43 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { useProgramContext } from "@/context/ProgramContext";
-import { Mentor, InsertMentor, ProgramMentor } from "@shared/schema";
+import { Mentor, ProgramMentor } from "@shared/schema";
 import { useAuth } from "@/context/AuthContext";
 import MentorCard from "./MentorCard";
-import MentorForm, { MentorFormDialog } from "./MentorForm";
-import { Button } from "@/components/ui/button";
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Loader2,
-  Plus,
-  Search,
-  UserPlus,
-  Users,
-  RefreshCw,
-  Info
-} from "lucide-react";
 
 // Mock data store
 const mockMentors: Mentor[] = [
@@ -101,49 +72,23 @@ const mockMentors: Mentor[] = [
 
 interface MentorManagementProps {
   programId?: number;
-  showAssignmentControls?: boolean;
 }
 
 const MentorManagement: React.FC<MentorManagementProps> = ({
-  programId,
-  showAssignmentControls = false
+  programId
 }) => {
   const [activeTab, setActiveTab] = useState("all");
 
-  // Removed mentorToEdit state
-  const [showAddForm, setShowAddForm] = useState(false);
+  // Removed mentor form state
   const [mentors, setMentors] = useState<Mentor[]>(mockMentors);
   const [programMentors, setProgramMentors] = useState<ProgramMentor[]>([]);
   const { selectedProgram, setSelectedProgram } = useProgramContext();
-  const [isLoading, setIsLoading] = useState(false);
+  // Removed isLoading state
   const { toast } = useToast();
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
 
-  // Create mentor
-  const createMentor = useCallback((mentorData: InsertMentor) => {
-    const newMentor: Mentor = {
-      id: mentors.length + 1,
-      name: String(mentorData.name),
-      email: String(mentorData.email),
-      expertise: typeof mentorData.expertise === 'string' ? mentorData.expertise :
-                Array.isArray(mentorData.expertise) ? mentorData.expertise.join(', ') : '',
-      bio: mentorData.bio ? String(mentorData.bio) : null,
-      profileImage: null,
-      rating: null,
-      isTopMentor: null,
-      calendlyUrl: null,
-      linkedinUrl: null,
-      title: null,
-      userId: null
-    };
-    setMentors(prev => [...prev, newMentor]);
-    toast({
-      title: "Mentor created",
-      description: "New mentor has been successfully added.",
-    });
-    setShowAddForm(false);
-  }, [mentors.length, toast]);
+  // Removed createMentor function
 
   // Removed updateMentor function
 
@@ -158,22 +103,7 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
     }
   }, [toast]);
 
-  // Assign mentor to program
-  const assignMentor = useCallback((mentorId: number) => {
-    if (!programId) return;
-
-    const newProgramMentor: ProgramMentor = {
-      id: programMentors.length + 1,
-      programId,
-      mentorId
-    };
-
-    setProgramMentors(prev => [...prev, newProgramMentor]);
-      toast({
-      title: "Mentor assigned",
-      description: "Mentor has been successfully assigned to the program.",
-    });
-  }, [programId, programMentors.length, toast]);
+  // Removed assignMentor function
 
   // Unassign mentor from program
   const unassignMentor = useCallback((mentorId: number) => {
@@ -219,16 +149,10 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
     return mentorList;
   };
 
-  const getAssignableMentors = () => {
-    return mentors.filter(mentor => !isMentorAssigned(mentor.id));
-  };
+  // Removed getAssignableMentors function
 
   const isMentorAssigned = (mentorId: number) => {
     return programMentors.some(pm => pm.mentorId === mentorId);
-  };
-
-  const handleMentorFormSubmit = (data: InsertMentor) => {
-    createMentor(data);
   };
 
   // Update programMentors when selectedProgram changes
@@ -294,21 +218,10 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
             <TabsTrigger value="assigned">Assignés</TabsTrigger>
           </TabsList>
         </Tabs>
-        {!isMentor && showAssignmentControls && (
-          <Button onClick={() => setShowAddForm(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Ajouter un mentor
-          </Button>
-        )}
+        {/* Removed "Add a mentor" button */}
       </div>
 
-      {showAddForm && (
-        <MentorFormDialog
-          open={showAddForm}
-          onOpenChange={setShowAddForm}
-          onSubmit={handleMentorFormSubmit}
-        />
-      )}
+      {/* Removed MentorFormDialog */}
 
 
 

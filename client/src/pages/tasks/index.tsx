@@ -126,20 +126,34 @@ const TasksPage: React.FC = () => {
       {/* View toggle and filters */}
       <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
         <div className="flex gap-2">
-          <Button
-            variant={activeView === "board" ? "default" : "outline"}
+          <button
             onClick={() => setActiveView("board")}
             className="flex-1 md:flex-none"
+            style={{
+              backgroundColor: activeView === "board" ? '#0c4c80' : 'white',
+              color: activeView === "board" ? 'white' : '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
           >
             Kanban Board
-          </Button>
-          <Button
-            variant={activeView === "list" ? "default" : "outline"}
+          </button>
+          <button
             onClick={() => setActiveView("list")}
             className="flex-1 md:flex-none"
+            style={{
+              backgroundColor: activeView === "list" ? '#0c4c80' : 'white',
+              color: activeView === "list" ? 'white' : '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
           >
             List View
-          </Button>
+          </button>
         </div>
         <div className="flex gap-2 flex-1 md:flex-none md:w-1/3">
           <div className="relative flex-1">
@@ -151,14 +165,23 @@ const TasksPage: React.FC = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button
-            variant="outline"
+          <button
             onClick={() => setShowFilters(!showFilters)}
             className={showFilters ? "bg-gray-100" : ""}
+            style={{
+              backgroundColor: showFilters ? '#f3f4f6' : 'white',
+              color: '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center'
+            }}
           >
             <Filter className="h-4 w-4 mr-2" />
             Filters
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -267,9 +290,21 @@ const TasksPage: React.FC = () => {
           <p className="text-sm">
             <span className="font-medium">Filtered by:</span> {getPhaseById(selectedPhase)?.name} phase
           </p>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedPhase(null)}>
+          <button
+            className="ml-auto"
+            onClick={() => setSelectedPhase(null)}
+            style={{
+              backgroundColor: 'transparent',
+              color: '#0c4c80',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.875rem'
+            }}
+          >
             Clear
-          </Button>
+          </button>
         </div>
       )}
 

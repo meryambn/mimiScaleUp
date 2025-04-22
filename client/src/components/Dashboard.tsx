@@ -31,7 +31,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="mt-6">
-        <MentorManagement showAssignmentControls />
+        <MentorManagement />
       </div>
     </div>
   );

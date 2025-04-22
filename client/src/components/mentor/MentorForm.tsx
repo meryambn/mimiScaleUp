@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -88,7 +88,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="title"
@@ -96,9 +96,9 @@ const MentorForm: React.FC<MentorFormProps> = ({
                   <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="CEO at Company" 
-                        value={field.value || ""} 
+                      <Input
+                        placeholder="CEO at Company"
+                        value={field.value || ""}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
                         name={field.name}
@@ -110,7 +110,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 )}
               />
             </div>
-            
+
             <FormField
               control={form.control}
               name="email"
@@ -124,7 +124,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="expertise"
@@ -132,8 +132,8 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 <FormItem>
                   <FormLabel>Areas of Expertise</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Marketing, Finance, Product (comma separated)" 
+                    <Input
+                      placeholder="Marketing, Finance, Product (comma separated)"
                       value={Array.isArray(field.value) ? field.value.join(", ") : ""}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -154,7 +154,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="bio"
@@ -162,17 +162,17 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 <FormItem>
                   <FormLabel>Bio</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Mentor bio and background" 
+                    <Textarea
+                      placeholder="Mentor bio and background"
                       className="min-h-[100px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -187,7 +187,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="calendlyUrl"
@@ -202,7 +202,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 )}
               />
             </div>
-            
+
             <FormField
               control={form.control}
               name="profileImage"
@@ -216,7 +216,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 </FormItem>
               )}
             />
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -225,10 +225,10 @@ const MentorForm: React.FC<MentorFormProps> = ({
                   <FormItem>
                     <FormLabel>Rating (0-5)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max="5" 
+                      <Input
+                        type="number"
+                        min="0"
+                        max="5"
                         step="0.1"
                         value={field.value || 0}
                         onChange={e => field.onChange(parseFloat(e.target.value))}
@@ -241,7 +241,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="isTopMentor"
@@ -263,11 +263,23 @@ const MentorForm: React.FC<MentorFormProps> = ({
                 )}
               />
             </div>
-            
-            <Button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={isLoading}
-              className="w-full"
+              style={{
+                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                border: 'none',
+                width: '100%',
+                opacity: isLoading ? '0.7' : '1'
+              }}
             >
               {isLoading ? (
                 <>
@@ -286,7 +298,7 @@ const MentorForm: React.FC<MentorFormProps> = ({
                   )}
                 </>
               )}
-            </Button>
+            </button>
           </form>
         </Form>
       </CardContent>
@@ -302,11 +314,11 @@ export const MentorFormDialog: React.FC<{
   mode?: "create" | "edit";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-}> = ({ 
-  trigger, 
-  onSubmit, 
-  defaultValues, 
-  isLoading, 
+}> = ({
+  trigger,
+  onSubmit,
+  defaultValues,
+  isLoading,
   mode = "create",
   open,
   onOpenChange
@@ -327,8 +339,8 @@ export const MentorFormDialog: React.FC<{
             Fill in the mentor details below.
           </DialogDescription>
         </DialogHeader>
-        
-        <MentorForm 
+
+        <MentorForm
           onSubmit={onSubmit}
           defaultValues={defaultValues}
           isLoading={isLoading}

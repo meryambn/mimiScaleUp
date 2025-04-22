@@ -12,7 +12,8 @@ import {
   HelpCircle,
   ClipboardCheck,
   FileCheck,
-  LogOut
+  LogOut,
+  TestTube
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +148,7 @@ const RoleSidebar: React.FC = () => {
     { name: "Ressources", path: "/resources", icon: <BookOpen className="h-5 w-5" /> },
     { name: "Paramètres", path: "/settings", icon: <Settings className="h-5 w-5" /> },
     { name: "Aide", path: "/help", icon: <HelpCircle className="h-5 w-5" /> },
+    { name: "Créer Équipe Test", path: "/test/create-team", icon: <TestTube className="h-5 w-5" /> },
   ];
 
   const isActive = (path: string) => {

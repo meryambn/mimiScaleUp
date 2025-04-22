@@ -92,15 +92,15 @@ const ProgramTemplateSelector: React.FC<ProgramTemplateSelectorProps> = ({
       </Tabs>
 
       <div className="flex justify-center mt-6">
-        <Button
-          variant="outline"
+        <button
+          style={{ backgroundColor: '#e43e32', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => {
             console.log('Custom program button clicked');
             onCustomProgramCreate();
           }}
         >
           Créer un programme personnalisé
-        </Button>
+        </button>
       </div>
     </div>
   );

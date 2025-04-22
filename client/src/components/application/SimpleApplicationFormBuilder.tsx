@@ -249,20 +249,18 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
                   <p className="text-sm text-gray-500">{getQuestionTypeLabel(question.type)}</p>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
+                    style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }}
                     onClick={() => handleEditQuestion(index)}
                   >
                     Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  </button>
+                  <button
+                    style={{ backgroundColor: 'transparent', color: '#ef4444', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => handleRemoveQuestion(index)}
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                   <div className="cursor-move">
                     <GripVertical className="h-5 w-5 text-gray-500" />
                   </div>
@@ -315,21 +313,25 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
       {/* Add question dialog */}
       <Dialog open={isAddingQuestion} onOpenChange={setIsAddingQuestion}>
         <DialogTrigger asChild>
-          <Button className="w-full" onClick={() => {
-            setNewQuestion({
-              id: uuidv4(),
-              type: "short_text",
-              text: "",
-              description: "",
-              required: false,
-              options: []
-            });
-            setEditingQuestionIndex(null);
-            setIsAddingQuestion(true);
-          }}>
+          <button
+            className="w-full"
+            style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+            onClick={() => {
+              setNewQuestion({
+                id: uuidv4(),
+                type: "short_text",
+                text: "",
+                description: "",
+                required: false,
+                options: []
+              });
+              setEditingQuestionIndex(null);
+              setIsAddingQuestion(true);
+            }}
+          >
             <PlusCircle className="h-4 w-4 mr-2" />
             Ajouter une question
-          </Button>
+          </button>
         </DialogTrigger>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -427,24 +429,22 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
                       onChange={(e) => handleOptionChange(idx, e.target.value)}
                       placeholder={`Option ${idx + 1}`}
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <button
                       onClick={() => handleRemoveOption(idx)}
+                      style={{ backgroundColor: 'transparent', color: '#ef4444', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={handleAddOption}
                   className="mt-2"
+                  style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Ajouter une option
-                </Button>
+                </button>
               </div>
             )}
 
@@ -485,17 +485,23 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddingQuestion(false)}>
+            <button
+              onClick={() => setIsAddingQuestion(false)}
+              style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+            >
               Annuler
-            </Button>
-            <Button onClick={editingQuestionIndex !== null ? handleUpdateQuestion : handleAddQuestion}>
+            </button>
+            <button
+              onClick={editingQuestionIndex !== null ? handleUpdateQuestion : handleAddQuestion}
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+            >
               {editingQuestionIndex !== null ? "Mettre à jour la question" : (
                 <>
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Ajouter la question
                 </>
               )}
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

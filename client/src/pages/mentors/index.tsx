@@ -1,14 +1,13 @@
 import React, { useState } from "react";
 import MentorManagement from "@/components/mentor/MentorManagement";
-import { Button } from "@/components/ui/button";
 import { useProgramContext } from "@/context/ProgramContext";
 import { Plus, User, Mail, X } from "lucide-react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
@@ -56,10 +55,12 @@ const MentorsPage: React.FC = () => {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <button
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Invite Mentor
-            </Button>
+            </button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -68,7 +69,7 @@ const MentorsPage: React.FC = () => {
                 Invite a mentor to join the program by email or username.
               </DialogDescription>
             </DialogHeader>
-            
+
             <Tabs defaultValue="email" className="w-full mt-4">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="email">By Email</TabsTrigger>
@@ -99,7 +100,21 @@ const MentorsPage: React.FC = () => {
                   </div>
                 </div>
                 <DialogFooter className="mt-4">
-                  <Button onClick={handleInviteByEmail} disabled={!inviteEmail}>Send Invitation</Button>
+                  <button
+                    onClick={handleInviteByEmail}
+                    disabled={!inviteEmail}
+                    style={{
+                      background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                      color: 'white',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: !inviteEmail ? 'not-allowed' : 'pointer',
+                      border: 'none',
+                      opacity: !inviteEmail ? '0.5' : '1'
+                    }}
+                  >
+                    Send Invitation
+                  </button>
                 </DialogFooter>
               </TabsContent>
               <TabsContent value="username" className="pt-4">
@@ -127,7 +142,21 @@ const MentorsPage: React.FC = () => {
                   </div>
                 </div>
                 <DialogFooter className="mt-4">
-                  <Button onClick={handleInviteByUsername} disabled={!inviteUsername}>Send Invitation</Button>
+                  <button
+                    onClick={handleInviteByUsername}
+                    disabled={!inviteUsername}
+                    style={{
+                      background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                      color: 'white',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: !inviteUsername ? 'not-allowed' : 'pointer',
+                      border: 'none',
+                      opacity: !inviteUsername ? '0.5' : '1'
+                    }}
+                  >
+                    Send Invitation
+                  </button>
                 </DialogFooter>
               </TabsContent>
             </Tabs>
@@ -135,9 +164,8 @@ const MentorsPage: React.FC = () => {
         </Dialog>
       </div>
 
-      <MentorManagement 
+      <MentorManagement
         programId={selectedProgramId ? parseInt(selectedProgramId) : undefined}
-        showAssignmentControls={true} 
       />
     </div>
   );

@@ -223,15 +223,34 @@ const TeamCreationDialog: React.FC<TeamCreationDialogProps> = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <button
+            onClick={() => onOpenChange(false)}
+            style={{
+              backgroundColor: 'white',
+              color: '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
             Annuler
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={handleCreateTeam}
             disabled={totalMemberCount === 0 || teamName.trim() === ''}
+            style={{
+              background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: (totalMemberCount === 0 || teamName.trim() === '') ? 'not-allowed' : 'pointer',
+              opacity: (totalMemberCount === 0 || teamName.trim() === '') ? '0.5' : '1'
+            }}
           >
             Créer l'équipe
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

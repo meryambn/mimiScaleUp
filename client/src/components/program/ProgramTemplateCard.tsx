@@ -53,13 +53,21 @@ const ProgramTemplateCard: React.FC<ProgramTemplateCardProps> = ({
 
       <CardFooter className="flex justify-end">
 
-        <Button
-          variant={isSelected ? "secondary" : "default"}
-          size="sm"
+        <button
           onClick={onSelect}
+          style={{
+            backgroundColor: isSelected ? '#f3f4f6' : 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+            background: isSelected ? '#f3f4f6' : 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+            color: isSelected ? '#111827' : 'white',
+            border: 'none',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.875rem'
+          }}
         >
           {isSelected ? 'Sélectionné' : 'Sélectionner le modèle'}
-        </Button>
+        </button>
       </CardFooter>
     </Card>
   );

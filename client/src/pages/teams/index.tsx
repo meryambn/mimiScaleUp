@@ -455,10 +455,10 @@ const TeamsPage = () => {
           />
         </div>
         <ViewSelector currentView={currentView} onViewChange={setCurrentView} />
-        <Button variant="outline">
+        <button style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           <Filter className="h-4 w-4 mr-2" />
           Filtres
-        </Button>
+        </button>
       </div>
 
       <Tabs value={currentTab} onValueChange={setCurrentTab}>

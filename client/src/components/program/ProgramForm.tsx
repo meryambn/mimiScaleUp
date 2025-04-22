@@ -91,7 +91,7 @@ const ProgramForm: React.FC<ProgramFormProps> = ({ initialData, onSubmit }) => {
             )}
           />
         </div>
-        <Button type="submit">Enregistrer les détails</Button>
+        <button type="submit" style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>Enregistrer les détails</button>
       </form>
     </Form>
   );

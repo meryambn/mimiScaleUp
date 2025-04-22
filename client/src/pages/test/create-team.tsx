@@ -491,27 +491,27 @@ const CreateTestTeamPage = () => {
           )}
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button
+          <button
             onClick={createTestTeam}
             disabled={teamCreated || !selectedProgram}
-            className="bg-purple-600 hover:bg-purple-700"
+            style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 24px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontWeight: 'bold', fontSize: '1.125rem' }}
           >
             {teamCreated ? "Équipe créée" : "Créer l'équipe de test"}
-          </Button>
+          </button>
 
           {teamCreated && (
             <Link href="/teams">
-              <Button variant="outline">
+              <button style={{ backgroundColor: 'white', color: '#9333ea', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}>
                 Voir toutes les équipes
-              </Button>
+              </button>
             </Link>
           )}
 
           {teamCreated && teamId && (
             <Link href={`/teams/${teamId}`}>
-              <Button>
+              <button style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>
                 Voir l'équipe créée
-              </Button>
+              </button>
             </Link>
           )}
         </CardFooter>

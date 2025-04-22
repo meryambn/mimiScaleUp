@@ -94,21 +94,28 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
       </CardContent>
       <CardFooter className="p-6 pt-0">
         {status === "draft" ? (
-          <Button
-            variant="outline"
+          <button
             className="w-full"
             onClick={handleEditProgram}
+            style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
           >
             Modifier
-          </Button>
+          </button>
         ) : (
-          <Button
-            variant={isSelected ? "default" : "outline"}
+          <button
             className="w-full"
             onClick={handleSelectProgram}
+            style={{
+              backgroundColor: isSelected ? '#0c4c80' : 'white',
+              color: isSelected ? 'white' : '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
           >
             {isSelected ? "Sélectionné" : "Sélectionner"}
-          </Button>
+          </button>
         )}
       </CardFooter>
     </Card>
@@ -138,10 +145,12 @@ const Programs: React.FC = () => {
           <h1 className="text-2xl font-semibold text-gray-900">Programmes</h1>
           {!isMentor && (
             <Link href="/programs/create">
-              <Button>
+              <button
+                style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Nouveau programme
-              </Button>
+              </button>
             </Link>
           )}
         </div>
@@ -185,9 +194,12 @@ const Programs: React.FC = () => {
               <p className="text-gray-500">Aucun programme actif trouvé</p>
               {draftPrograms.length === 0 && (
                 <Link href="/programs/create">
-                  <Button variant="outline" className="mt-4">
+                  <button
+                    className="mt-4"
+                    style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
                     Créer votre premier programme
-                  </Button>
+                  </button>
                 </Link>
               )}
             </div>

@@ -127,14 +127,21 @@ const MentorSelection: React.FC<MentorSelectionProps> = ({
 
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
+                      <button
                         onClick={() => handleSelectMentor(mentor)}
                         disabled={selectedMentors.some(m => m.id === mentor.id)}
+                        style={{
+                          backgroundColor: selectedMentors.some(m => m.id === mentor.id) ? '#d1d5db' : '#0c4c80',
+                          color: 'white',
+                          border: 'none',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          cursor: selectedMentors.some(m => m.id === mentor.id) ? 'not-allowed' : 'pointer',
+                          fontSize: '0.875rem'
+                        }}
                       >
                         {selectedMentors.some(m => m.id === mentor.id) ? 'Ajouté' : 'Ajouter'}
-                      </Button>
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
@@ -166,13 +173,20 @@ const MentorSelection: React.FC<MentorSelectionProps> = ({
 
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="destructive"
+                        <button
                           onClick={() => handleRemoveMentor(mentor.id)}
+                          style={{
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem'
+                          }}
                         >
                           Retirer
-                        </Button>
+                        </button>
                     </div>
                   </CardContent>
                 </Card>

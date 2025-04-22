@@ -144,61 +144,56 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phase
           )}
 
           <div className="flex justify-between pt-2">
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               className="h-7 px-2"
               onClick={() => onMoveTeam(team.id, phaseIndex - 1)}
               disabled={phaseIndex === 0}
+              style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: phaseIndex === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem', opacity: phaseIndex === 0 ? '0.5' : '1' }}
             >
               <ArrowLeft className="h-3 w-3 mr-1" />
               Retour
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+            </button>
+            <button
               className="h-7 px-2"
               onClick={() => navigateWithoutReload(`/teams/${team.id}`)}
+              style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
             >
               <MessageSquare className="h-3 w-3 mr-1" />
               Détails
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+            </button>
+            <button
               className="h-7 px-2"
               onClick={() => onMoveTeam(team.id, phaseIndex + 1)}
               disabled={phaseIndex === phasesCount - 1}
+              style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: phaseIndex === phasesCount - 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem', opacity: phaseIndex === phasesCount - 1 ? '0.5' : '1' }}
             >
               Avancer
               <ArrowRight className="h-3 w-3 ml-1" />
-            </Button>
+            </button>
           </div>
 
           {isLastPhase && hasWinner && team.status !== 'completed' && (
             <div className="mt-2 pt-2 border-t border-gray-100">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-7 bg-amber-100 text-amber-800 hover:bg-amber-200"
+              <button
+                className="w-full h-7"
                 onClick={() => onSelectWinner && onSelectWinner(team.id)}
+                style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', width: '100%' }}
               >
                 <Trophy className="h-3 w-3 mr-1" />
                 Sélectionner comme gagnant
-              </Button>
+              </button>
             </div>
           )}
           {isLastPhase && hasWinner && team.status === 'completed' && (
             <div className="mt-2 pt-2 border-t border-gray-100">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-7 bg-green-100 text-green-800"
+              <button
+                className="w-full h-7"
                 disabled
+                style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #22c55e', padding: '4px 8px', borderRadius: '4px', cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', width: '100%', opacity: '0.7' }}
               >
                 <Trophy className="h-3 w-3 mr-1" />
                 Gagnant sélectionné
-              </Button>
+              </button>
             </div>
           )}
         </div>

@@ -81,6 +81,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
     accessibleBy: ['mentors', 'teams'],
     filledBy: 'teams',
     requiresValidation: false,
+    options: [],  // Options for liste_deroulante type
   });
   const [newDeliverable, setNewDeliverable] = useState<Deliverable>({
     id: '',
@@ -224,6 +225,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
       accessibleBy: ['mentors', 'teams'],
       filledBy: 'teams',
       requiresValidation: false,
+      options: [],  // Options for liste_deroulante type
     });
   };
 
@@ -343,8 +345,20 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
               <Label>Start Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
+                  <button
+                    style={{
+                      backgroundColor: 'white',
+                      color: '#0c4c80',
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      textAlign: 'left'
+                    }}
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !phase.startDate && "text-muted-foreground"
@@ -352,7 +366,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {phase.startDate ? format(phase.startDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
@@ -377,8 +391,20 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
               <Label>End Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
+                  <button
+                    style={{
+                      backgroundColor: 'white',
+                      color: '#0c4c80',
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      textAlign: 'left'
+                    }}
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !phase.endDate && "text-muted-foreground"
@@ -386,7 +412,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {phase.endDate ? format(phase.endDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
@@ -438,13 +464,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
         <TabsContent value="tasks" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Tâches</h3>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setShowAddTask(!showAddTask)}
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
             >
               <Plus className="h-4 w-4 mr-2" /> {showAddTask ? 'Masquer le formulaire' : 'Ajouter une tâche'}
-            </Button>
+            </button>
           </div>
 
           {/* Add Task Form */}
@@ -471,8 +496,20 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
               <Label>Date d'échéance</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
+                  <button
+                    style={{
+                      backgroundColor: 'white',
+                      color: '#0c4c80',
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      textAlign: 'left'
+                    }}
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !newTask.dueDate && "text-muted-foreground"
@@ -480,7 +517,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {newTask.dueDate ? format(newTask.dueDate, "PPP") : <span>Choisir une date</span>}
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
@@ -492,13 +529,25 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 </PopoverContent>
               </Popover>
             </div>
-            <Button
+            <button
               onClick={handleAddTask}
               disabled={!newTask.name || newTask.name.trim() === ''}
-              className="w-full"
+              style={{
+                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: (!newTask.name || newTask.name.trim() === '') ? 'not-allowed' : 'pointer',
+                border: 'none',
+                width: '100%',
+                opacity: (!newTask.name || newTask.name.trim() === '') ? '0.5' : '1'
+              }}
             >
                 Ajouter la tâche
-            </Button>
+            </button>
           </div>
           )}
 
@@ -518,13 +567,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                     Échéance: {format(new Date(task.dueDate), 'MMM d, yyyy')}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => handleRemoveTask(task.id)}
+                  style={{ backgroundColor: 'transparent', color: '#9333ea', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             ))}
           </div>
@@ -533,13 +581,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
         <TabsContent value="meetings" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Réunions</h3>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setShowAddMeeting(!showAddMeeting)}
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
             >
               <Plus className="h-4 w-4 mr-2" /> {showAddMeeting ? 'Masquer le formulaire' : 'Ajouter des réunions'}
-            </Button>
+            </button>
           </div>
 
           {/* Add Meeting Form */}
@@ -558,8 +605,20 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 <Label>Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
+                    <button
+                      style={{
+                        backgroundColor: 'white',
+                        color: '#0c4c80',
+                        border: '1px solid #e5e7eb',
+                        padding: '8px 16px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        textAlign: 'left'
+                      }}
                       className={cn(
                         "w-full justify-start text-left font-normal",
                         !newMeeting.date && "text-muted-foreground"
@@ -567,7 +626,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {newMeeting.date ? format(newMeeting.date, "PPP") : <span>Choisir une date</span>}
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
@@ -596,17 +655,29 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 placeholder="Entrez le lieu de la réunion ou le lien Zoom"
               />
             </div>
-            <Button
-              className="w-full"
+            <button
               onClick={() => {
                 handleAddMeeting();
                 // Keep the form visible after adding a meeting
                 setShowAddMeeting(true);
               }}
               disabled={!newMeeting.name || newMeeting.name.trim() === ''}
+              style={{
+                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: (!newMeeting.name || newMeeting.name.trim() === '') ? 'not-allowed' : 'pointer',
+                border: 'none',
+                width: '100%',
+                opacity: (!newMeeting.name || newMeeting.name.trim() === '') ? '0.5' : '1'
+              }}
             >
                 Ajouter la réunion
-            </Button>
+            </button>
           </div>
           )}
 
@@ -636,13 +707,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                     </p>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => handleRemoveMeeting(meeting.id)}
+                  style={{ backgroundColor: 'transparent', color: '#9333ea', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             ))}
           </div>
@@ -651,13 +721,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
         <TabsContent value="evaluation" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Critères d'évaluation</h3>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setShowAddCriterion(!showAddCriterion)}
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
             >
               <Plus className="h-4 w-4 mr-2" /> {showAddCriterion ? 'Masquer le formulaire' : 'Ajouter des critères'}
-            </Button>
+            </button>
           </div>
 
           {/* Add Criterion Form */}
@@ -675,7 +744,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
               <Label>Type</Label>
               <Select
                 value={newCriterion.type}
-                onValueChange={(value: 'numeric' | 'star_rating' | 'yes_no' | 'text') =>
+                onValueChange={(value: 'numeric' | 'star_rating' | 'yes_no' | 'liste_deroulante') =>
                   setNewCriterion({ ...newCriterion, type: value })
                 }
               >
@@ -686,10 +755,58 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                   <SelectItem value="numeric">Numérique</SelectItem>
                   <SelectItem value="star_rating">Évaluation par étoiles</SelectItem>
                   <SelectItem value="yes_no">Oui/Non</SelectItem>
-                  <SelectItem value="text">Texte</SelectItem>
+                  <SelectItem value="liste_deroulante">Liste déroulante</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {newCriterion.type === 'liste_deroulante' && (
+              <div>
+                <Label className="mb-2 block">Options</Label>
+                <div className="space-y-3">
+                  {newCriterion.options && newCriterion.options.map((option, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <div className="relative flex-grow">
+                        <Input
+                          value={option}
+                          onChange={(e) => {
+                            const newOptions = [...(newCriterion.options || [])];
+                            newOptions[index] = e.target.value;
+                            setNewCriterion({ ...newCriterion, options: newOptions });
+                          }}
+                          placeholder={`Option ${index + 1}`}
+                          className="pr-10 w-full"
+                        />
+                        <button
+                          onClick={() => {
+                            const newOptions = [...(newCriterion.options || [])];
+                            newOptions.splice(index, 1);
+                            setNewCriterion({ ...newCriterion, options: newOptions });
+                          }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-red-500 hover:text-red-700"
+                          type="button"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      const newOptions = [...(newCriterion.options || []), ''];
+                      setNewCriterion({ ...newCriterion, options: newOptions });
+                    }}
+                    className="flex items-center text-blue-600 hover:text-blue-800 border border-blue-600 rounded-md px-3 py-2 text-sm"
+                    type="button"
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Ajouter une option
+                  </button>
+                  {(newCriterion.options?.length || 0) < 2 && (
+                    <p className="text-xs text-red-500 mt-2">Ajoutez au moins 2 options pour la liste déroulante</p>
+                  )}
+                </div>
+              </div>
+            )}
             <div>
               <Label>Poids</Label>
               <Input
@@ -770,7 +887,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
               </div>
             </div>
 
-            <Button
+            <button
               className="w-full"
               onClick={() => {
                 handleAddCriterion();
@@ -778,9 +895,10 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 setShowAddCriterion(true);
               }}
               disabled={!newCriterion.name || newCriterion.name.trim() === ''}
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none', width: '100%' }}
             >
                 Ajouter le critère
-              </Button>
+              </button>
             </div>
           )}
 
@@ -794,7 +912,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 <div>
                   <h4 className="font-medium">{criterion.name}</h4>
                   <p className="text-sm text-gray-500">
-                    Type: {criterion.type === 'numeric' ? 'Numérique' : criterion.type === 'star_rating' ? 'Évaluation par étoiles' : criterion.type === 'yes_no' ? 'Oui/Non' : 'Texte'} | Poids: {criterion.weight}
+                    Type: {criterion.type === 'numeric' ? 'Numérique' : criterion.type === 'star_rating' ? 'Évaluation par étoiles' : criterion.type === 'yes_no' ? 'Oui/Non' : criterion.type === 'liste_deroulante' ? 'Liste déroulante' : 'Autre'} | Poids: {criterion.weight}
+                    {criterion.type === 'liste_deroulante' && criterion.options && criterion.options.length > 0 && (
+                      <div className="mt-1 text-xs text-gray-500">
+                        Options: {criterion.options.join(', ')}
+                      </div>
+                    )}
                   </p>
 
                   <div className="flex items-center space-x-2 mt-2">
@@ -812,13 +935,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                     </span>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => handleRemoveCriterion(criterion.id)}
+                  style={{ backgroundColor: 'transparent', color: '#9333ea', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   <Trash2 className="h-4 w-4" />
-            </Button>
+                </button>
               </div>
             ))}
           </div>
@@ -827,13 +949,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
         <TabsContent value="deliverables" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Livrables de la phase</h3>
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setShowAddDeliverable(!showAddDeliverable)}
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
             >
               <Plus className="h-4 w-4 mr-2" /> {showAddDeliverable ? 'Masquer le formulaire' : 'Ajouter un livrable'}
-            </Button>
+            </button>
           </div>
 
           {showAddDeliverable && (
@@ -861,8 +982,8 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                 <Label>Date d'échéance</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
+                    <button
+                      style={{ backgroundColor: 'white', color: '#9333ea', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center' }}
                       className={cn(
                         "w-full justify-start text-left font-normal",
                         !newDeliverable.dueDate && "text-muted-foreground"
@@ -870,7 +991,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {newDeliverable.dueDate ? format(newDeliverable.dueDate, "PPP") : <span>Choisir une date</span>}
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
@@ -897,13 +1018,14 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
               </div>
 
 
-              <Button
+              <button
                 onClick={handleAddDeliverable}
                 disabled={!newDeliverable.name || newDeliverable.name.trim() === ''}
                 className="w-full"
+                style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none', width: '100%' }}
               >
                 Ajouter le livrable
-              </Button>
+              </button>
             </div>
           )}
 
@@ -927,13 +1049,12 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
                     )}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => handleRemoveDeliverable(deliverable.id)}
+                  style={{ backgroundColor: 'transparent', color: '#9333ea', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             ))}
           </div>

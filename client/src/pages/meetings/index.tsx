@@ -87,24 +87,42 @@ const MeetingsPage: React.FC = () => {
         </div>
         <div className="flex space-x-2">
           <div className="flex bg-muted rounded-md p-1">
-            <Button
-              variant={activeView === "list" ? "default" : "ghost"}
-              size="sm"
+            <button
               onClick={() => setActiveView("list")}
               className="rounded-sm"
+              style={{
+                backgroundColor: activeView === "list" ? '#0c4c80' : 'transparent',
+                color: activeView === "list" ? 'white' : '#0c4c80',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '0.875rem'
+              }}
             >
               <List className="h-4 w-4 mr-2" />
               Liste
-            </Button>
-            <Button
-              variant={activeView === "calendar" ? "default" : "ghost"}
-              size="sm"
+            </button>
+            <button
               onClick={() => setActiveView("calendar")}
               className="rounded-sm"
+              style={{
+                backgroundColor: activeView === "calendar" ? '#0c4c80' : 'transparent',
+                color: activeView === "calendar" ? 'white' : '#0c4c80',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '0.875rem'
+              }}
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               Calendrier
-            </Button>
+            </button>
           </div>
 
         </div>
@@ -180,10 +198,21 @@ const MeetingsPage: React.FC = () => {
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <button
+            style={{
+              backgroundColor: 'white',
+              color: '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
             <ListFilter className="h-4 w-4 mr-2" />
             Filtrer
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -198,13 +227,20 @@ const MeetingsPage: React.FC = () => {
               Filtré par phase : {getPhaseById(selectedPhase)?.name}
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={() => setSelectedPhase(null)}
+            style={{
+              backgroundColor: 'transparent',
+              color: '#0c4c80',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.875rem'
+            }}
           >
             Effacer
-          </Button>
+          </button>
         </div>
       )}
 
@@ -287,22 +323,62 @@ const MeetingsPage: React.FC = () => {
                           <div className="mt-4 flex flex-wrap gap-2">
                             {meeting.date >= today && !meeting.isCompleted ? (
                               <>
-                                <Button size="sm" variant="outline">
+                                <button
+                                  style={{
+                                    backgroundColor: 'white',
+                                    color: '#0c4c80',
+                                    border: '1px solid #e5e7eb',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
                                   Modifier
-                                </Button>
-                                <Button size="sm" variant="ghost">
+                                </button>
+                                <button
+                                  style={{
+                                    backgroundColor: 'transparent',
+                                    color: '#0c4c80',
+                                    border: 'none',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
                                   Être notifié
-                                </Button>
+                                </button>
                               </>
                             ) : (
                               meeting.hasNotes ? (
-                                <Button size="sm" variant="outline">
+                                <button
+                                  style={{
+                                    backgroundColor: 'white',
+                                    color: '#0c4c80',
+                                    border: '1px solid #e5e7eb',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
                                   Voir les notes
-                                </Button>
+                                </button>
                               ) : (
-                                <Button size="sm">
+                                <button
+                                  style={{
+                                    background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
                                   Ajouter des notes
-                                </Button>
+                                </button>
                               )
                             )}
                           </div>
@@ -380,13 +456,33 @@ const MeetingsPage: React.FC = () => {
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             {meeting.hasNotes ? (
-                              <Button size="sm" variant="outline">
+                              <button
+                                style={{
+                                  backgroundColor: 'white',
+                                  color: '#0c4c80',
+                                  border: '1px solid #e5e7eb',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem'
+                                }}
+                              >
                                 Voir les notes
-                              </Button>
+                              </button>
                             ) : (
-                              <Button size="sm">
+                              <button
+                                style={{
+                                  background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                                  color: 'white',
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem'
+                                }}
+                              >
                                 Ajouter des notes
-                              </Button>
+                              </button>
                             )}
                           </div>
                         </div>

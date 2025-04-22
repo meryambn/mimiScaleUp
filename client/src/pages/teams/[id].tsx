@@ -39,8 +39,8 @@ interface EvaluationCriterion {
   weight: number;
   score?: number;
   phase?: string; // Phase à laquelle ce critère appartient
-  type?: 'stars' | 'yesno' | 'numeric' | 'text'; // Type d'évaluation
-  textValue?: string; // Pour les évaluations de type texte
+  type?: 'stars' | 'yesno' | 'numeric' | 'liste_deroulante'; // Type d'évaluation
+  textValue?: string; // Pour les évaluations de type liste déroulante
   numericValue?: number; // Pour les évaluations de type numérique
   booleanValue?: boolean; // Pour les évaluations de type oui/non
   filledByTeam?: boolean; // Indique si le critère a été rempli par l'équipe
@@ -892,10 +892,10 @@ const StartupDetailPage = () => {
     // Forcer le type en fonction de l'ID du critère
     const id = parseInt(criterionId);
     if (id % 4 === 0) return 'numeric';
-    if (id % 4 === 1) return 'stars';
-    if (id % 4 === 2) return 'yesno';
-    if (id % 4 === 3) return 'text';
-    return 'stars'; // Par défaut
+    if (id % 4 === 1) return 'star_rating';
+    if (id % 4 === 2) return 'yes_no';
+    if (id % 4 === 3) return 'liste_deroulante';
+    return 'star_rating'; // Par défaut
   };
 
   // Fonction pour filtrer les critères d'évaluation en fonction de la phase sélectionnée
@@ -916,29 +916,29 @@ const StartupDetailPage = () => {
       criteria = startup.evaluationCriteria;
     }
 
-    // Forcer le type d'évaluation pour chaque critère si nécessaire
+    // Initialiser les valeurs pour chaque critère sans forcer le type
     criteria = criteria.map((criterion: any) => {
-      // Si le type n'est pas défini ou ne correspond pas au type attendu, le forcer
-      const expectedType = getEvaluationType(criterion.id);
-      if (!criterion.type || criterion.type !== expectedType) {
-        return {
-          ...criterion,
-          type: expectedType,
-          // Initialiser les valeurs spécifiques au type si elles n'existent pas
-          booleanValue: expectedType === 'yesno' ? (criterion.booleanValue !== undefined ? criterion.booleanValue : false) : undefined,
-          numericValue: expectedType === 'numeric' ? (criterion.numericValue !== undefined ? criterion.numericValue : 0) : undefined,
-          textValue: expectedType === 'text' ? (criterion.textValue !== undefined ? criterion.textValue : '') : undefined,
-          // Initialiser les champs de validation
-          filledByTeam: criterion.filledByTeam !== undefined ? criterion.filledByTeam : Math.random() > 0.5, // Simulation: certains critères sont remplis par l'équipe
-          validated: criterion.validated !== undefined ? criterion.validated : false,
-          requiresValidation: criterion.requiresValidation !== undefined ? criterion.requiresValidation : true
-        };
-      }
-      return criterion;
+      // Utiliser le type existant du critère
+      const type = criterion.type || 'star_rating'; // Par défaut, utiliser star_rating
+
+      // Initialiser les valeurs spécifiques au type si elles n'existent pas
+      return {
+        ...criterion,
+        // Assurer que le type est préservé
+        type: type,
+        // Initialiser les valeurs spécifiques au type si elles n'existent pas
+        booleanValue: (type === 'yesno' || type === 'yes_no') ? (criterion.booleanValue !== undefined ? criterion.booleanValue : false) : undefined,
+        numericValue: type === 'numeric' ? (criterion.numericValue !== undefined ? criterion.numericValue : 0) : undefined,
+        textValue: type === 'liste_deroulante' ? (criterion.textValue !== undefined ? criterion.textValue : '') : undefined,
+        // Initialiser les champs de validation
+        filledByTeam: criterion.filledByTeam !== undefined ? criterion.filledByTeam : Math.random() > 0.5, // Simulation: certains critères sont remplis par l'équipe
+        validated: criterion.validated !== undefined ? criterion.validated : false,
+        requiresValidation: criterion.requiresValidation !== undefined ? criterion.requiresValidation : true
+      };
     });
 
     // Afficher les critères dans la console pour déboguer
-    console.log('Critères filtrés avec types forcés:', criteria);
+    console.log('Critères filtrés avec types préservés:', criteria);
     criteria.forEach((criterion: any) => {
       console.log(`Critère ${criterion.id} - ${criterion.name} - Type: ${criterion.type}`);
     });
@@ -997,34 +997,35 @@ const StartupDetailPage = () => {
             {!isMentor && (
               <>
                 {isInFinalPhase && !isWinner ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="bg-amber-100 text-amber-800 hover:bg-amber-200"
+                  <button
+                    style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                     onClick={handleSelectWinner}
                   >
                     <Trophy className="h-4 w-4 mr-2" />
                     Sélectionner comme gagnant
-                  </Button>
+                  </button>
                 ) : isWinner ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="bg-green-100 text-green-800"
+                  <button
+                    style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #22c55e', padding: '4px 8px', borderRadius: '4px', cursor: 'not-allowed', display: 'flex', alignItems: 'center', fontSize: '0.875rem', opacity: '0.7' }}
                     disabled
                   >
                     <Trophy className="h-4 w-4 mr-2" />
                     Gagnant sélectionné
-                  </Button>
+                  </button>
                 ) : (
-                  <Button size="sm" onClick={handleNextPhase}>
+                  <button
+                    onClick={handleNextPhase}
+                    style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontSize: '0.875rem' }}
+                  >
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Next Phase
-                  </Button>
+                  </button>
                 )}
-                <Button variant="destructive" size="sm">
+                <button
+                  style={{ backgroundColor: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontSize: '0.875rem' }}
+                >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </button>
               </>
             )}
           </div>
@@ -1184,12 +1185,10 @@ const StartupDetailPage = () => {
                     </div>
                     <div className="flex space-x-2">
                       {deliverable.fileUrl && (
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={deliverable.fileUrl} download>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </a>
-                        </Button>
+                        <a href={deliverable.fileUrl} download style={{ backgroundColor: 'white', color: '#e43e32', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem', textDecoration: 'none' }}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </a>
                       )}
                     </div>
                   </div>
@@ -1256,18 +1255,26 @@ const StartupDetailPage = () => {
                               </div>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500">Weight: {criterion.weight}%</p>
+                          <p className="text-sm text-gray-500">Weight: {criterion.weight}% | Type: {criterion.type}</p>
                         </div>
                         <div className="flex items-center space-x-1">
                           {/* Affichage du critère */}
-                          {criterion.type === 'yesno' ? (
+                          {criterion.type === 'yesno' || criterion.type === 'yes_no' ? (
                             // Affichage Oui/Non
                             <div className="flex items-center space-x-4">
                               <div className="flex space-x-2">
-                                <Button
-                                  variant={(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? "default" : "outline"}
-                                  size="sm"
-                                  className={(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? "bg-green-600 hover:bg-green-700" : "hover:bg-green-100"}
+                                <button
+                                  style={{
+                                    backgroundColor: (criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? '#16a34a' : 'white',
+                                    color: (criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? 'white' : '#16a34a',
+                                    border: (criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? 'none' : '1px solid #16a34a',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '0.875rem'
+                                  }}
                                   onClick={() => {
                                     // Mettre à jour le score et la valeur booléenne directement
                                     updateCriterion(criterion.id, { score: 5, booleanValue: true });
@@ -1275,11 +1282,19 @@ const StartupDetailPage = () => {
                                 >
                                   <CheckCircle className="h-4 w-4 mr-1" />
                                   Oui
-                                </Button>
-                                <Button
-                                  variant={!(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? "default" : "outline"}
-                                  size="sm"
-                                  className={!(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? "bg-red-600 hover:bg-red-700" : "hover:bg-red-100"}
+                                </button>
+                                <button
+                                  style={{
+                                    backgroundColor: !(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? '#dc2626' : 'white',
+                                    color: !(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? 'white' : '#dc2626',
+                                    border: !(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? 'none' : '1px solid #dc2626',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '0.875rem'
+                                  }}
                                   onClick={() => {
                                     // Mettre à jour le score et la valeur booléenne directement
                                     updateCriterion(criterion.id, { score: 0, booleanValue: false });
@@ -1287,7 +1302,7 @@ const StartupDetailPage = () => {
                                 >
                                   <XCircle className="h-4 w-4 mr-1" />
                                   Non
-                                </Button>
+                                </button>
                               </div>
                               {(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) !== undefined && (
                                 <Badge className={(criteriaValues[criterion.id]?.booleanValue !== undefined ? criteriaValues[criterion.id].booleanValue : criterion.booleanValue) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
@@ -1322,33 +1337,63 @@ const StartupDetailPage = () => {
                                 ></div>
                               </div>
                             </div>
-                          ) : criterion.type === 'text' ? (
-                            // Affichage Texte
+                          ) : criterion.type === 'liste_deroulante' ? (
+                            // Affichage Liste déroulante
                             <div className="w-full ml-4">
                               <div className="flex justify-between items-center mb-1">
-                                <label className="text-sm font-medium">Commentaire d'évaluation:</label>
+                                <label className="text-sm font-medium">Sélection dans la liste déroulante:</label>
                                 {((criteriaValues[criterion.id]?.textValue !== undefined ? criteriaValues[criterion.id].textValue : criterion.textValue) || '').length > 0 && (
                                   <Badge className="bg-green-100 text-green-800">
                                     Évaluation complétée
                                   </Badge>
                                 )}
                               </div>
-                              <textarea
+                              <select
                                 value={(criteriaValues[criterion.id]?.textValue !== undefined ? criteriaValues[criterion.id].textValue : criterion.textValue) || ''}
                                 onChange={(e) => {
                                   const value = e.target.value;
-                                  // Mettre à jour le score en fonction de la longueur du texte
+                                  // Mettre à jour le score en fonction de la sélection
                                   const score = value.length > 0 ? 5 : 0;
                                   // Mettre à jour le score et la valeur texte dans l'état temporaire
                                   updateCriterion(criterion.id, { score, textValue: value });
                                 }}
                                 className="w-full p-2 border rounded-md text-sm focus:ring-1 focus:ring-blue-300 focus:border-blue-300"
-                                rows={3}
-                                placeholder="Entrez votre évaluation détaillée ici..."
-                              />
+                              >
+                                <option value="">Sélectionnez une option...</option>
+                                {criterion.options && criterion.options.length > 0 ? (
+                                  // Afficher les options personnalisées si elles existent
+                                  criterion.options.map((option, index) => (
+                                    <option key={index} value={option}>{option}</option>
+                                  ))
+                                ) : (
+                                  // Options par défaut si aucune option personnalisée n'est définie
+                                  <>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Très bien">Très bien</option>
+                                    <option value="Bien">Bien</option>
+                                    <option value="Moyen">Moyen</option>
+                                    <option value="Insuffisant">Insuffisant</option>
+                                  </>
+                                )}
+                              </select>
+                            </div>
+                          ) : criterion.type === 'star_rating' || criterion.type === 'stars' ? (
+                            // Affichage Étoiles
+                            <div className="flex items-center space-x-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-6 w-6 cursor-pointer transition-colors ${
+                                    (criteriaScores[criterion.id] || 0) >= star
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-gray-300 hover:text-yellow-200'
+                                  }`}
+                                  onClick={() => handleScoreChange(criterion.id, star)}
+                                />
+                              ))}
                             </div>
                           ) : (
-                            // Affichage par défaut (stars)
+                            // Fallback display (stars)
                             <div className="flex items-center space-x-1">
                               {[1, 2, 3, 4, 5].map((star) => (
                                 <Star
@@ -1394,14 +1439,13 @@ const StartupDetailPage = () => {
                           <span className="text-sm text-gray-700">
                             {calculateOverallScore().toFixed(1)}%
                           </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <button
                             onClick={() => setManualOverallScore(Math.round(calculateOverallScore()))}
                             className="ml-2 text-xs"
+                            style={{ backgroundColor: 'white', color: '#e43e32', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
                           >
                             Utiliser ce score
-                          </Button>
+                          </button>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1441,13 +1485,13 @@ const StartupDetailPage = () => {
                           Evaluation successfully updated!
                         </div>
                       )}
-                      <Button
+                      <button
                         onClick={handleUpdateEvaluation}
                         disabled={isUpdating}
-                        className="px-6"
+                        style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 24px', borderRadius: '4px', cursor: 'pointer', border: 'none', opacity: isUpdating ? '0.7' : '1' }}
                       >
                         {isUpdating ? 'Updating...' : 'Update Evaluation'}
-                      </Button>
+                      </button>
                     </div>
                   </div>
                 </div>

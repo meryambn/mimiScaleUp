@@ -1,6 +1,5 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import EvaluationCriteriaWidget from "@/components/widgets/EvaluationCriteriaWidget";
 import UpcomingMeetingsWidget from "@/components/widgets/UpcomingMeetingsWidget";
@@ -56,6 +55,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Tableau de bord</h1>
@@ -73,10 +73,12 @@ const Dashboard: React.FC = () => {
           </div>
           {!isMentor && (
             <Link href="/programs/create">
-              <Button>
+              <button
+                style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Nouveau programme
-              </Button>
+              </button>
             </Link>
           )}
         </div>
@@ -111,34 +113,28 @@ const Dashboard: React.FC = () => {
                     {!isMentor && (
                       <div className="flex space-x-1">
                         {selectedProgram.status !== "active" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <button
                             onClick={() => handleStatusChange("active")}
-                            className="text-xs h-7 px-2"
+                            style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', height: '28px' }}
                           >
                             Activer
-                          </Button>
+                          </button>
                         )}
                         {selectedProgram.status !== "completed" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <button
                             onClick={() => handleStatusChange("completed")}
-                            className="text-xs h-7 px-2"
+                            style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', height: '28px' }}
                           >
                             Terminé
-                          </Button>
+                          </button>
                         )}
                         {selectedProgram.status !== "draft" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
+                          <button
                             onClick={() => handleStatusChange("draft")}
-                            className="text-xs h-7 px-2"
+                            style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', height: '28px' }}
                           >
                             Brouillon
-                          </Button>
+                          </button>
                         )}
                       </div>
                     )}
@@ -229,9 +225,11 @@ const Dashboard: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun programme sélectionné</h3>
                 <p className="text-gray-500 mb-6">Veuillez sélectionner un programme pour afficher son tableau de bord</p>
                 <Link href="/programs">
-                  <Button>
+                  <button
+                    style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+                  >
                     Voir les programmes
-                  </Button>
+                  </button>
                 </Link>
               </div>
             </CardContent>

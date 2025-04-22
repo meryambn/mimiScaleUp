@@ -8,8 +8,7 @@ import CreateProgram from './pages/programs/create';
 import Mentors from './pages/mentors';
 import Applications from './pages/applications';
 import CreateApplicationForm from './pages/applications/create';
-import Evaluation from './pages/evaluation';
-import CreateEvaluationCriteria from './pages/evaluation/create';
+
 import MeetingsPage from './pages/meetings';
 import TasksPage from './pages/tasks';
 import DeliverablesPage from './pages/deliverables';
@@ -132,20 +131,7 @@ const App = () => {
                         </Layout>
                       )}
                     </Route>
-                    <Route path="/evaluation">
-                      {() => (
-                        <Layout>
-                          <Evaluation />
-                        </Layout>
-                      )}
-                    </Route>
-                    <Route path="/evaluation/create">
-                      {() => (
-                        <Layout>
-                          <CreateEvaluationCriteria />
-                        </Layout>
-                      )}
-                    </Route>
+
                     <Route path="/test/create-team">
                       {() => (
                         <Layout>

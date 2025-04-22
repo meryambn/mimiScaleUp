@@ -63,13 +63,13 @@ const WinnerDialog: React.FC<WinnerDialogProps> = ({
           </p>
         </div>
         <DialogFooter className="sm:justify-center">
-          <Button 
+          <button
             onClick={() => onOpenChange(false)}
-            className="bg-amber-600 hover:bg-amber-700"
+            style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
           >
             <Trophy className="h-4 w-4 mr-2" />
             Fermer
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

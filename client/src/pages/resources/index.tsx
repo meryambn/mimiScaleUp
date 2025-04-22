@@ -112,10 +112,23 @@ const ResourceCard = ({ resource }: { resource: Resource }) => {
           <div className="text-sm text-gray-500">
             Added on {new Date(resource.createdAt).toLocaleDateString()}
           </div>
-          <Button variant="outline" size="sm" className="gap-1">
+          <button
+            style={{
+              backgroundColor: 'white',
+              color: '#0c4c80',
+              border: '1px solid #e5e7eb',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.875rem'
+            }}
+          >
             <Download className="h-4 w-4" />
             Download
-          </Button>
+          </button>
         </div>
       </CardContent>
     </Card>
@@ -126,12 +139,27 @@ const ExternalResourceItem = ({ title, url }: { title: string; url: string }) =>
   return (
     <div className="flex items-center justify-between p-3 border rounded-md mb-2">
       <div className="font-medium">{title}</div>
-      <Button variant="ghost" size="sm" asChild>
-        <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
-          <ExternalLink className="h-4 w-4" />
-          Visit
-        </a>
-      </Button>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          backgroundColor: 'transparent',
+          color: '#0c4c80',
+          border: 'none',
+          padding: '4px 8px',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '0.875rem',
+          textDecoration: 'none'
+        }}
+      >
+        <ExternalLink className="h-4 w-4" />
+        Visit
+      </a>
     </div>
   );
 };
@@ -337,18 +365,38 @@ const AddResourceDialog = ({
           </div>
 
           <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => {
-              resetForm();
-              onOpenChange(false);
-            }}>
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                onOpenChange(false);
+              }}
+              style={{
+                backgroundColor: 'white',
+                color: '#0c4c80',
+                border: '1px solid #e5e7eb',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
               Cancel
-            </Button>
-            <Button
+            </button>
+            <button
               type="submit"
               disabled={isSubmitting || (isExternalLink ? !url : !file) || !title}
+              style={{
+                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: (isSubmitting || (isExternalLink ? !url : !file) || !title) ? 'not-allowed' : 'pointer',
+                opacity: (isSubmitting || (isExternalLink ? !url : !file) || !title) ? '0.5' : '1'
+              }}
             >
               {isSubmitting ? 'Adding...' : 'Add Resource'}
-            </Button>
+            </button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -403,10 +451,10 @@ const ResourcesPage: React.FC = () => {
               </p>
             )}
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
+          <button onClick={() => setDialogOpen(true)} style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>
             <Plus className="mr-2 h-4 w-4" />
             Add Resource
-          </Button>
+          </button>
         </div>
       </div>
 

@@ -29,10 +29,11 @@ export interface EvaluationCriterion {
   name: string;
   description: string;
   weight: number;
-  type?: string;
+  type?: 'numeric' | 'star_rating' | 'yes_no' | 'liste_deroulante';
   accessibleBy: string[];
   filledBy?: 'mentors' | 'teams';
   requiresValidation: boolean;
+  options?: string[];
   rubric?: {
     id: string;
     score: number;

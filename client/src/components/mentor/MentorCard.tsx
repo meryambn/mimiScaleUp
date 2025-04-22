@@ -127,25 +127,34 @@ const MentorCard: React.FC<MentorCardProps> = ({
           <div className="flex space-x-2">
             {/* Edit button removed */}
             {onDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={() => onDelete(mentor.id)}
-                className="h-8 text-destructive"
+                style={{ backgroundColor: 'transparent', color: '#ef4444', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', height: '32px', fontSize: '0.875rem' }}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 {deleteButtonText || (isAssigned ? "Retirer" : "Supprimer")}
-              </Button>
+              </button>
             )}
           </div>
 
           {(onAssign || onRemove) && (
-            <Button
-              variant={isAssigned ? "secondary" : "default"}
-              size="sm"
+            <button
               onClick={handleAction}
               disabled={disabled}
-              className="h-8"
+              style={{
+                backgroundColor: isAssigned ? '#f3f4f6' : 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                background: isAssigned ? '#f3f4f6' : 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: isAssigned ? '#111827' : 'white',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                height: '32px',
+                fontSize: '0.875rem',
+                opacity: disabled ? '0.5' : '1'
+              }}
             >
               {isAssigned ? (
                 "Retirer"
@@ -155,7 +164,7 @@ const MentorCard: React.FC<MentorCardProps> = ({
                   Assigner
                 </>
               )}
-            </Button>
+            </button>
           )}
         </CardFooter>
       )}

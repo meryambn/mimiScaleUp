@@ -965,17 +965,15 @@ const ApplicationsPage = () => {
                   </CardContent>
                   <CardFooter className="flex flex-wrap gap-2 pt-2">
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                      <button
                         onClick={() => setPreviewForm(form)}
+                        style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         Preview
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                      </button>
+                      <button
+                        style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                         onClick={() => {
                           // Créer l'URL du formulaire
                           const formUrl = `${window.location.origin}/apply/${form.id}`;
@@ -999,23 +997,21 @@ const ApplicationsPage = () => {
                       >
                         <Link className="h-4 w-4 mr-1" />
                         Share
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                      </button>
+                      <button
+                        style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                         onClick={() => setLocation(`/applications/edit/${form.id}`)}
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                      </button>
+                      <button
+                        style={{ backgroundColor: 'transparent', color: '#e43e32', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                         onClick={() => handleDeleteForm(form.id)}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
-                      </Button>
+                      </button>
                     </div>
                   </CardFooter>
                 </Card>
@@ -1043,10 +1039,13 @@ const ApplicationsPage = () => {
             <>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium">Soumissions de candidature</h3>
-                <Button onClick={() => setShowTeamCreationDialog(true)}>
+                <button
+                  onClick={() => setShowTeamCreationDialog(true)}
+                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+                >
                   <UsersRound className="h-4 w-4 mr-2" />
                   Créer une équipe
-                </Button>
+                </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {programApplicationSubmissions.map((submission) => (
@@ -1087,8 +1086,7 @@ const ApplicationsPage = () => {
             </div>
 
             <DialogFooter className="flex justify-between">
-              <Button
-                variant="outline"
+              <button
                 onClick={() => {
                   const formId = previewForm?.id;
                   setPreviewForm(null);
@@ -1096,12 +1094,18 @@ const ApplicationsPage = () => {
                     setLocation(`/applications/edit/${formId}`);
                   }
                 }}
+                style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Form
-              </Button>
+              </button>
               <DialogClose asChild>
-                <Button type="button">Close Preview</Button>
+                <button
+                  type="button"
+                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+                >
+                  Close Preview
+                </button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>

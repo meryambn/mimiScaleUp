@@ -91,10 +91,14 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
               </TabsTrigger>
             </TabsList>
 
-            <Button onClick={handleFormSave} className="ml-auto">
+            <button
+              onClick={handleFormSave}
+              className="ml-auto"
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+            >
               <Check className="h-4 w-4 mr-2" />
               Enregistrer le formulaire
-            </Button>
+            </button>
           </div>
 
           <TabsContent value="questions" className="space-y-6">
@@ -126,9 +130,8 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
                     readOnly
                     className="bg-white"
                   />
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
+                    style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/apply/${programId}`);
                       toast({
@@ -138,7 +141,7 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
                     }}
                   >
                     <Copy className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </div>
                 <p className="text-xs text-gray-500">Partagez ce lien avec les équipes pour leur permettre de postuler à votre programme</p>
               </div>
@@ -265,7 +268,12 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
               )}
 
               <div className="pt-4 border-t">
-                <Button disabled>Soumettre la candidature</Button>
+                <button
+                  disabled
+                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'not-allowed', border: 'none', opacity: '0.5' }}
+                >
+                  Soumettre la candidature
+                </button>
               </div>
             </div>
           </TabsContent>
