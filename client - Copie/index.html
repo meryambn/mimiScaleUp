@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScaleUp - Startup Accelerator Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+      body {
+        font-family: 'Poppins', sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      #loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        flex-direction: column;
+      }
+      #error-message {
+        display: none;
+        background-color: #fee2e2;
+        color: #b91c1c;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+        max-width: 80%;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="loading">
+        <h2>Loading ScaleUp Dashboard...</h2>
+        <p>Please wait while the application initializes</p>
+        <div id="error-message"></div>
+      </div>
+    </div>
+    <script>
+      // Add error handling for script loading issues
+      window.addEventListener('error', function(e) {
+        console.error('Script error detected:', e);
+        const errorMsg = document.getElementById('error-message');
+        if (errorMsg) {
+          errorMsg.style.display = 'block';
+          errorMsg.textContent = 'An error occurred while loading the application. Please check the console for details.';
+        }
+      });
+
+      // Set a timeout to show an error message if the app doesn't load within 10 seconds
+      setTimeout(function() {
+        const root = document.getElementById('root');
+        const loading = document.getElementById('loading');
+        if (root && loading && root.children.length === 1) {
+          const errorMsg = document.getElementById('error-message');
+          if (errorMsg) {
+            errorMsg.style.display = 'block';
+            errorMsg.textContent = 'The application is taking longer than expected to load. There might be an issue with initialization.';
+          }
+        }
+      }, 10000);
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

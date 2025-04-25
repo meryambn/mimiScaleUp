@@ -1,0 +1,626 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'wouter';
+import { FaCamera, FaTrash, FaStar, FaBell, FaCog } from 'react-icons/fa';
+import { FiLogOut } from "react-icons/fi";
+import PasswordPopup from './PasswordPopup';
+import { useToast } from '@/hooks/use-toast';
+
+interface ProfileData {
+  'Nom': string;
+  'Prénom': string;
+  'Email': string;
+  'Téléphone': string;
+}
+
+interface Comment {
+  author?: string;
+  text: string;
+  date: string;
+}
+
+interface ApiResponse {
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone: string;
+}
+
+const ParticulierProfile: React.FC = () => {
+  const [profilePhoto, setProfilePhoto] = useState<string>('/default-avatar.jpg');
+  const [profileData, setProfileData] = useState<ProfileData>({
+    'Nom': 'Chargement...',
+    'Prénom': 'Chargement...',
+    'Email': 'Chargement...',
+    'Téléphone': 'Chargement...'
+  });
+  const [showPasswordPopup, setShowPasswordPopup] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rating, setRating] = useState<number>(0);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState<string>('');
+  const [apiData, setApiData] = useState<ApiResponse | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (!user?.id) {
+          throw new Error('Utilisateur non authentifié');
+        }
+  
+        const response = await fetch(`http://localhost:8083/api/profile/particulier/${user.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || errorData.error || 'Erreur lors de la récupération des données');
+        }
+  
+        const data: ApiResponse = await response.json();
+        console.log('Données reçues:', data);
+        setApiData(data);
+        
+        setProfileData({
+          'Nom': data.nom || 'Non renseigné',
+          'Prénom': data.prenom || 'Non renseigné',
+          'Email': data.email || 'Non renseigné',
+          'Téléphone': data.telephone || 'Non renseigné'
+        });
+  
+      } catch (err) {
+        console.error('Erreur:', err);
+        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    fetchProfileData();
+  }, []);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setProfilePhoto(result);
+        localStorage.setItem('profilePhoto', result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePhotoDelete = () => {
+    if (window.confirm('Supprimer la photo de profil ?')) {
+      setProfilePhoto('/default-avatar.jpg');
+      localStorage.removeItem('profilePhoto');
+    }
+  };
+
+  const handleRating = (value: number) => {
+    setRating(value);
+    localStorage.setItem('userRating', value.toString());
+  };
+
+  const handleAddComment = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (newComment.trim()) {
+      const updatedComments = [
+        ...comments,
+        {
+          text: newComment.trim(),
+          date: new Date().toLocaleDateString('fr-FR', { 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+          }),
+        },
+      ];
+      setComments(updatedComments);
+      localStorage.setItem('comments', JSON.stringify(updatedComments));
+      setNewComment('');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      const response = await fetch('http://localhost:8083/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`
+        }
+      });
+  
+      if (response.ok) {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        console.log('Déconnexion réussie');
+        
+        window.location.href = '/home';
+      } else {
+        const errorData = await response.json();
+        console.error('Erreur lors de la déconnexion:', errorData.error);
+      }
+    } catch (err) {
+      console.error('Erreur lors de la déconnexion:', err);
+    }
+  };
+
+  if (loading) {
+    return <div>Chargement...</div>;
+  }
+
+  if (error) {
+    return <div>Erreur: {error}</div>;
+  }
+
+  return (
+    <div className="profile-page">
+      <div className="profile-container">
+        {/* Barre de navigation */}
+        <nav className="navbar">
+          <div className="nav-links">
+            <Link to="/particulier/dashboard">Dashboard</Link>
+          </div>
+
+          <img 
+            src="/ScaleUp_Logo_-_Original_with_Transparent_Background_-_5000x5000.png" 
+            className="logo" 
+            alt="ScaleUp Logo" 
+          />
+
+          <div className="nav-links">
+            <Link to="#"><FaBell /></Link>
+            <button 
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              onClick={() => setShowPasswordPopup(true)}
+              className="nav-link-button"
+            >
+              <FaCog />
+            </button>
+            <FiLogOut onClick={handleLogout} style={{ cursor: 'pointer' }} />
+            <Link className="active">Mon Profil</Link>
+          </div>
+        </nav>
+
+        {/* Section principale */}
+        <section className="profile-section">
+          <div className="profile-header">
+            <div className="avatar-container">
+              <div className="avatar-card">
+                <div className="avatar-inner">
+                  <div className="avatar-front">
+                    <img src={profilePhoto} alt="Profile" />
+                  </div>
+                  <div className="avatar-back">
+                    <div className="avatar-actions">
+                      <label className="avatar-btn change-btn">
+                        <FaCamera /> Changer
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handlePhotoChange} 
+                          style={{ display: 'none' }} 
+                        />
+                      </label>
+                      <button 
+                        className="avatar-btn delete-btn" 
+                        onClick={handlePhotoDelete}
+                      >
+                        <FaTrash /> Supprimer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-content">
+            {/* Formulaire d'informations */}
+            <form className="user-info-card">
+              <h2>Informations du profil</h2>
+              <div className="info-grid">
+                {Object.entries(profileData).map(([label, value]) => (
+                  <div className="info-item" key={label}>
+                    <label>{label}</label>
+                    <div className="editable-input">
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </form>
+
+            {/* Section commentaires et évaluation */}
+            <div className="comments-section">
+              <div className="rating-section">
+                <h3>Note de ce profil</h3>
+                <div className="stars">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <FaStar
+                      key={star}
+                      className={rating >= star ? 'active' : ''}
+                      onClick={() => handleRating(star)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  ))}
+                </div>
+                <small className="rating-text">
+                  {rating 
+                    ? ['Très mauvais', 'Mauvais', 'Moyen', 'Bon', 'Excellent'][rating - 1] 
+                    : 'Cliquez pour noter'}
+                </small>
+              </div>
+
+              <h2>Votre Biographie</h2>
+              <div className="comments-list">
+                {comments.length > 0 ? (
+                  comments.map((comment, index) => (
+                    <div className="comment" key={index}>
+                      <p><strong>{comment.author}</strong> {comment.text}</p>
+                      <small>{comment.date}</small>
+                    </div>
+                  ))
+                ) : (
+                  <p></p>
+                )}
+              </div>
+
+              <form className="comment-form" onSubmit={handleAddComment}>
+                <textarea
+                  placeholder="Ajouter..."
+                  rows={3}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  required
+                />
+                <button type="submit" className="btn-primary">
+                  Envoyer
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <PasswordPopup 
+        isOpen={showPasswordPopup}
+        onClose={() => setShowPasswordPopup(false)}
+      />
+
+      <style jsx>{`
+        .profile-page {
+          min-height: 100vh;
+          background-color: #f5f5f5;
+        }
+
+        .profile-container {
+          font-family: 'Montserrat', sans-serif;
+          --primary: #e43e32;
+          --secondary: #0c4c80;
+          --light-gray: #f8f9fa;
+          --clean-white: #ffffff;
+          --dark-text: #2c3e50;
+          --shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+          --transition: all 0.3s ease;
+        }
+
+        .navbar {
+          position: fixed;
+          width: 100%;
+          padding: 1.5rem 5%;
+          background: var(--clean-white);
+          box-shadow: var(--shadow);
+          z-index: 1000;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          height: 80px;
+        }
+
+        .logo {
+          width: 150px;
+          transition: transform 0.4s ease;
+        }
+
+        .logo:hover {
+          transform: scale(1.05);
+        }
+
+        .nav-links {
+          display: flex;
+          gap: 2rem;
+          align-items: center;
+        }
+
+        .nav-links a {
+          text-decoration: none;
+          color: var(--dark-text);
+          font-weight: 600;
+          transition: var(--transition);
+        }
+
+        .nav-links a.active {
+          color: var(--primary);
+        }
+        
+        .nav-links a:hover {
+          color: var(--primary);
+        }
+
+        .profile-section {
+          padding: 8rem 5% 3rem;
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+
+        .profile-header {
+          position: relative;
+          height: 150px;
+          background: linear-gradient(to right, #000428, #004e92);
+          border-radius: 8px;
+          margin-bottom: 4rem;
+        }
+
+        .avatar-container {
+          position: absolute;
+          bottom: -50px;
+          left: 50px;
+        }
+
+        .avatar-card {
+          width: 140px;
+          height: 140px;
+          perspective: 1000px;
+        }
+
+        .avatar-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          transition: transform 0.8s;
+          transform-style: preserve-3d;
+          border-radius: 50%;
+          box-shadow: var(--shadow);
+          border: 3px solid white;
+        }
+
+        .avatar-card:hover .avatar-inner {
+          transform: rotateY(180deg);
+        }
+
+        .avatar-front,
+        .avatar-back {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          backface-visibility: hidden;
+          border-radius: 50%;
+          overflow: hidden;
+        }
+
+        .avatar-front img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .avatar-back {
+          background: var(--light-gray);
+          transform: rotateY(180deg);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
+        .avatar-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          width: 80%;
+        }
+
+        .avatar-btn {
+          padding: 0.5rem;
+          border: none;
+          border-radius: 20px;
+          font-size: 0.7rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.3rem;
+          transition: var(--transition);
+        }
+
+        .change-btn {
+          background: white;
+        }
+
+        .delete-btn {
+          background: rgba(255, 255, 255, 0.8);
+          color: var(--primary);
+        }
+
+        .profile-content {
+          display: flex;
+          gap: 2rem;
+          margin-top: 3rem;
+        }
+
+        .user-info-card {
+          flex: 1;
+          background: var(--clean-white);
+          padding: 2rem;
+          border-radius: 8px;
+          box-shadow: var(--shadow);
+        }
+
+        .info-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 1.5rem;
+          margin: 2rem 0;
+        }
+
+        .info-item {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .info-item label {
+          font-weight: 600;
+          color: var(--primary);
+          font-size: 0.9rem;
+        }
+
+        .editable-input {
+          background: var(--light-gray);
+          padding: 0.8rem;
+          border-radius: 8px;
+          border: 1px solid #ddd;
+          width: 100%;
+          transition: var(--transition);
+        }
+
+        .editable-input:focus {
+          border-color: var(--primary);
+          outline: none;
+          box-shadow: 0 0 5px rgba(228, 62, 50, 0.3);
+        }
+
+        .btn-primary {
+          background: var(--primary);
+          color: white;
+          border: none;
+          padding: 0.8rem 1.5rem;
+          border-radius: 25px;
+          cursor: pointer;
+          font-weight: 600;
+          width: 100%;
+          transition: var(--transition);
+        }
+
+        .btn-primary:hover {
+          opacity: 0.9;
+          transform: translateY(-2px);
+        }
+
+        .comments-section {
+          width: 350px;
+          background: var(--clean-white);
+          padding: 1.5rem;
+          border-radius: 8px;
+          box-shadow: var(--shadow);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .rating-section {
+          text-align: center;
+          margin-bottom: 1.5rem;
+        }
+
+        .stars {
+          display: flex;
+          justify-content: center;
+          gap: 0.5rem;
+          margin: 1rem 0;
+          color: #ddd;
+          font-size: 1.5rem;
+        }
+
+        .stars .active {
+          color: #ffd700;
+        }
+
+        .rating-text {
+          display: block;
+          color: var(--primary);
+          font-weight: 500;
+          font-size: 0.9rem;
+        }
+
+        .comments-list {
+          flex: 1;
+          overflow-y: auto;
+          max-height: 300px;
+          margin-bottom: 1rem;
+        }
+
+        .comment {
+          background: var(--light-gray);
+          padding: 0.8rem;
+          border-radius: 8px;
+          margin-bottom: 0.8rem;
+        }
+
+        .comment small {
+          color: #666;
+          font-size: 0.8rem;
+        }
+
+        .comment-form textarea {
+          width: 100%;
+          padding: 0.8rem;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          resize: none;
+          margin-bottom: 0.8rem;
+          min-height: 80px;
+        }
+
+        @media (max-width: 992px) {
+          .profile-content {
+            flex-direction: column;
+          }
+          
+          .comments-section {
+            width: 100%;
+            margin-top: 2rem;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .info-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .navbar {
+            flex-direction: column;
+            height: auto;
+            padding: 1rem;
+          }
+          
+          .nav-links {
+            width: 100%;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default ParticulierProfile; 

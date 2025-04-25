@@ -9,33 +9,125 @@ interface LoginModalProps {
   switchToRegister: () => void;
 }
 
+interface LoginFormData {
+  email: string;
+  password: string;
+}
+
+interface LoginResponse {
+  utilisateur: {
+    id: number;
+    email: string;
+    role: 'startup' | 'mentor' | 'particulier' | 'admin';
+    infosRole: Record<string, any>;
+  };
+  token: string;
+  error?: string;
+}
+
 const LoginModal: React.FC<LoginModalProps> = ({ show, onClose, switchToRegister }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
+  });
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const { login } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateForm = (): boolean => {
+    // Email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setError('Veuillez entrer une adresse email valide.');
+      return false;
+    }
+
+    // Password validation
+    if (formData.password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
 
     try {
-      // Add login logic here
-      await login(email, password);
-      console.log('Email:', email, 'Password:', password);
-      onClose();
-      setLocation('/dashboard');
+      // Appel direct à l'API de login
+      const response = await fetch('http://localhost:8083/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          motDePasse: formData.password,
+        }),
+      });
+
+      const data: LoginResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Identifiants invalides');
+      }
+
+      // Store user data in localStorage
+      localStorage.setItem('user', JSON.stringify(data.utilisateur));
+      localStorage.setItem('role', data.utilisateur.role);
+      localStorage.setItem('token', data.token);
+
+      // Call the login function from AuthContext
+      await login(formData.email, formData.password);
+
+      // Show success toast
       toast({
         title: "Connexion réussie",
         description: "Bienvenue sur ScaleUp!",
       });
+
+      // Close modal and redirect based on user role
+      onClose();
+      
+      // Attendre un court instant pour s'assurer que le modal est fermé
+      setTimeout(() => {
+        if (data.utilisateur.role === 'particulier') {
+          setLocation('/particulier/profile');
+        } else if (data.utilisateur.role === 'startup') {
+          setLocation('/startup/profile');
+        } else {
+          setLocation('/dashboard');
+        }
+      }, 100);
     } catch (error) {
+      console.error('Erreur serveur:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion';
+      setError(errorMessage);
       toast({
         title: "Erreur de connexion",
-        description: "Email ou mot de passe incorrect",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   if (!show) return null;
@@ -49,28 +141,37 @@ const LoginModal: React.FC<LoginModalProps> = ({ show, onClose, switchToRegister
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
+          {error && <p className="error-message">{error}</p>}
+          {loading && <p className="loading-message">Chargement...</p>}
+
           <div className="form-group">
-            <label>Email</label>
+            <label htmlFor="email">Email</label>
             <input
+              id="email"
+              name="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={formData.email}
+              onChange={handleInputChange}
               required
+              disabled={loading}
             />
           </div>
 
           <div className="form-group">
-            <label>Mot de passe</label>
+            <label htmlFor="password">Mot de passe</label>
             <input
+              id="password"
+              name="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleInputChange}
               required
+              disabled={loading}
             />
           </div>
 
-          <button type="submit" className="cta-button">
-            Se connecter
+          <button type="submit" className="cta-button" disabled={loading}>
+            {loading ? 'Connexion en cours...' : 'Se connecter'}
           </button>
         </form>
 
@@ -85,6 +186,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ show, onClose, switchToRegister
             <button
               className="link-button"
               onClick={switchToRegister}
+              disabled={loading}
             >
               S'inscrire
             </button>

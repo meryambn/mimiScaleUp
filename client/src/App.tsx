@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route, Switch } from 'wouter';
+import { Route, Switch, useLocation } from 'wouter';
 import Dashboard from './pages/dashboard';
 import TeamsPage from './pages/teams';
 import StartupDetailPage from './pages/teams/[id]';
@@ -28,8 +28,30 @@ import { TasksProvider } from "@/context/TasksContext";
 import { ResourcesProvider } from "@/context/ResourcesContext";
 import { DeliverablesProvider } from "@/context/DeliverablesContext";
 import Layout from "@/components/layout/Layout";
+import Profile from './components/Profile';
+import ParticulierProfilePage from './pages/particulier/profile';
+import StartupDashboardPage from './pages/startup/dashboard';
+import ParticulierDashboardPage from './pages/particulier/dashboard';
+import ParticulierMeetingsPage from './pages/particulier/meetings';
+import StartupMeetingsPage from './pages/startup/meetings';
+import StartupDeliverablesPage from './pages/startup/deliverables';
+import ParticulierDeliverablesPage from './pages/particulier/deliverables';
+import StartupResourcePage from './pages/startup/resources';
+import ParticulierResourcePage from './pages/particulier/resources';
+import StartupTasksPage from './pages/startup/tasks';
+import ParticulierTasksPage from './pages/particulier/tasks';
+import StartupAnalytics from './pages/startup/analytics';
 
 const App = () => {
+  const [, setLocation] = useLocation();
+
+  React.useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/') {
+      setLocation('/home');
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -40,6 +62,16 @@ const App = () => {
                 <DeliverablesProvider>
                   <Switch>
                     <Route path="/">
+                      {() => {
+                        const [, setLocation] = useLocation();
+                        React.useEffect(() => {
+                          setLocation('/home');
+                        }, []);
+                        return null;
+                      }}
+                    </Route>
+
+                    <Route path="/home">
                       {() => (
                         <HomeLayout>
                           <HomePage />
@@ -47,13 +79,42 @@ const App = () => {
                       )}
                     </Route>
 
-                    <Route path="/dashboard">
-                      {() => (
-                        <Layout>
-                          <Dashboard />
-                        </Layout>
-                      )}
+                    <Route path="/startup/dashboard">
+                      {() => <StartupDashboardPage />}
                     </Route>
+
+                    <Route path="/particulier/dashboard">
+                      {() => <ParticulierDashboardPage />}
+                    </Route>
+
+                    <Route path="/particulier/meetings">
+                      {() => <ParticulierMeetingsPage />}
+                    </Route>
+
+                    <Route path="/startup/profile">
+                      {() => <Profile />}
+                    </Route>
+
+                    <Route path="/particulier/profile">
+                      {() => <ParticulierProfilePage />}
+                    </Route>
+
+                    <Route path="/startup/livrable">
+                      {() => <StartupDeliverablesPage />}
+                    </Route>
+
+                    <Route path="/particulier/livrable">
+                      {() => <ParticulierDeliverablesPage />}
+                    </Route>
+
+                    <Route path="/startup/ressource">
+                      {() => <StartupResourcePage />}
+                    </Route>
+
+                    <Route path="/particulier/ressource">
+                      {() => <ParticulierResourcePage />}
+                    </Route>
+
                     <Route path="/teams">
                       {() => (
                         <Layout>
@@ -139,6 +200,23 @@ const App = () => {
                         </Layout>
                       )}
                     </Route>
+
+                    <Route path="/startup/meetings">
+                      {() => <StartupMeetingsPage />}
+                    </Route>
+
+                    <Route path="/startup/tasks">
+                      {() => <StartupTasksPage />}
+                    </Route>
+
+                    <Route path="/startup/analytics">
+                      {() => <StartupAnalytics />}
+                    </Route>
+
+                    <Route path="/particulier/tasks">
+                      {() => <ParticulierTasksPage />}
+                    </Route>
+
                     <Route>
                       {() => (
                         <Layout>
