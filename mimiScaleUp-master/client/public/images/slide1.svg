@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c4c80" />
+      <stop offset="100%" stop-color="#1a6baf" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg)" />
+  
+  <!-- Grid pattern -->
+  <path d="M0 100 H1200 M0 200 H1200 M0 300 H1200 M0 400 H1200 M0 500 H1200 M0 600 H1200 M0 700 H1200" stroke="white" stroke-width="1" stroke-opacity="0.1" />
+  <path d="M100 0 V800 M200 0 V800 M300 0 V800 M400 0 V800 M500 0 V800 M600 0 V800 M700 0 V800 M800 0 V800 M900 0 V800 M1000 0 V800 M1100 0 V800" stroke="white" stroke-width="1" stroke-opacity="0.1" />
+  
+  <!-- Abstract network nodes -->
+  <circle cx="300" cy="200" r="20" fill="white" fill-opacity="0.8" />
+  <circle cx="500" cy="300" r="15" fill="white" fill-opacity="0.8" />
+  <circle cx="700" cy="250" r="25" fill="white" fill-opacity="0.8" />
+  <circle cx="900" cy="400" r="18" fill="white" fill-opacity="0.8" />
+  <circle cx="400" cy="500" r="22" fill="white" fill-opacity="0.8" />
+  <circle cx="600" cy="600" r="16" fill="white" fill-opacity="0.8" />
+  <circle cx="800" cy="500" r="20" fill="white" fill-opacity="0.8" />
+  
+  <!-- Connection lines -->
+  <path d="M300 200 L500 300 L700 250 L900 400 L800 500 L600 600 L400 500 Z" stroke="white" stroke-width="2" stroke-opacity="0.6" fill="none" />
+  
+  <!-- Title -->
+  <text x="600" y="700" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="white" text-anchor="middle">Écosystème Dynamique</text>
+</svg>
