@@ -315,44 +315,47 @@ const Profile: React.FC = () => {
 
   return (
     <div className="profile-page">
-      <div className="profile-container">
-        {/* Barre de navigation */}
-        <nav className="navbar">
-          <div className="nav-links">
-            <Link to="/startup/dashboard">Dashboard</Link>
-          </div>
+    <div className="profile-container">
+      {/* Barre de navigation */}
+      <nav className="navbar">
+        <div className="nav-links">
+          <Link to="/startup/dashboard">Dashboard</Link>
+        </div>
 
-          <img
-            src="/ScaleUp_Logo_-_Original_with_Transparent_Background_-_5000x5000.png"
-            className="logo"
-            alt="ScaleUp Logo"
-          />
+        <img
+          src="/ScaleUp_Logo_-_Original_with_Transparent_Background_-_5000x5000.png"
+          className="logo"
+          alt="ScaleUp Logo"
+        />
 
-          <div className="nav-links">
-            <Link to="#"><FaBell /></Link>
-            <button
-              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              onClick={() => setShowPasswordPopup(true)}
-              className="nav-link-button"
-            >
-              <FaCog />
-            </button>
-            <div
-              onClick={handleLogout}
-              style={{
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                color: '#e43e32'
-              }}
-            >
-              <FiLogOut size={18} />
-              <span>Déconnexion</span>
-            </div>
-            <Link className="active">Mon Profil</Link>
+        <div className="nav-links">
+          <Link to="/startup/notifications" className="notification-link">
+            <FaBell />
+            <span className="notification-badge"></span>
+          </Link>
+          <button
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            onClick={() => setShowPasswordPopup(true)}
+            className="nav-link-button"
+          >
+            <FaCog />
+          </button>
+          <div
+            onClick={handleLogout}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: '#e43e32'
+            }}
+          >
+            <FiLogOut size={18} />
+            <span>Déconnexion</span>
           </div>
-        </nav>
+          <Link className="active">Mon Profil</Link>
+        </div>
+      </nav>
 
         {/* Section principale */}
         <section className="profile-section">
@@ -605,7 +608,7 @@ const Profile: React.FC = () => {
 
         .nav-links a:hover {
           color: var(--primary);
-        }
+        }   
 
         .profile-section {
           padding: 8rem 5% 3rem;
@@ -994,7 +997,32 @@ const Profile: React.FC = () => {
             height: auto;
             padding: 1rem;
           }
+            .notification-link {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          text-decoration: none;
+          color: var(--dark-text);
+          transition: var(--transition);
+        }
 
+        .notification-badge {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background-color: var(--primary);
+          color: white;
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 2px 6px;
+          border-radius: 10px;
+          min-width: 18px;
+          text-align: center;
+        }
+
+        .notification-link:hover {
+          color: var(--primary);
+        }
           .nav-links {
             width: 100%;
             justify-content: space-between;

@@ -176,7 +176,10 @@ const ParticulierProfile: React.FC = () => {
           />
 
           <div className="nav-links">
-            <Link to="#"><FaBell /></Link>
+            <Link to="/particulier/notifications" className="notification-link">
+              <FaBell />
+              <span className="notification-badge">3</span>
+            </Link>
             <button
               style={{ background: 'none', border: 'none', cursor: 'pointer' }}
               onClick={() => setShowPasswordPopup(true)}
@@ -617,6 +620,33 @@ const ParticulierProfile: React.FC = () => {
             justify-content: space-between;
             margin: 0.5rem 0;
           }
+        }
+
+        .notification-link {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          text-decoration: none;
+          color: var(--dark-text);
+          transition: var(--transition);
+        }
+
+        .notification-badge {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background-color: var(--primary);
+          color: white;
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 2px 6px;
+          border-radius: 10px;
+          min-width: 18px;
+          text-align: center;
+        }
+
+        .notification-link:hover {
+          color: var(--primary);
         }
       `}</style>
     </div>

@@ -156,27 +156,11 @@ const ParticulierResourcePage = () => {
         {/* Header */}
         <header className="resources-header">
           <div>
-            <h1>Ressources - Phase {activePhase}</h1>
+            <h1>Ressources</h1>
             <p className="subtitle">Documents et templates pour votre parcours</p>
           </div>
         </header>
 
-        {/* Phases Navigation */}
-        <section className="phases-section">
-          <div className="phases-tabs">
-            {[1, 2, 3, 4].map((phase) => (
-              <motion.button
-                key={phase}
-                className={`phase-tab ${activePhase === phase ? 'active' : ''}`}
-                onClick={() => handlePhaseChange(phase)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Phase {phase}
-              </motion.button>
-            ))}
-          </div>
-        </section>
 
         {/* Search and Filters */}
         <div className="search-filters">
