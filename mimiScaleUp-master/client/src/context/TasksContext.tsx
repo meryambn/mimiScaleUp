@@ -332,10 +332,84 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   ];
 
-  // Initialize tasks with initial data
+  // Initialize tasks with program data or fallback to initial data
   useEffect(() => {
+    if (selectedProgram && selectedProgram.phases) {
+      console.log('Loading tasks from program phases...', selectedProgram);
+
+      // Extract tasks from all phases
+      const programTasks: Task[] = [];
+
+      // Also extract phases for the phase filter
+      const programPhases: Phase[] = [];
+
+      selectedProgram.phases.forEach((phase: any) => {
+        // Add phase to phases list for filtering
+        programPhases.push({
+          id: String(phase.id),
+          name: phase.name,
+          color: phase.color || '#818cf8'
+        });
+
+        if (phase.tasks && Array.isArray(phase.tasks)) {
+          const phaseTasks = phase.tasks.map((task: any) => {
+            // Map backend task to frontend Task format
+            // Normalize status to English values for consistency
+            let normalizedStatus = task.status || 'todo';
+
+            // Map various status values to our three standard statuses
+            if (normalizedStatus === 'à faire' ||
+                normalizedStatus?.toLowerCase() === 'a faire' ||
+                normalizedStatus === 'not_started' ||
+                normalizedStatus === 'pending') {
+              normalizedStatus = 'todo';
+            } else if (normalizedStatus === 'en cours' ||
+                       normalizedStatus?.toLowerCase() === 'en_cours' ||
+                       normalizedStatus === 'in_progress' ||
+                       normalizedStatus === 'started') {
+              normalizedStatus = 'in_progress';
+            } else if (normalizedStatus === 'terminé' ||
+                       normalizedStatus?.toLowerCase() === 'termine' ||
+                       normalizedStatus === 'completed' ||
+                       normalizedStatus === 'done') {
+              normalizedStatus = 'completed';
+            }
+
+            return {
+              id: String(task.id),
+              title: task.name || task.title || 'Untitled Task',
+              name: task.name || task.title || 'Untitled Task',
+              description: task.description || '',
+              dueDate: task.dueDate || task.date_decheance || new Date().toISOString().split('T')[0],
+              status: normalizedStatus,
+              priority: task.priority || 'medium',
+              assignee: task.assignee || 'Unassigned',
+              phaseId: String(phase.id),
+              phaseName: phase.name,
+              tags: task.tags || [],
+              isOverdue: new Date(task.dueDate || task.date_decheance) < new Date(today),
+              programId: String(selectedProgram.id),
+              forAllTeams: true
+            };
+          });
+
+          programTasks.push(...phaseTasks);
+        }
+      });
+
+      // Update phases for filtering
+      setPhases(programPhases);
+
+      if (programTasks.length > 0) {
+        // Use ONLY program tasks when available
+        setTasks(programTasks);
+        return; // Exit early to avoid setting mock tasks
+      }
+    }
+
+    // Only use mock tasks if no program is selected or no program tasks are available
     setTasks(initialTasks);
-  }, []);
+  }, [selectedProgram, today]);
 
   // Filter tasks based on selected filters, search query, and program
   const filteredTasks = tasks.filter(task => {
@@ -348,18 +422,40 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const matchesSearch = searchQuery === '' ||
                         title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = selectedStatuses.length === 0 || (task.status && selectedStatuses.includes(task.status));
+    // Handle both English and French status values for filtering
+    const matchesStatus = selectedStatuses.length === 0 || (task.status && (
+      selectedStatuses.includes(task.status) ||
+      (task.status === 'todo' && selectedStatuses.includes('à faire')) ||
+      (task.status === 'in_progress' && selectedStatuses.includes('en cours')) ||
+      (task.status === 'completed' && selectedStatuses.includes('terminé'))
+    ));
     const matchesPriority = selectedPriorities.length === 0 || (task.priority && selectedPriorities.includes(task.priority));
     const matchesPhase = !selectedPhase || task.phaseId === selectedPhase;
+
+    // Only show tasks for the selected program
     const matchesProgram = !selectedProgramId || task.programId === selectedProgramId;
+
     return matchesSearch && matchesStatus && matchesPriority && matchesPhase && matchesProgram;
   });
 
-  // Group tasks by status
+  // Group tasks by status - handle both English and French status values
   const tasksByStatus = {
-    todo: filteredTasks.filter(task => task.status === 'todo'),
-    in_progress: filteredTasks.filter(task => task.status === 'in_progress'),
-    completed: filteredTasks.filter(task => task.status === 'completed')
+    todo: filteredTasks.filter(task =>
+      task.status === 'todo' ||
+      task.status === 'à faire' ||
+      task.status?.toLowerCase() === 'a faire' ||
+      task.status === 'not_started' ||
+      task.status === 'pending'),
+    in_progress: filteredTasks.filter(task =>
+      task.status === 'in_progress' ||
+      task.status === 'en cours' ||
+      task.status?.toLowerCase() === 'en_cours' ||
+      task.status === 'started'),
+    completed: filteredTasks.filter(task =>
+      task.status === 'completed' ||
+      task.status === 'terminé' ||
+      task.status?.toLowerCase() === 'termine' ||
+      task.status === 'done')
   };
 
   // Function to get a phase by ID

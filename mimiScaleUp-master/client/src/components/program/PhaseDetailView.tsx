@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,8 +13,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import React from 'react';
-import { Badge } from "@/components/ui/badge";
+
 import { Phase, Task, Meeting, EvaluationCriterion } from '@/types/program';
+import {
+  createReunion,
+  createCritere,
+  createLivrable,
+  CreateReunionRequest,
+  CreateCritereRequest,
+  CreateLivrableRequest
+} from '@/services/programService';
 
 // Define the Deliverable interface
 export interface Deliverable {
@@ -151,9 +159,10 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
     onUpdate(updatedPhase);
   };
 
-  const handleAddMeeting = () => {
+  const handleAddMeeting = async () => {
     if (!newMeeting.name) return;
 
+    // Create the meeting in the local state first
     const meetingToAdd: Meeting = {
       id: `meeting-${Date.now()}`,
       title: newMeeting.name,
@@ -176,7 +185,50 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
       ]
     };
 
+    // Update the UI immediately
     onUpdate(updatedPhase);
+
+    // Check if this is a valid numeric phase ID (from the database)
+    const isValidPhaseId = !isNaN(Number(phase.id)) ||
+                          (typeof phase.id === 'string' &&
+                           phase.id.match(/^\d+$/) !== null);
+
+    // Only try to save to the backend if this is not a temporary phase
+    if (isValidPhaseId) {
+      try {
+        // Format the date as YYYY-MM-DD
+        const formattedDate = format(newMeeting.date, 'yyyy-MM-dd');
+
+        // Prepare the API request data
+        const reunionData: CreateReunionRequest = {
+          nom_reunion: newMeeting.name,
+          date: formattedDate,
+          heure: newMeeting.time,
+          lieu: newMeeting.location || (newMeeting.meetingType === 'online' ? 'Réunion virtuelle' : 'À déterminer')
+        };
+
+        console.log('Sending reunion data to API:', reunionData);
+
+        // Extract the numeric part if it's in format "phase-123"
+        const phaseIdMatch = phase.id.match(/\d+$/);
+        const numericPhaseId = phaseIdMatch ? phaseIdMatch[0] : phase.id;
+
+        console.log('Using numeric phase ID for API call:', numericPhaseId);
+
+        // Send the data to the backend API
+        const result = await createReunion(numericPhaseId, reunionData);
+        console.log('Reunion created successfully:', result);
+      } catch (error) {
+        console.error('Error creating reunion:', error);
+        // We'll continue anyway since we've already updated the UI
+        alert('La réunion a été ajoutée localement, mais n\'a pas pu être enregistrée sur le serveur. Les modifications seront perdues lors de l\'actualisation de la page.');
+      }
+    } else {
+      console.log('Skipping backend API call for temporary phase');
+      alert('Cette phase n\'a pas encore été enregistrée sur le serveur. La réunion a été ajoutée localement, mais sera perdue lors de l\'actualisation de la page.');
+    }
+
+    // Reset the form
     setNewMeeting({
       id: '',
       name: '',
@@ -201,21 +253,75 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
     onUpdate(updatedPhase);
   };
 
-  const handleAddCriterion = () => {
+  const handleAddCriterion = async () => {
     if (!newCriterion.name) return;
+
+    // Create the criterion in the local state first
+    const criterionToAdd = {
+      ...newCriterion,
+      id: `criterion-${Date.now()}`
+    };
 
     const updatedPhase = {
       ...phase,
       evaluationCriteria: [
         ...(Array.isArray(phase.evaluationCriteria) ? phase.evaluationCriteria : []),
-        {
-          ...newCriterion,
-          id: `criterion-${Date.now()}`
-        }
+        criterionToAdd
       ]
     };
 
+    // Update the UI immediately
     onUpdate(updatedPhase);
+
+    // Check if this is a valid numeric phase ID (from the database)
+    const isValidPhaseId = !isNaN(Number(phase.id)) ||
+                          (typeof phase.id === 'string' &&
+                           phase.id.match(/^\d+$/) !== null);
+
+    // Only try to save to the backend if this is a valid phase ID
+    if (isValidPhaseId) {
+      try {
+        // Map the frontend criterion type to the backend type
+        const typeMap: Record<string, string> = {
+          'star_rating': 'etoiles',
+          'numeric': 'numerique',
+          'yes_no': 'oui_non',
+          'dropdown': 'liste_deroulante'
+        };
+
+        // Prepare the API request data
+        const critereData: CreateCritereRequest = {
+          nom_critere: newCriterion.name,
+          type: newCriterion.type ? typeMap[newCriterion.type] || 'etoiles' : 'etoiles',
+          poids: newCriterion.weight,
+          accessible_mentors: newCriterion.accessibleBy.includes('mentors'),
+          accessible_equipes: newCriterion.accessibleBy.includes('teams'),
+          rempli_par: newCriterion.filledBy === 'mentors' ? 'mentor' : 'equipe',
+          necessite_validation: newCriterion.requiresValidation
+        };
+
+        console.log('Sending critere data to API:', critereData);
+
+        // Extract the numeric part if it's in format "phase-123"
+        const phaseIdMatch = phase.id.match(/\d+$/);
+        const numericPhaseId = phaseIdMatch ? phaseIdMatch[0] : phase.id;
+
+        console.log('Using numeric phase ID for API call:', numericPhaseId);
+
+        // Send the data to the backend API
+        const result = await createCritere(numericPhaseId, critereData);
+        console.log('Critere created successfully:', result);
+      } catch (error) {
+        console.error('Error creating critere:', error);
+        // We'll continue anyway since we've already updated the UI
+        alert('Le critère a été ajouté localement, mais n\'a pas pu être enregistré sur le serveur. Les modifications seront perdues lors de l\'actualisation de la page.');
+      }
+    } else {
+      console.log('Skipping backend API call for temporary phase');
+      alert('Cette phase n\'a pas encore été enregistrée sur le serveur. Le critère a été ajouté localement, mais sera perdu lors de l\'actualisation de la page.');
+    }
+
+    // Reset the form
     setNewCriterion({
       id: '',
       name: '',
@@ -238,9 +344,10 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
     onUpdate(updatedPhase);
   };
 
-  const handleAddDeliverable = () => {
+  const handleAddDeliverable = async () => {
     if (!newDeliverable.name) return;
 
+    // Create the deliverable in the local state first
     const deliverableToAdd = {
       ...newDeliverable,
       id: `deliverable-${Date.now()}`
@@ -253,8 +360,56 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
         : [deliverableToAdd]
     };
 
+    // Update the UI immediately
     onUpdate(updatedPhase);
 
+    // Check if this is a valid numeric phase ID (from the database)
+    const isValidPhaseId = !isNaN(Number(phase.id)) ||
+                          (typeof phase.id === 'string' &&
+                           phase.id.match(/^\d+$/) !== null);
+
+    // Only try to save to the backend if this is a valid phase ID
+    if (isValidPhaseId) {
+      try {
+        // Format the date as YYYY-MM-DD
+        // The backend expects a date string in the format 'YYYY-MM-DD'
+        const formattedDate = format(newDeliverable.dueDate, 'yyyy-MM-dd');
+
+        // Convert allowed file types array to a comma-separated string
+        const fileTypes = Array.isArray(newDeliverable.allowedFileTypes)
+          ? newDeliverable.allowedFileTypes.join(', ')
+          : '.pdf, .docx';
+
+        // Prepare the API request data
+        const livrableData: CreateLivrableRequest = {
+          nom: newDeliverable.name,
+          description: newDeliverable.description,
+          date_echeance: formattedDate,
+          types_fichiers: fileTypes
+        };
+
+        console.log('Sending livrable data to API:', livrableData);
+
+        // Extract the numeric part if it's in format "phase-123"
+        const phaseIdMatch = phase.id.match(/\d+$/);
+        const numericPhaseId = phaseIdMatch ? phaseIdMatch[0] : phase.id;
+
+        console.log('Using numeric phase ID for API call:', numericPhaseId);
+
+        // Send the data to the backend API
+        const result = await createLivrable(numericPhaseId, livrableData);
+        console.log('Livrable created successfully:', result);
+      } catch (error) {
+        console.error('Error creating livrable:', error);
+        // We'll continue anyway since we've already updated the UI
+        alert('Le livrable a été ajouté localement, mais n\'a pas pu être enregistré sur le serveur. Les modifications seront perdues lors de l\'actualisation de la page.');
+      }
+    } else {
+      console.log('Skipping backend API call for temporary phase');
+      alert('Cette phase n\'a pas encore été enregistrée sur le serveur. Le livrable a été ajouté localement, mais sera perdu lors de l\'actualisation de la page.');
+    }
+
+    // Reset the form
     setNewDeliverable({
       id: '',
       name: '',
@@ -265,7 +420,7 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
       required: true,
       maxFileSize: 10,
       allowedFileTypes: ['.pdf', '.doc', '.docx']
-    } );
+    });
   };
 
   const handleRemoveDeliverable = (deliverableId: string) => {
@@ -278,8 +433,25 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
     onUpdate(updatedPhase);
   };
 
+  // Check if this is a temporary phase ID (like a timestamp from Date.now())
+  const isTemporaryPhase = phase.id.includes('phase-') && phase.id.length > 15;
+
   return (
     <div className="bg-white rounded-lg border p-6">
+      {/* Warning for temporary phases */}
+      {isTemporaryPhase && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800">
+          <p className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span>
+              <strong>Phase temporaire :</strong> Cette phase n'a pas encore été enregistrée sur le serveur. Les modifications apportées (réunions, critères, livrables) seront perdues lors de l'actualisation de la page.
+            </span>
+          </p>
+        </div>
+      )}
+
       {/* Phase Details Section */}
       <div className="mb-6 space-y-4">
         <div className="flex items-center justify-between">

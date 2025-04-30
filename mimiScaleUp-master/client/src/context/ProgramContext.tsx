@@ -2,6 +2,17 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { useLocation } from "wouter";
 import { Program, Phase } from "@/types/program";
 import { v4 as uuidv4 } from 'uuid';
+import {
+  getProgram,
+  getPhases,
+  getTasks,
+  getReunions,
+  getCriteres,
+  getLivrables,
+  createCritere,
+  createReunion,
+  createLivrable
+} from "@/services/programService";
 
 // Example programs
 const examplePrograms: Program[] = [
@@ -305,8 +316,9 @@ interface ProgramContextType {
   setCurrentStep: (step: number) => void;
   resetProgramCreation: () => void;
   setSelectedProgram: (program: Program) => void;
-  createProgram: (program: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  createProgram: (program: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateProgram: (updatedProgram: Program) => void;
+  isLoading: boolean;
 }
 
 const ProgramContext = createContext<ProgramContextType | undefined>(undefined);
@@ -323,12 +335,271 @@ interface ProgramProviderProps {
   children: ReactNode;
 }
 
+// Utility function to deduplicate programs by ID
+const deduplicatePrograms = (programs: Program[]): Program[] => {
+  const programsMap = new Map<string, Program>();
+
+  // Add all programs to the map (this will automatically deduplicate by ID)
+  programs.forEach(program => {
+    programsMap.set(program.id, program);
+  });
+
+  // Convert map back to array
+  return Array.from(programsMap.values());
+};
+
 export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) => {
   const [location] = useLocation();
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [programs, setPrograms] = useState<Program[]>(examplePrograms);
   const [currentStep, setCurrentStep] = useState<number>(1);
+  // selectedProgram is used in the context value
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
+  // isLoading is used to track API request status
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Custom setter for programs that ensures deduplication
+  const setDeduplicatedPrograms = (newPrograms: Program[] | ((prev: Program[]) => Program[])) => {
+    if (typeof newPrograms === 'function') {
+      setPrograms(prev => deduplicatePrograms(newPrograms(prev)));
+    } else {
+      setPrograms(deduplicatePrograms(newPrograms));
+    }
+  };
+
+  // Define the function to load programs from the backend
+  const loadProgramsFromBackend = async () => {
+      try {
+        setIsLoading(true);
+        console.log('Loading programs from backend...');
+
+        // Since there's no endpoint to get all programs, we'll try a range of IDs
+        // This is a workaround to fetch all programs without a dedicated endpoint
+
+        // Create a Set to track program IDs we've already processed
+        // This will help prevent duplicates
+        const processedProgramIds = new Set<number>();
+
+        // Try to find programs by checking a range of IDs
+        // Start with the most recent IDs (higher numbers) to prioritize newer programs
+        const programIds: number[] = [];
+
+        // Check the most recent 200 IDs
+        for (let i = 200; i >= 1; i--) {
+          programIds.push(i);
+        }
+
+        console.log(`Checking for programs with IDs from 200 down to 1...`);
+
+        // Try to fetch each program
+        const fetchedPrograms: Program[] = [];
+
+        // Keep track of consecutive failures to optimize the process
+        let consecutiveFailures = 0;
+        const MAX_CONSECUTIVE_FAILURES = 10;
+
+        for (const id of programIds) {
+          // Skip IDs we've already processed
+          if (processedProgramIds.has(id)) {
+            console.log(`Skipping already processed program ID: ${id}`);
+            continue;
+          }
+
+          // If we've had too many consecutive failures, assume we've reached the end of valid programs
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            console.log(`Stopping program search after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
+            break;
+          }
+
+          try {
+            const programDetails = await getProgram(id);
+            if (programDetails) {
+              // Mark this ID as processed
+              processedProgramIds.add(id);
+
+              consecutiveFailures = 0; // Reset counter on success
+              console.log(`Found program with ID ${id}:`, programDetails.nom);
+
+              // Map mentors from backend format to frontend format
+              const mappedMentors = (programDetails.mentors || []).map((mentor: any) => ({
+                id: mentor.utilisateur_id,
+                name: `${mentor.prenom} ${mentor.nom}`,
+                expertise: mentor.profession || 'General',
+                bio: mentor.bio || `${mentor.prenom} ${mentor.nom} - ${mentor.profession || 'Mentor'}`,
+                email: mentor.email || `mentor${mentor.utilisateur_id}@example.com`,
+                title: mentor.profession || 'Program Mentor',
+                rating: 4.5, // Default rating
+                isTopMentor: true // Default value
+              }));
+
+              console.log('Mapped mentors:', mappedMentors);
+
+              // Parse array fields from PostgreSQL format if needed
+              let requiredStages = [];
+              let requiredIndustries = [];
+              let requiredDocuments = [];
+
+              try {
+                // Handle PostgreSQL array format like "{item1,item2}"
+                if (typeof programDetails.phases_requises === 'string') {
+                  requiredStages = programDetails.phases_requises
+                    .replace(/^\{|\}$/g, '') // Remove { and }
+                    .split(',')
+                    .filter(Boolean)
+                    .map((item: string) => item.trim().replace(/^"|"$/g, '')); // Remove quotes
+                } else if (Array.isArray(programDetails.phases_requises)) {
+                  requiredStages = programDetails.phases_requises;
+                }
+
+                if (typeof programDetails.industries_requises === 'string') {
+                  requiredIndustries = programDetails.industries_requises
+                    .replace(/^\{|\}$/g, '')
+                    .split(',')
+                    .filter(Boolean)
+                    .map((item: string) => item.trim().replace(/^"|"$/g, ''));
+                } else if (Array.isArray(programDetails.industries_requises)) {
+                  requiredIndustries = programDetails.industries_requises;
+                }
+
+                if (typeof programDetails.documents_requis === 'string') {
+                  requiredDocuments = programDetails.documents_requis
+                    .replace(/^\{|\}$/g, '')
+                    .split(',')
+                    .filter(Boolean)
+                    .map((item: string) => item.trim().replace(/^"|"$/g, ''));
+                } else if (Array.isArray(programDetails.documents_requis)) {
+                  requiredDocuments = programDetails.documents_requis;
+                }
+              } catch (error) {
+                console.error('Error parsing array fields:', error);
+              }
+
+              console.log('Parsed eligibility criteria:', {
+                stages: requiredStages,
+                industries: requiredIndustries,
+                documents: requiredDocuments
+              });
+
+              // We need to fetch phases for this program to ensure they're loaded correctly
+              let programPhases: Phase[] = [];
+              try {
+                // Fetch phases for this program
+                const phases = await getPhases(id);
+                console.log(`Loaded ${phases.length} phases for program ${id}:`, phases);
+
+                if (phases && phases.length > 0) {
+                  // Map phases to frontend format
+                  programPhases = phases.map((phase: any) => {
+                    // Determine phase status based on dates
+                    const now = new Date();
+                    const startDate = new Date(phase.date_debut);
+                    const endDate = new Date(phase.date_fin);
+
+                    let phaseStatus: "not_started" | "in_progress" | "completed" = "not_started";
+                    if (now > endDate) {
+                      phaseStatus = "completed";
+                    } else if (now >= startDate && now <= endDate) {
+                      phaseStatus = "in_progress";
+                    }
+
+                    return {
+                      id: String(phase.id),
+                      name: phase.nom,
+                      description: phase.description,
+                      startDate: new Date(phase.date_debut),
+                      endDate: new Date(phase.date_fin),
+                      status: phaseStatus,
+                      color: "#818cf8", // Default color
+                      tasks: [],
+                      meetings: [],
+                      evaluationCriteria: [],
+                      deliverables: []
+                    };
+                  });
+                }
+              } catch (error) {
+                console.error(`Error fetching phases for program ${id}:`, error);
+              }
+
+              // Convert to frontend format
+              const convertedProgram = {
+                id: String(programDetails.id),
+                name: programDetails.nom,
+                description: programDetails.description,
+                startDate: programDetails.date_debut,
+                endDate: programDetails.date_fin,
+                status: "active" as "active" | "completed" | "draft",
+                phases: programPhases,
+                mentors: mappedMentors,
+                evaluationCriteria: [],
+                eligibilityCriteria: {
+                  minTeamSize: programDetails.taille_equipe_min || 1,
+                  maxTeamSize: programDetails.taille_equipe_max || 5,
+                  requiredStages: requiredStages,
+                  requiredIndustries: requiredIndustries,
+                  minRevenue: programDetails.ca_min || 0,
+                  maxRevenue: programDetails.ca_max || 100000,
+                  requiredDocuments: requiredDocuments
+                },
+                dashboardWidgets: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              };
+
+              // Check if this program is already in the fetchedPrograms array
+              const isDuplicate = fetchedPrograms.some(p => p.id === convertedProgram.id);
+              if (!isDuplicate) {
+                fetchedPrograms.push(convertedProgram);
+              } else {
+                console.log(`Skipping duplicate program with ID ${convertedProgram.id}`);
+              }
+            }
+          } catch (error) {
+            // Increment the consecutive failures counter
+            consecutiveFailures++;
+            // Ignore errors for programs that don't exist
+            // Don't log these errors to avoid cluttering the console
+          }
+        }
+
+        console.log('Fetched programs from API:', fetchedPrograms.length);
+
+        if (fetchedPrograms.length > 0) {
+          // Use programs from the backend, but make sure there are no duplicates
+          // Create a Map to deduplicate programs by ID
+          const programsMap = new Map();
+
+          // Add all fetched programs to the map
+          fetchedPrograms.forEach(program => {
+            programsMap.set(program.id, program);
+          });
+
+          // Convert map back to array
+          const uniquePrograms = Array.from(programsMap.values());
+          console.log(`Found ${uniquePrograms.length} unique programs`);
+
+          // Replace the programs state entirely with the unique programs from the backend
+          // This ensures we don't have any duplicates from previous loads
+          setPrograms(uniquePrograms);
+        } else {
+          // Fallback to example programs if no programs found
+          console.log('No programs found in backend, using example programs');
+          setPrograms(examplePrograms);
+        }
+
+      } catch (error) {
+        console.error('Error loading programs:', error);
+        // Fallback to example programs
+        setPrograms(examplePrograms);
+      } finally {
+        setIsLoading(false);
+      }
+  };
+
+  // Load programs directly from the backend on mount
+  useEffect(() => {
+    loadProgramsFromBackend();
+  }, []);
 
   // Get the selected program based on the ID
   const currentProgram = selectedProgramId
@@ -342,10 +613,327 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
 
     // Ne pas sélectionner automatiquement le premier programme si nous sommes en train d'en créer un nouveau
     if (!selectedProgramId && programs.length > 0 && !isCreatingProgram) {
-      console.log('%c Auto-sélection du premier programme:', "background: blue; color: white; padding: 5px; font-size: 14px;", programs[0].id);
-      setSelectedProgramId(programs[0].id);
+      // Deduplicate programs by ID before selecting the first one
+      const uniqueProgramIds = new Set(programs.map(p => p.id));
+      const uniquePrograms = Array.from(uniqueProgramIds).map(id =>
+        programs.find(p => p.id === id)
+      ).filter(Boolean);
+
+      if (uniquePrograms.length > 0) {
+        console.log('%c Auto-sélection du premier programme:', "background: blue; color: white; padding: 5px; font-size: 14px;", uniquePrograms[0].id);
+        setSelectedProgramId(uniquePrograms[0].id);
+      }
     }
   }, [selectedProgramId, programs, location]);
+
+  // Fetch program details when a program is selected
+  useEffect(() => {
+    if (selectedProgramId) {
+      const fetchProgramDetails = async () => {
+        try {
+          console.log(`Fetching details for program ${selectedProgramId}...`);
+
+          // Convert string ID to number if needed
+          const programIdNumber = parseInt(selectedProgramId);
+
+          if (isNaN(programIdNumber)) {
+            console.log('Program ID is not a number, skipping API fetch');
+            return;
+          }
+
+          // Fetch program details including mentors
+          const programDetails = await getProgram(programIdNumber);
+          console.log('Loaded program details:', programDetails);
+
+          // Log the program type to help debug
+          console.log('Program type:', programDetails.type);
+
+          if (programDetails) {
+            // Fetch phases for this program
+            const phases = await getPhases(programIdNumber);
+            console.log('Loaded phases:', phases);
+
+            // Fetch tasks, meetings, criteria, and deliverables for each phase
+            const phasesWithDetails = await Promise.all(
+              phases.map(async (phase: any) => {
+                try {
+                  // Fetch tasks
+                  const tasks = await getTasks(phase.id);
+
+                  // Fetch meetings (reunions)
+                  let meetings = [];
+                  try {
+                    meetings = await getReunions(phase.id);
+
+                    // If meetings is not an array, make it one
+                    if (!Array.isArray(meetings)) {
+                      meetings = [];
+                    }
+                  } catch (meetingError) {
+                    console.error(`Error fetching meetings for phase ${phase.id}:`, meetingError);
+                    meetings = [];
+                  }
+
+                  // Fetch evaluation criteria
+                  let evaluationCriteria = [];
+                  try {
+                    evaluationCriteria = await getCriteres(phase.id);
+
+                    // If criteria is not an array, make it one
+                    if (!Array.isArray(evaluationCriteria)) {
+                      evaluationCriteria = [];
+                    }
+                  } catch (criteriaError) {
+                    console.error(`Error fetching evaluation criteria for phase ${phase.id}:`, criteriaError);
+                    evaluationCriteria = [];
+                  }
+
+                  // Fetch deliverables
+                  let deliverables = [];
+                  try {
+                    deliverables = await getLivrables(phase.id);
+
+                    // If deliverables is not an array, make it one
+                    if (!Array.isArray(deliverables)) {
+                      deliverables = [];
+                    }
+                  } catch (deliverableError) {
+                    console.error(`Error fetching deliverables for phase ${phase.id}:`, deliverableError);
+                    deliverables = [];
+                  }
+
+                  // Return phase with all its details
+                  return {
+                    ...phase,
+                    tasks: Array.isArray(tasks) ? tasks : [],
+                    meetings: Array.isArray(meetings) ? meetings : [],
+                    evaluationCriteria: Array.isArray(evaluationCriteria) ? evaluationCriteria : [],
+                    deliverables: Array.isArray(deliverables) ? deliverables : []
+                  };
+                } catch (error) {
+                  console.error(`Error fetching details for phase ${phase.id}:`, error);
+                  return {
+                    ...phase,
+                    tasks: [],
+                    meetings: [],
+                    evaluationCriteria: [],
+                    deliverables: []
+                  };
+                }
+              })
+            );
+
+            // Map mentors from backend format to frontend format
+            const mappedMentors = (programDetails.mentors || []).map((mentor: any) => ({
+              id: mentor.utilisateur_id,
+              name: `${mentor.prenom} ${mentor.nom}`,
+              expertise: mentor.profession || 'General',
+              bio: mentor.bio || `${mentor.prenom} ${mentor.nom} - ${mentor.profession || 'Mentor'}`,
+              email: mentor.email || `mentor${mentor.utilisateur_id}@example.com`,
+              title: mentor.profession || 'Program Mentor',
+              rating: 4.5, // Default rating
+              isTopMentor: true // Default value
+            }));
+
+            // Parse array fields from PostgreSQL format if needed
+            let requiredStages = [];
+            let requiredIndustries = [];
+            let requiredDocuments = [];
+
+            try {
+              // Handle PostgreSQL array format like "{item1,item2}"
+              if (typeof programDetails.phases_requises === 'string') {
+                requiredStages = programDetails.phases_requises
+                  .replace(/^\{|\}$/g, '') // Remove { and }
+                  .split(',')
+                  .filter(Boolean)
+                  .map((item: string) => item.trim().replace(/^"|"$/g, '')); // Remove quotes
+              } else if (Array.isArray(programDetails.phases_requises)) {
+                requiredStages = programDetails.phases_requises;
+              }
+
+              if (typeof programDetails.industries_requises === 'string') {
+                requiredIndustries = programDetails.industries_requises
+                  .replace(/^\{|\}$/g, '')
+                  .split(',')
+                  .filter(Boolean)
+                  .map((item: string) => item.trim().replace(/^"|"$/g, ''));
+              } else if (Array.isArray(programDetails.industries_requises)) {
+                requiredIndustries = programDetails.industries_requises;
+              }
+
+              if (typeof programDetails.documents_requis === 'string') {
+                requiredDocuments = programDetails.documents_requis
+                  .replace(/^\{|\}$/g, '')
+                  .split(',')
+                  .filter(Boolean)
+                  .map((item: string) => item.trim().replace(/^"|"$/g, ''));
+              } else if (Array.isArray(programDetails.documents_requis)) {
+                requiredDocuments = programDetails.documents_requis;
+              }
+            } catch (error) {
+              console.error('Error parsing array fields:', error);
+            }
+
+            // Program details loaded from backend
+
+            // Convert backend program to frontend format
+            const updatedProgram = {
+              id: String(programDetails.id),
+              name: programDetails.nom,
+              description: programDetails.description,
+              startDate: programDetails.date_debut,
+              endDate: programDetails.date_fin,
+              status: "active" as "active" | "completed" | "draft",
+              phases: phasesWithDetails.map((phase: any) => {
+                // Ensure all arrays are properly initialized
+                const phaseTasks = Array.isArray(phase.tasks) ? phase.tasks : [];
+                const phaseMeetings = Array.isArray(phase.meetings) ? phase.meetings : [];
+                const phaseCriteria = Array.isArray(phase.evaluationCriteria) ? phase.evaluationCriteria : [];
+                const phaseDeliverables = Array.isArray(phase.deliverables) ? phase.deliverables : [];
+
+
+
+                // Determine phase status based on dates
+                const now = new Date();
+                const startDate = new Date(phase.date_debut);
+                const endDate = new Date(phase.date_fin);
+
+                let phaseStatus: "not_started" | "in_progress" | "completed" = "not_started";
+                if (now > endDate) {
+                  phaseStatus = "completed";
+                } else if (now >= startDate && now <= endDate) {
+                  phaseStatus = "in_progress";
+                }
+
+                // Assign a color based on the phase name or index
+                let phaseColor = "#818cf8"; // Default blue
+
+                // Try to assign a meaningful color based on phase name
+                const phaseName = phase.nom.toLowerCase();
+                if (phaseName.includes("idéation") || phaseName.includes("ideation") || phaseName.includes("découverte") || phaseName.includes("decouverte") || phaseName.includes("définition") || phaseName.includes("definition")) {
+                  phaseColor = "#8b5cf6"; // Purple for early phases
+                } else if (phaseName.includes("prototype") || phaseName.includes("développement") || phaseName.includes("developpement") || phaseName.includes("solution")) {
+                  phaseColor = "#3b82f6"; // Blue for middle phases
+                } else if (phaseName.includes("test") || phaseName.includes("validation")) {
+                  phaseColor = "#10b981"; // Green for testing phases
+                } else if (phaseName.includes("lancement") || phaseName.includes("démo") || phaseName.includes("demo") || phaseName.includes("pitch")) {
+                  phaseColor = "#f59e0b"; // Amber for final phases
+                }
+
+                return {
+                  id: String(phase.id),
+                  name: phase.nom,
+                  description: phase.description,
+                  startDate: new Date(phase.date_debut),
+                  endDate: new Date(phase.date_fin),
+                  status: phaseStatus,
+                  color: phaseColor,
+                  tasks: phaseTasks.map((task: any) => {
+                    return {
+                      id: String(task.id),
+                      name: task.nom,
+                      description: task.description || '',
+                      dueDate: task.date_decheance,
+                      status: "todo" as "todo" | "in_progress" | "completed",
+                      priority: "medium",
+                      assignee: "Unassigned",
+                      phaseId: String(phase.id),
+                      phaseName: phase.nom,
+                      tags: [],
+                      isOverdue: false,
+                      programId: String(programDetails.id),
+                      forAllTeams: true
+                    };
+                  }),
+                  meetings: phaseMeetings.map((meeting: any) => {
+                    return {
+                      id: String(meeting.id),
+                      title: meeting.nom_reunion,
+                      date: new Date(meeting.date),
+                      time: meeting.heure,
+                      location: meeting.lieu,
+                      type: 'group',
+                      description: meeting.description || '',
+                      attendees: [],
+                      phaseId: String(phase.id),
+                      phaseName: phase.nom,
+                      programId: String(programDetails.id)
+                    };
+                  }),
+                  evaluationCriteria: phaseCriteria.map((criterion: any) => {
+                    return {
+                      id: String(criterion.id),
+                      name: criterion.nom_critere,
+                      type: criterion.type === 'etoiles' ? 'star_rating' :
+                            criterion.type === 'numerique' ? 'numeric' :
+                            criterion.type === 'oui_non' ? 'yes_no' :
+                            criterion.type === 'liste_deroulante' ? 'dropdown' : 'star_rating',
+                      weight: criterion.poids || 10,
+                      description: criterion.description || '',
+                      accessibleBy: [
+                        ...(criterion.accessible_mentors ? ['mentors'] : []),
+                        ...(criterion.accessible_equipes ? ['teams'] : [])
+                      ],
+                      filledBy: criterion.rempli_par === 'mentor' ? 'mentors' : 'teams',
+                      requiresValidation: criterion.necessite_validation || false,
+                      options: criterion.options || []
+                    };
+                  }),
+                  deliverables: phaseDeliverables.map((deliverable: any) => {
+                    return {
+                      id: String(deliverable.id),
+                      name: deliverable.nom,
+                      description: deliverable.description || '',
+                      dueDate: new Date(deliverable.date_echeance),
+                      status: "pending" as "pending" | "submitted" | "reviewed",
+                      submissionType: "file",
+                      required: true,
+                      maxFileSize: 10,
+                      allowedFileTypes: deliverable.types_fichiers ?
+                        (Array.isArray(deliverable.types_fichiers) ?
+                          deliverable.types_fichiers :
+                          typeof deliverable.types_fichiers === 'string' ?
+                            deliverable.types_fichiers.split(',').map((type: string) => type.trim()) :
+                            ['.pdf', '.doc', '.docx']) :
+                        ['.pdf', '.doc', '.docx']
+                    };
+                  })
+                };
+              }),
+              mentors: mappedMentors,
+              evaluationCriteria: [],
+              eligibilityCriteria: {
+                minTeamSize: programDetails.taille_equipe_min || 1,
+                maxTeamSize: programDetails.taille_equipe_max || 5,
+                requiredStages: requiredStages,
+                requiredIndustries: requiredIndustries,
+                minRevenue: programDetails.ca_min || 0,
+                maxRevenue: programDetails.ca_max || 100000,
+                requiredDocuments: requiredDocuments
+              },
+              dashboardWidgets: [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            // Update the programs array with the detailed program
+            setPrograms(prevPrograms => {
+              const updatedPrograms = prevPrograms.map(prog =>
+                prog.id === selectedProgramId ? updatedProgram : prog
+              );
+
+              return updatedPrograms;
+            });
+          }
+        } catch (error) {
+          console.error('Error loading program details:', error);
+        }
+      };
+
+      fetchProgramDetails();
+    }
+  }, [selectedProgramId]);
 
   // Check URL for program ID
   useEffect(() => {
@@ -365,8 +953,21 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
   };
 
   // Create a new program with unique ID
-  const createProgram = (program: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>): string => {
+  const createProgram = async (program: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
     console.log('Creating program with mentors:', program.mentors);
+
+    // Log if the program has evaluation criteria, meetings, or deliverables
+    if (program.phases) {
+      console.log(`ℹ️ Evaluation criteria will be created in create.tsx`);
+    }
+
+    if (program.phases) {
+      console.log(`ℹ️ Meetings will be created in create.tsx`);
+    }
+
+    if (program.phases) {
+      console.log(`ℹ️ Deliverables will be created in create.tsx`);
+    }
 
     // Ensure mentors are properly formatted
     if (program.mentors && Array.isArray(program.mentors)) {
@@ -512,7 +1113,9 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
     };
 
     console.log('Creating new program:', newProgram);
-    setPrograms(prevPrograms => [...prevPrograms, newProgram]);
+
+    // Store the temporary ID for later removal
+    const tempProgramId = newProgram.id;
 
     // Automatically select the newly created program
     console.log('%c Setting selected program ID to:', "background: red; color: white; padding: 5px; font-size: 14px;", newProgram.id, "type:", typeof newProgram.id);
@@ -521,39 +1124,208 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
     // Vérifier immédiatement si le selectedProgramId a été correctement défini
     console.log('%c selectedProgramId après setSelectedProgramId:', "background: orange; color: black; padding: 5px; font-size: 14px;", selectedProgramId, "type:", typeof selectedProgramId);
 
+    // Create the program in the backend
+    try {
+      // First, create the program in the backend
+      const backendProgram = {
+        type: 'Accélération', // Default type
+        nom: newProgram.name,
+        description: newProgram.description,
+        date_debut: newProgram.startDate,
+        date_fin: newProgram.endDate,
+        phases_requises: newProgram.eligibilityCriteria?.requiredStages || [],
+        industries_requises: newProgram.eligibilityCriteria?.requiredIndustries || [],
+        documents_requis: newProgram.eligibilityCriteria?.requiredDocuments || [],
+        taille_equipe_min: newProgram.eligibilityCriteria?.minTeamSize || 1,
+        taille_equipe_max: newProgram.eligibilityCriteria?.maxTeamSize || 5,
+        ca_min: newProgram.eligibilityCriteria?.minRevenue || 0,
+        ca_max: newProgram.eligibilityCriteria?.maxRevenue || 100000,
+        admin_id: 1 // Required by the backend
+      };
+
+      console.log('Creating program in backend:', backendProgram);
+
+      const programResponse = await fetch(`http://localhost:8083/api/programmes/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(backendProgram),
+        credentials: 'include'
+      });
+
+      if (!programResponse.ok) {
+        console.error('Failed to create program in backend');
+        throw new Error('Failed to create program in backend');
+      }
+
+      const programResult = await programResponse.json();
+      console.log('Program created in backend:', programResult);
+
+      // Get the backend program ID
+      const backendProgramId = programResult.id;
+
+      // Now create phases for the program
+      if (newProgram.phases && newProgram.phases.length > 0) {
+        for (const phase of newProgram.phases) {
+          // Create the phase in the backend
+          const phaseData = {
+            nom: phase.name,
+            description: phase.description,
+            date_debut: phase.startDate instanceof Date ? phase.startDate.toISOString().split('T')[0] : phase.startDate,
+            date_fin: phase.endDate instanceof Date ? phase.endDate.toISOString().split('T')[0] : phase.endDate,
+            gagnant: false // Default value
+          };
+
+          console.log(`Creating phase ${phase.name} in backend for program ${backendProgramId}:`, phaseData);
+
+          const phaseResponse = await fetch(`http://localhost:8083/api/phase/create/${backendProgramId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(phaseData),
+            credentials: 'include'
+          });
+
+          if (!phaseResponse.ok) {
+            console.error(`Failed to create phase ${phase.name} in backend`);
+            continue; // Skip to the next phase
+          }
+
+          const phaseResult = await phaseResponse.json();
+          console.log(`Phase ${phase.name} created in backend:`, phaseResult);
+
+          // Get the backend phase ID
+          const backendPhaseId = phaseResult.id;
+          console.log(`Backend phase ID for ${phase.name}:`, backendPhaseId, 'Type:', typeof backendPhaseId);
+
+          // Add high-level debugging to check the phase structure
+          console.log('🔍 PHASE STRUCTURE CHECK:');
+          console.log('Phase Object:', phase);
+          console.log('Phase has evaluation criteria:', Boolean(phase.evaluationCriteria && phase.evaluationCriteria.length > 0));
+          console.log('Phase has meetings:', Boolean(phase.meetings && phase.meetings.length > 0));
+          console.log('Phase has deliverables:', Boolean(phase.deliverables && phase.deliverables.length > 0));
+
+          // Debug information about what's available in this phase
+          console.log(`DEBUG: Phase ${phase.name} (ID: ${backendPhaseId}) contains:`);
+          console.log(`- Evaluation Criteria: ${phase.evaluationCriteria?.length || 0} items`);
+          console.log(`- Meetings: ${phase.meetings?.length || 0} items`);
+          console.log(`- Deliverables: ${phase.deliverables?.length || 0} items`);
+          console.log(`- Tasks: ${phase.tasks?.length || 0} items`);
+
+          // Evaluation criteria, meetings, and deliverables will be created in create.tsx
+          if (phase.evaluationCriteria && phase.evaluationCriteria.length > 0) {
+            console.log('ℹ️ Evaluation criteria will be created in create.tsx');
+          }
+
+          if (phase.meetings && phase.meetings.length > 0) {
+            console.log('ℹ️ Meetings will be created in create.tsx');
+          }
+
+          if (phase.deliverables && phase.deliverables.length > 0) {
+            console.log('ℹ️ Deliverables will be created in create.tsx');
+          }
+        }
+      }
+
+      // Add a summary of what was created
+      console.log('📊 CREATION SUMMARY:');
+      console.log(`Program created with ID: ${backendProgramId}`);
+      console.log(`Phases created: ${newProgram.phases?.length || 0}`);
+      let criteriaCount = 0, meetingsCount = 0, deliverablesCount = 0;
+      newProgram.phases?.forEach(phase => {
+        criteriaCount += phase.evaluationCriteria?.length || 0;
+        meetingsCount += phase.meetings?.length || 0;
+        deliverablesCount += phase.deliverables?.length || 0;
+      });
+      console.log(`Total criteria to create: ${criteriaCount}`);
+      console.log(`Total meetings to create: ${meetingsCount}`);
+      console.log(`Total deliverables to create: ${deliverablesCount}`);
+
+      // Update the program ID to use the backend ID
+      newProgram.id = String(backendProgramId);
+      console.log('Updated program ID to backend ID:', backendProgramId);
+
+      // Criteria are now created directly when the phase is created
+
+      // Update the programs state with the updated program
+      // First, create a Map with all existing programs except the one we're updating
+      const programsMap = new Map();
+
+      // Add all existing programs to the map except the one with the same ID
+      programs.forEach(program => {
+        // Skip the program with the same temporary ID or backend ID
+        if (program.id !== tempProgramId && program.id !== String(backendProgramId)) {
+          programsMap.set(program.id, program);
+        }
+      });
+
+      // Add the new program to the map
+      programsMap.set(newProgram.id, newProgram);
+
+      // Convert map back to array
+      const uniquePrograms = Array.from(programsMap.values());
+      console.log(`Setting ${uniquePrograms.length} unique programs`);
+
+      // Replace the programs state entirely with the unique programs
+      setPrograms(uniquePrograms);
+
+      // Set the selected program ID to the new program ID
+      // This will be overridden by the setTimeout below, but we set it here as a fallback
+      setSelectedProgramId(newProgram.id);
+
+    } catch (error) {
+      console.error('Error creating program in backend:', error);
+    }
+
     // Publish the program data for other contexts to consume
     // This will trigger a custom event that other contexts can listen for
     const programCreatedEvent = new CustomEvent('program-created', {
       detail: {
         programId: newProgram.id,
-        program: newProgram
+        phasesCount: newProgram.phases?.length || 0,
+        meetingsCount: newProgram.phases?.reduce((count, phase) =>
+          count + (phase.meetings?.length || 0), 0) || 0
       }
-    });
-    console.log('Dispatching program-created event:', {
-      programId: newProgram.id,
-      phasesCount: newProgram.phases?.length || 0,
-      meetingsCount: newProgram.phases?.reduce((count, phase) =>
-        count + (phase.meetings?.length || 0), 0) || 0
     });
     document.dispatchEvent(programCreatedEvent);
 
-    // Add a delay and verify the selected program ID was set correctly
-    setTimeout(() => {
-      console.log('%c After program creation - Selected program ID:', "background: purple; color: white; padding: 5px; font-size: 14px;", selectedProgramId, "type:", typeof selectedProgramId);
+    // Instead of reloading all programs, just make sure this program is in the state
+    // This is more efficient than reloading everything
+    setPrograms(prevPrograms => {
+      // Create a Map to deduplicate programs by ID
+      const programsMap = new Map();
 
-      // Vérifier si le selectedProgramId est différent de l'ID du nouveau programme
-      if (selectedProgramId !== newProgram.id) {
-        console.log('%c CORRECTION: Le selectedProgramId ne correspond pas au nouveau programme', "background: red; color: white; padding: 5px; font-size: 14px;");
-        console.log('%c Forcer la sélection du nouveau programme:', "background: green; color: white; padding: 5px; font-size: 14px;", newProgram.id);
-        setSelectedProgramId(newProgram.id);
-      }
-    }, 100);
+      // Add all existing programs to the map, except any with the same ID as the new program
+      prevPrograms.forEach(program => {
+        if (program.id !== newProgram.id) {
+          programsMap.set(program.id, program);
+        }
+      });
+
+      // Add the new program
+      programsMap.set(newProgram.id, newProgram);
+
+      // Convert map back to array
+      const uniquePrograms = Array.from(programsMap.values());
+      console.log(`Setting ${uniquePrograms.length} unique programs after adding new program`);
+
+      return uniquePrograms;
+    });
+
+    // Set the selected program ID
+    setSelectedProgramId(newProgram.id);
 
     return newProgram.id;
   };
 
   // Fonction pour mettre à jour un programme existant
   const updateProgram = (updatedProgram: Program) => {
+    console.log('Updating program:', updatedProgram);
+
     // Mettre à jour le programme dans la liste des programmes
     const updatedPrograms = programs.map(program =>
       program.id === updatedProgram.id ? updatedProgram : program
@@ -562,8 +1334,50 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
     // Mettre à jour l'état des programmes
     setPrograms(updatedPrograms);
 
-    // Stocker les programmes mis à jour dans le localStorage
-    localStorage.setItem('programs', JSON.stringify(updatedPrograms));
+    // Also update the backend if the program has a numeric ID
+    const programIdNumber = parseInt(updatedProgram.id);
+    if (!isNaN(programIdNumber)) {
+      // Convert frontend program to backend format
+      const backendProgram = {
+        nom: updatedProgram.name,
+        description: updatedProgram.description,
+        date_debut: updatedProgram.startDate,
+        date_fin: updatedProgram.endDate,
+        phases_requises: updatedProgram.eligibilityCriteria?.requiredStages || [],
+        industries_requises: updatedProgram.eligibilityCriteria?.requiredIndustries || [],
+        documents_requis: updatedProgram.eligibilityCriteria?.requiredDocuments || [],
+        taille_equipe_min: updatedProgram.eligibilityCriteria?.minTeamSize || 1,
+        taille_equipe_max: updatedProgram.eligibilityCriteria?.maxTeamSize || 5,
+        ca_min: updatedProgram.eligibilityCriteria?.minRevenue || 0,
+        ca_max: updatedProgram.eligibilityCriteria?.maxRevenue || 100000
+      };
+
+      // Send update to backend
+      fetch(`http://localhost:8083/api/programmes/${programIdNumber}/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(backendProgram),
+        credentials: 'include'
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log('Program updated successfully in backend');
+          return response.json();
+        } else {
+          console.error('Failed to update program in backend');
+          throw new Error('Failed to update program');
+        }
+      })
+      .then(data => {
+        console.log('Backend update response:', data);
+      })
+      .catch(error => {
+        console.error('Error updating program in backend:', error);
+      });
+    }
 
     // Si le programme mis à jour est le programme sélectionné, mettre à jour l'ID sélectionné
     if (selectedProgramId === updatedProgram.id) {
@@ -587,10 +1401,13 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
         resetProgramCreation,
         setSelectedProgram,
         createProgram,
-        updateProgram
+        updateProgram,
+        isLoading
       }}
     >
       {children}
     </ProgramContext.Provider>
   );
 };
+
+export default ProgramContext;

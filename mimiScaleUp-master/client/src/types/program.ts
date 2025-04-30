@@ -147,7 +147,7 @@ export interface Program {
   phases: Phase[];
   evaluationCriteria: EvaluationCriterion[];
   eligibilityCriteria?: EligibilityCriteria;
-  dashboardWidgets: WidgetData[];
+  dashboardWidgets?: WidgetData[];
   mentors?: any[];
   hasWinner?: boolean;
   createdAt: string;

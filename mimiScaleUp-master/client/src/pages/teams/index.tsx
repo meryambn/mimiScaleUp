@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, Trophy } from 'lucide-react';
-// Fonction pour naviguer sans rechargement de page
+// Import useLocation from wouter
+import { useLocation } from 'wouter';
+
+// Fonction pour naviguer sans rechargement de page - will be replaced by useLocation
 const navigateWithoutReload = (path: string): void => {
   window.history.pushState({}, '', path);
   // Déclencher un événement de navigation pour que les composants puissent réagir
@@ -119,6 +122,7 @@ const TeamsPage = () => {
   const [winner, setWinner] = useState<number | string | null>(null);
   const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
   const [selectedWinner, setSelectedWinner] = useState<Startup | null>(null);
+  const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
 
   // Fonction pour mettre à jour la phase d'une équipe
   const handlePhaseChange = (teamId: number | string, newPhase: string) => {
@@ -438,7 +442,12 @@ const TeamsPage = () => {
       </div>
 
       {/* Widget de l'équipe gagnante */}
-      <Card className="mb-6 cursor-pointer hover:shadow-md transition-shadow w-full" onClick={() => winner && navigateWithoutReload(`/teams/${winner}`)}>
+      <Card className="mb-6 cursor-pointer hover:shadow-md transition-shadow w-full" onClick={() => {
+        if (winner) {
+          console.log(`Navigating to winner team detail: /teams/${winner}`);
+          setLocation(`/teams/${winner}`);
+        }
+      }}>
         <CardContent className="p-0">
           <WinnerTeamWidget />
         </CardContent>
@@ -482,7 +491,10 @@ const TeamsPage = () => {
           ) : (
             <div className="flex flex-col space-y-4">
               {filteredStartups.map((startup) => (
-                <Card key={startup.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateWithoutReload(`/teams/${startup.id}`)}>
+                <Card key={startup.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => {
+                  console.log(`Navigating to team detail: /teams/${startup.id}`);
+                  setLocation(`/teams/${startup.id}`);
+                }}>
                   <CardContent className="p-4 flex items-center">
                     <img
                       src={startup.logo}

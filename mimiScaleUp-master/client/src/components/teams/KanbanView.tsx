@@ -3,7 +3,6 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { MessageSquare, ArrowRight, ArrowLeft, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -47,13 +46,7 @@ const fallbackColors = [
   '#14b8a6', // Teal
 ];
 
-// Fonction pour naviguer sans rechargement de page
-const navigateWithoutReload = (path: string): void => {
-  window.history.pushState({}, '', path);
-  // Déclencher un événement de navigation pour que les composants puissent réagir
-  const navEvent = new PopStateEvent('popstate');
-  window.dispatchEvent(navEvent);
-};
+import { useLocation } from 'wouter';
 
 // Interface pour les props de TeamCard
 interface TeamCardProps {
@@ -68,6 +61,7 @@ interface TeamCardProps {
 
 // Composant pour une carte d'équipe
 const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phasesCount, isLastPhase, hasWinner, onSelectWinner }) => {
+  const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'TEAM',
     item: { id: team.id, currentPhaseIndex: phaseIndex },
@@ -155,7 +149,11 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phase
             </button>
             <button
               className="h-7 px-2"
-              onClick={() => navigateWithoutReload(`/teams/${team.id}`)}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent drag event
+                console.log(`Navigating to team detail from kanban: /teams/${team.id}`);
+                setLocation(`/teams/${team.id}`);
+              }}
               style={{ backgroundColor: 'transparent', color: '#0c4c80', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
             >
               <MessageSquare className="h-3 w-3 mr-1" />

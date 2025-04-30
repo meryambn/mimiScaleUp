@@ -10,7 +10,7 @@ export interface Phase {
   startDate: string;
   endDate: string;
   status: 'not_started' | 'in_progress' | 'completed';
-  meetingCount: number;
+  meetingCount?: number;
 }
 
 export interface Meeting {
@@ -18,20 +18,20 @@ export interface Meeting {
   title: string;
   date: string;
   time: string;
-  duration: number; // in minutes
+  duration: number;
   type: 'group' | 'one-on-one' | 'info-session' | 'workshop';
-  location?: string;
+  location: string;
   attendees: string[];
   phaseId: string;
-  description?: string;
-  isCompleted?: boolean;
-  hasNotes?: boolean;
+  description: string;
+  isCompleted: boolean;
+  hasNotes: boolean;
   isOnline?: boolean;
   programId: string;
 }
 
-// Context interface
-interface MeetingsContextType {
+// Context type
+export interface MeetingsContextType {
   meetings: Meeting[];
   phases: Phase[];
   upcomingMeetings: Meeting[];
@@ -43,8 +43,8 @@ interface MeetingsContextType {
   setSelectedPhase: (phaseId: string | null) => void;
   getPhaseById: (phaseId: string) => Phase | undefined;
   formatAttendees: (attendees: string[]) => string;
-  formatDate: (dateStr: string, timeStr: string) => string;
-  formatTime: (timeStr: string) => string;
+  formatDate: (date: string) => string;
+  formatTime: (time: string) => string;
   today: string;
   createMeeting: (meeting: Omit<Meeting, 'id'>) => string;
   addMeetings: (meetings: Omit<Meeting, 'id'>[]) => string[];
@@ -64,419 +64,194 @@ export const MeetingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Get today's date for UI comparison
   const today = new Date().toISOString().split('T')[0];
 
-  // Mock meetings data
-  const meetingsData: Meeting[] = [
-    {
-      id: "1",
-      title: "Program Kickoff Meeting",
-      date: "2023-06-01",
-      time: "10:00",
-      duration: 60,
-      type: "group",
-      attendees: ["All Teams", "Program Managers", "Mentors"],
-      phaseId: "phase-1",
-      description: "Initial kickoff meeting for the summer program. Introduction to mentors and overview of the program structure.",
-      location: "Main Conference Room",
-      isCompleted: true,
-      hasNotes: true,
-      programId: "1"
-    },
-    {
-      id: "meeting-2",
-      title: "Application Workshop",
-      date: "2023-01-25",
-      time: "14:00",
-      duration: 120,
-      type: "workshop",
-      location: "Zoom",
-      attendees: ["Interested Teams", "Mentors"],
-      phaseId: "phase-1",
-      description: "Workshop to help teams prepare their applications.",
-      isCompleted: true,
-      hasNotes: true,
-      isOnline: true,
-      programId: "1"
-    },
-    {
-      id: "meeting-3",
-      title: "Application Q&A",
-      date: "2023-02-05",
-      time: "11:00",
-      duration: 60,
-      type: "info-session",
-      location: "Zoom",
-      attendees: ["Interested Teams", "Program Staff"],
-      phaseId: "phase-1",
-      description: "Q&A session for application questions.",
-      isCompleted: true,
-      hasNotes: false,
-      isOnline: true,
-      programId: "1"
-    },
-    {
-      id: "meeting-4",
-      title: "Selection Committee - Round 1",
-      date: "2023-02-20",
-      time: "09:00",
-      duration: 180,
-      type: "group",
-      location: "Executive Boardroom",
-      attendees: ["Selection Committee", "Program Directors"],
-      phaseId: "phase-2",
-      description: "First round of application reviews.",
-      isCompleted: true,
-      hasNotes: true,
-      isOnline: false,
-      programId: "1"
-    },
-    {
-      id: "meeting-5",
-      title: "Team Interview - EcoTech Solutions",
-      date: "2023-03-02",
-      time: "13:00",
-      duration: 45,
-      type: "one-on-one",
-      location: "Zoom",
-      attendees: ["EcoTech Solutions Team", "Selection Committee"],
-      phaseId: "phase-2",
-      description: "Interview with EcoTech Solutions team.",
-      isCompleted: true,
-      hasNotes: true,
-      isOnline: true,
-      programId: "1"
-    },
-    {
-      id: "meeting-6",
-      title: "Team Interview - HealthAI",
-      date: "2023-03-03",
-      time: "10:00",
-      duration: 45,
-      type: "one-on-one",
-      location: "Zoom",
-      attendees: ["HealthAI Team", "Selection Committee"],
-      phaseId: "phase-2",
-      description: "Interview with HealthAI team.",
-      isCompleted: true,
-      hasNotes: true,
-      isOnline: true,
-      programId: "1"
-    },
-    {
-      id: "meeting-7",
-      title: "Selection Committee - Final Decisions",
-      date: "2023-03-10",
-      time: "14:00",
-      duration: 120,
-      type: "group",
-      location: "Executive Boardroom",
-      attendees: ["Selection Committee", "Program Directors"],
-      phaseId: "phase-2",
-      description: "Final selection meeting to choose program participants.",
-      isCompleted: true,
-      hasNotes: true,
-      isOnline: false,
-      programId: "1"
-    },
-    {
-      id: "meeting-8",
-      title: "Welcome Session",
-      date: "2023-03-18",
-      time: "10:00",
-      duration: 90,
-      type: "info-session",
-      location: "Main Hall",
-      attendees: ["Selected Teams", "Program Staff", "Mentors"],
-      phaseId: "phase-3",
-      description: "Welcome session for the selected teams.",
-      isCompleted: true,
-      hasNotes: true,
-      isOnline: false,
-      programId: "1"
-    },
-    {
-      id: "meeting-9",
-      title: "Mentor Matching Event",
-      date: "2023-03-25",
-      time: "13:00",
-      duration: 180,
-      type: "group",
-      location: "Main Hall",
-      attendees: ["Selected Teams", "Mentors"],
-      phaseId: "phase-3",
-      description: "Event to match teams with mentors.",
-      isCompleted: true,
-      hasNotes: false,
-      isOnline: false,
-      programId: "1"
-    },
-    {
-      id: "meeting-10",
-      title: "Legal Workshop",
-      date: "2023-04-05",
-      time: "10:00",
-      duration: 120,
-      type: "workshop",
-      location: "Zoom",
-      attendees: ["Selected Teams", "Legal Mentors"],
-      phaseId: "phase-3",
-      description: "Workshop on legal aspects of startups.",
-      isCompleted: false,
-      hasNotes: false,
-      isOnline: true,
-      programId: "1"
-    },
-    {
-      id: "meeting-11",
-      title: "Pitch Training - Session 1",
-      date: "2023-04-12",
-      time: "14:00",
-      duration: 150,
-      type: "workshop",
-      location: "Main Conference Room",
-      attendees: ["Selected Teams", "Pitch Coach"],
-      phaseId: "phase-3",
-      description: "First session of pitch training.",
-      isCompleted: false,
-      hasNotes: false,
-      isOnline: false,
-      programId: "1"
-    },
-    {
-      id: "meeting-12",
-      title: "Financial Modeling Workshop",
-      date: "2023-04-19",
-      time: "10:00",
-      duration: 180,
-      type: "workshop",
-      location: "Zoom",
-      attendees: ["Selected Teams", "Finance Mentors"],
-      phaseId: "phase-3",
-      description: "Workshop on financial modeling for startups.",
-      isCompleted: false,
-      hasNotes: false,
-      isOnline: true,
-      programId: "1"
-    }
-  ];
-
-  // Initialize meetings with mock data when component mounts
+  // Initialize meetings with program data or fallback to empty array
   useEffect(() => {
-    setMeetings(meetingsData);
-  }, []);
+    if (selectedProgram && selectedProgram.phases) {
+      console.log('Loading meetings from program phases...', selectedProgram);
+
+      // No need to create test meetings - we're using backend data
+
+      // Extract meetings from all phases
+      const programMeetings: Meeting[] = [];
+
+      // Also extract phases for the phase filter
+      const programPhases: Phase[] = [];
+
+      selectedProgram.phases.forEach((phase: any) => {
+        // Add phase to phases list for filtering
+        programPhases.push({
+          id: String(phase.id),
+          name: phase.name,
+          color: phase.color || '#818cf8',
+          startDate: phase.startDate instanceof Date ? phase.startDate.toISOString().split('T')[0] : String(phase.startDate),
+          endDate: phase.endDate instanceof Date ? phase.endDate.toISOString().split('T')[0] : String(phase.endDate),
+          status: phase.status || 'not_started',
+          meetingCount: Array.isArray(phase.meetings) ? phase.meetings.length : 0
+        });
+
+        if (phase.meetings && Array.isArray(phase.meetings)) {
+          console.log(`Processing ${phase.meetings.length} meetings for phase ${phase.id}`);
+
+          // Use a Set to track unique meeting IDs we've already processed
+          const processedIds = new Set<string>();
+
+          const phaseMeetings = phase.meetings.map((meeting: any) => {
+            console.log(`Processing meeting:`, meeting);
+
+            // Skip if we've already processed this meeting
+            const meetingId = String(meeting.id || '');
+            if (processedIds.has(meetingId)) {
+              console.log(`Skipping duplicate meeting with ID ${meetingId}`);
+              return null;
+            }
+
+            processedIds.add(meetingId);
+
+            // Format date if it's a Date object
+            const formatDate = (date: Date | string) => {
+              if (date instanceof Date) {
+                return date.toISOString().split('T')[0];
+              }
+              return String(date);
+            };
+
+            // Create a properly formatted meeting object
+            const formattedMeeting = {
+              id: meetingId,
+              title: meeting.title || meeting.nom_reunion || '',
+              date: formatDate(meeting.date),
+              time: meeting.time || meeting.heure || '00:00',
+              duration: meeting.duration || 60,
+              type: (meeting.type as 'group' | 'one-on-one' | 'info-session' | 'workshop') || 'group',
+              location: meeting.location || meeting.lieu || '',
+              attendees: Array.isArray(meeting.attendees) ? meeting.attendees : [],
+              phaseId: String(phase.id),
+              description: meeting.description || '',
+              isCompleted: false,
+              hasNotes: false,
+              isOnline: (meeting.location?.toLowerCase().includes('zoom') ||
+                         meeting.lieu?.toLowerCase().includes('zoom') ||
+                         meeting.lieu?.toLowerCase().includes('virtuelle')) || false,
+              programId: String(selectedProgram.id)
+            };
+
+            console.log(`Formatted meeting:`, formattedMeeting);
+            return formattedMeeting;
+          }).filter(Boolean); // Filter out null values
+
+          console.log(`Adding ${phaseMeetings.length} meetings from phase ${phase.id} to program meetings`);
+          programMeetings.push(...phaseMeetings);
+        } else {
+          console.log(`No meetings found for phase ${phase.id}`);
+        }
+      });
+
+      // Update phases for filtering
+      setPhases(programPhases);
+
+      if (programMeetings.length > 0) {
+        // Use ONLY program meetings when available
+        console.log(`Using ${programMeetings.length} meetings from selected program`);
+        setMeetings(programMeetings);
+        return; // Exit early to avoid setting mock meetings
+      }
+    }
+
+    // Only use empty array if no program is selected or no program meetings are available
+    console.log('No meetings found in selected program, using empty array');
+    setMeetings([]);
+
+    // We're now using backend data, no need to load from localStorage
+  }, [selectedProgram, selectedProgramId]);
 
   // Update phases when selected program changes
   useEffect(() => {
     if (selectedProgram && selectedProgram.phases && selectedProgram.phases.length > 0) {
       // Map program phases to the format needed by the context
-      const mappedPhases = selectedProgram.phases.map(phase => {
+      const mappedPhases = selectedProgram.phases.map((phase: any) => {
         // Calculate meeting count
         const meetingCount = Array.isArray(phase.meetings) ? phase.meetings.length : 0;
-        
-        // Format dates if needed
-        const formatDate = (date: Date | string) => {
-          if (date instanceof Date) {
-            return date.toISOString().split('T')[0];
-          }
-          return date;
-        };
-
-        // Map status
-        let mappedStatus: 'not_started' | 'in_progress' | 'completed' = 'not_started';
-        if (phase.status === 'completed') {
-          mappedStatus = 'completed';
-        } else if (phase.status === 'in_progress') {
-          mappedStatus = 'in_progress';
-        }
 
         return {
-          id: phase.id.toString(),
+          id: String(phase.id),
           name: phase.name,
-          color: phase.color || "#3b82f6", // Default to blue
-          startDate: formatDate(phase.startDate),
-          endDate: formatDate(phase.endDate),
-          status: mappedStatus,
-          meetingCount: meetingCount
+          color: phase.color || '#818cf8',
+          startDate: phase.startDate instanceof Date ? phase.startDate.toISOString().split('T')[0] : String(phase.startDate),
+          endDate: phase.endDate instanceof Date ? phase.endDate.toISOString().split('T')[0] : String(phase.endDate),
+          status: phase.status as 'not_started' | 'in_progress' | 'completed' || 'not_started',
+          meetingCount
         };
       });
-      
+
       setPhases(mappedPhases);
     } else {
-      // Use default phases if no program is selected
-      setPhases([
-        {
-          id: "phase-1",
-          name: "Application",
-          color: "#3b82f6", // blue
-          startDate: "2023-01-15",
-          endDate: "2023-02-15",
-          status: "completed",
-          meetingCount: 3
-        },
-        {
-          id: "phase-2",
-          name: "Selection",
-          color: "#10b981", // green
-          startDate: "2023-02-16",
-          endDate: "2023-03-15",
-          status: "completed",
-          meetingCount: 4
-        },
-        {
-          id: "phase-3",
-          name: "Onboarding",
-          color: "#8b5cf6", // purple
-          startDate: "2023-03-16",
-          endDate: "2023-04-15",
-          status: "in_progress",
-          meetingCount: 5
-        },
-        {
-          id: "phase-4",
-          name: "Development",
-          color: "#f59e0b", // amber
-          startDate: "2023-04-16",
-          endDate: "2023-05-15",
-          status: "not_started",
-          meetingCount: 8
-        },
-        {
-          id: "phase-5",
-          name: "Demo Day",
-          color: "#ef4444", // red
-          startDate: "2023-05-16",
-          endDate: "2023-06-15",
-          status: "not_started",
-          meetingCount: 2
-        }
-      ]);
+      // Use empty array if no program is selected
+      setPhases([]);
     }
   }, [selectedProgram]);
 
   // Add event listener for new program creation
   useEffect(() => {
-    const handleProgramCreated = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { programId, program } = customEvent.detail;
-      
-      console.log('Program created event received:', programId, program);
-      
-      // Update phases from the new program
-      if (program && program.phases && Array.isArray(program.phases)) {
-        const mappedPhases = program.phases.map((phase: any) => {
-          // Calculate meeting count
-          const meetingCount = Array.isArray(phase.meetings) ? phase.meetings.length : 0;
-          
-          // Format dates if needed
-          const formatDate = (date: Date | string) => {
-            if (date instanceof Date) {
-              return date.toISOString().split('T')[0];
-            }
-            return date;
-          };
+    const handleProgramCreated = (event: CustomEvent) => {
+      const newProgram = event.detail;
+      console.log('New program created event received:', newProgram);
 
-          // Map status
-          let mappedStatus: 'not_started' | 'in_progress' | 'completed' = 'not_started';
-          if (phase.status === 'completed') {
-            mappedStatus = 'completed';
-          } else if (phase.status === 'in_progress') {
-            mappedStatus = 'in_progress';
-          }
-
+      if (newProgram && newProgram.phases) {
+        // Map new program phases to the format needed by the context
+        const mappedPhases = newProgram.phases.map((phase: any) => {
           return {
-            id: phase.id.toString(),
+            id: String(phase.id),
             name: phase.name,
-            color: phase.color || "#3b82f6", // Default to blue
-            startDate: formatDate(phase.startDate),
-            endDate: formatDate(phase.endDate),
-            status: mappedStatus,
-            meetingCount: meetingCount
+            color: phase.color || '#818cf8',
+            startDate: phase.startDate instanceof Date ? phase.startDate.toISOString().split('T')[0] : String(phase.startDate),
+            endDate: phase.endDate instanceof Date ? phase.endDate.toISOString().split('T')[0] : String(phase.endDate),
+            status: phase.status as 'not_started' | 'in_progress' | 'completed' || 'not_started',
+            meetingCount: Array.isArray(phase.meetings) ? phase.meetings.length : 0
           };
         });
-        
+
         setPhases(mappedPhases);
       }
-      
+
       // Update meetings from the new program
-      if (program && program.phases) {
-        console.log('Processing program phases for meetings:', program.phases);
-        // Extract meetings from each phase
-        const allPhaseMeetings: any[] = [];
-        
-        program.phases.forEach((phase: any) => {
+      if (newProgram && newProgram.phases) {
+        const allPhaseMeetings: Meeting[] = [];
+
+        newProgram.phases.forEach((phase: any) => {
           if (phase.meetings && Array.isArray(phase.meetings)) {
-            // Process meetings from this phase
             const phaseMeetings = phase.meetings.map((meeting: any) => {
-              // Ensure date is in the correct format (YYYY-MM-DD)
+              // Format date if it's a Date object
               const formatDate = (date: Date | string) => {
                 if (date instanceof Date) {
                   return date.toISOString().split('T')[0];
-                } else if (typeof date === 'string') {
-                  // Try to convert if it's a string but not in the right format
-                  try {
-                    const dateObj = new Date(date);
-                    return dateObj.toISOString().split('T')[0];
-                  } catch (e) {
-                    console.error("Error formatting date:", date, e);
-                    return date;
-                  }
                 }
                 return String(date);
               };
-              
-              // Ensure time is in the correct format (HH:MM)
-              const formatTime = (time: any) => {
-                if (!time) return "00:00";
-                if (typeof time === 'string' && time.includes(':')) {
-                  return time;
-                }
-                // If time is provided as a number of minutes since midnight
-                if (typeof time === 'number') {
-                  const hours = Math.floor(time / 60);
-                  const minutes = time % 60;
-                  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-                }
-                return String(time);
-              };
-              
+
               return {
-                ...meeting,
-                id: meeting.id || uuidv4(),
-                title: meeting.title || meeting.name || 'Untitled Meeting',
+                id: String(meeting.id || ''),
+                title: meeting.title || meeting.nom_reunion || '',
                 date: formatDate(meeting.date),
-                time: formatTime(meeting.time),
-                duration: Number(meeting.duration) || 60,
-                type: meeting.type || 'group',
-                attendees: Array.isArray(meeting.attendees) ? meeting.attendees : ['All Participants'],
-                phaseId: phase.id.toString(),
-                programId: programId,
-                isCompleted: Boolean(meeting.isCompleted),
-                hasNotes: Boolean(meeting.hasNotes),
-                isOnline: Boolean(meeting.isOnline)
+                time: meeting.time || meeting.heure || '00:00',
+                duration: meeting.duration || 60,
+                type: (meeting.type as 'group' | 'one-on-one' | 'info-session' | 'workshop') || 'group',
+                location: meeting.location || meeting.lieu || '',
+                attendees: Array.isArray(meeting.attendees) ? meeting.attendees : [],
+                phaseId: String(phase.id),
+                description: meeting.description || '',
+                isCompleted: false,
+                hasNotes: false,
+                isOnline: (meeting.location?.toLowerCase().includes('zoom') ||
+                          meeting.lieu?.toLowerCase().includes('zoom') ||
+                          meeting.lieu?.toLowerCase().includes('virtuelle')) || false,
+                programId: String(newProgram.id)
               };
             });
-            
+
             allPhaseMeetings.push(...phaseMeetings);
           }
         });
-        
-        // Also check for direct meetings array at program level
-        if (program.meetings && Array.isArray(program.meetings)) {
-          console.log('Processing program-level meetings:', program.meetings);
-          const programMeetings = program.meetings.map((meeting: any) => ({
-            ...meeting,
-            id: meeting.id || uuidv4(),
-            programId: programId,
-            title: meeting.title || meeting.name || 'Untitled Meeting',
-            type: meeting.type || 'group',
-            isCompleted: Boolean(meeting.isCompleted),
-            hasNotes: Boolean(meeting.hasNotes),
-            isOnline: Boolean(meeting.isOnline),
-            attendees: Array.isArray(meeting.attendees) ? meeting.attendees : ['All Participants']
-          }));
-          
-          allPhaseMeetings.push(...programMeetings);
-        }
-        
+
         if (allPhaseMeetings.length > 0) {
           console.log(`Adding ${allPhaseMeetings.length} meetings from new program:`, allPhaseMeetings);
           setMeetings(prevMeetings => [...prevMeetings, ...allPhaseMeetings]);
@@ -485,17 +260,19 @@ export const MeetingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       }
     };
-    
-    document.addEventListener('program-created', handleProgramCreated);
-    
+
+    // Add event listener
+    window.addEventListener('programCreated', handleProgramCreated as EventListener);
+
+    // Cleanup
     return () => {
-      document.removeEventListener('program-created', handleProgramCreated);
+      window.removeEventListener('programCreated', handleProgramCreated as EventListener);
     };
   }, []);
 
   // Filter meetings based on selected filters, search query, and program
   const filteredMeetings = meetings.filter(meeting => {
-    const matchesSearch = meeting.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = meeting.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         (meeting.description && meeting.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesPhase = !selectedPhase || meeting.phaseId === selectedPhase;
     const matchesProgram = !selectedProgramId || meeting.programId === selectedProgramId;
@@ -512,20 +289,25 @@ export const MeetingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const formatAttendees = (attendees: string[]): string => {
-    if (attendees.length <= 2) return attendees.join(", ");
-    return `${attendees[0]}, ${attendees[1]}, +${attendees.length - 2} more`;
+    if (!attendees || attendees.length === 0) return 'No attendees';
+    if (attendees.length === 1) return attendees[0];
+    if (attendees.length === 2) return `${attendees[0]} and ${attendees[1]}`;
+    return `${attendees[0]}, ${attendees[1]}, and ${attendees.length - 2} more`;
   };
 
-  const formatDate = (dateStr: string, timeStr: string): string => {
-    const date = new Date(`${dateStr}T${timeStr}`);
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const formatDate = (date: string): string => {
+    if (!date) return '';
+    const dateObj = new Date(date);
+    return dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
-  
-  const formatTime = (timeStr: string): string => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const formattedHours = hours % 12 || 12;
-    return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+
+  const formatTime = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
   // Create a new meeting
@@ -535,31 +317,49 @@ export const MeetingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       ...meeting,
       id: newMeetingId
     };
-    
+
     // Update local state with the new meeting
     setMeetings(prevMeetings => [...prevMeetings, newMeeting]);
+
+    // TODO: Add API call to save meeting to backend
+    // Example:
+    // if (meeting.phaseId) {
+    //   try {
+    //     await fetch(`http://localhost:8083/api/reunion/create/${meeting.phaseId}`, {
+    //       method: 'POST',
+    //       headers: { 'Content-Type': 'application/json' },
+    //       body: JSON.stringify({
+    //         nom_reunion: meeting.title,
+    //         date: meeting.date,
+    //         heure: meeting.time,
+    //         lieu: meeting.location
+    //       })
+    //     });
+    //   } catch (error) {
+    //     console.error('Error saving meeting to backend:', error);
+    //   }
+    // }
+
     return newMeetingId;
   };
-  
+
   // Add multiple meetings at once
   const addMeetings = (meetingsToAdd: Omit<Meeting, 'id'>[]): string[] => {
     const newMeetingIds: string[] = [];
-    
-    const newMeetings = meetingsToAdd.map(meeting => {
+    const newMeetings: Meeting[] = meetingsToAdd.map(meeting => {
       const newMeetingId = uuidv4();
       newMeetingIds.push(newMeetingId);
-      
       return {
         ...meeting,
         id: newMeetingId
       };
     });
-    
+
     // Update meetings state with all new meetings
     setMeetings(prevMeetings => [...prevMeetings, ...newMeetings]);
     return newMeetingIds;
   };
-  
+
   // Value object for the context provider
   const value = {
     meetings,
@@ -594,4 +394,4 @@ export const useMeetings = (): MeetingsContextType => {
     throw new Error('useMeetings must be used within a MeetingsProvider');
   }
   return context;
-}; 
+};

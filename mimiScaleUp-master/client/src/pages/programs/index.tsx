@@ -67,7 +67,9 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
       <CardContent className="flex-grow p-6">
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-medium text-gray-900">{name}</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              {name} <span className="text-xs text-gray-500 ml-1">(ID: {id})</span>
+            </h3>
             {isSelected && <Check className="h-5 w-5 text-primary" />}
           </div>
           <Badge variant={status === "draft" ? "outline" : status === "active" ? "default" : "secondary"}>

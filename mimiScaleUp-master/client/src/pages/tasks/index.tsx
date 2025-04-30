@@ -104,6 +104,17 @@ const TasksPage: React.FC = () => {
     updateTaskStatus(draggableId, newStatus);
   };
 
+  // Force refresh tasks when program changes
+  React.useEffect(() => {
+    if (selectedProgram) {
+      // Clear any filters that might be applied
+      setSearchQuery('');
+      setSelectedStatuses([]);
+      setSelectedPriorities([]);
+      setSelectedPhase(null);
+    }
+  }, [selectedProgram, setSearchQuery, setSelectedStatuses, setSelectedPriorities, setSelectedPhase]);
+
   if (!selectedProgram) {
     return (
       <div className="container mx-auto py-12 text-center">

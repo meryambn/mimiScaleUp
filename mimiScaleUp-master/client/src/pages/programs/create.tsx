@@ -17,6 +17,7 @@ import { saveFormDirect, checkAndRepairStorage } from "@/utils/directStorage";
 import { saveProgramAsTemplate, getSavedProgramTemplates } from "@/utils/programTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { createProgram as apiCreateProgram, createPhase, createTask, createLivrable, createCritere, createReunion, addMentorToProgram } from "@/services/programService";
 import { Plus, PlusCircle, BarChart, Calendar, Users, BarChart2, Flag, MessageSquare, Filter } from "lucide-react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -48,6 +49,7 @@ interface ProgramState {
   id?: string;
   name: string;
   description: string;
+  type?: string; // Add type property
   startDate: Date;
   endDate: Date;
   dashboardWidgets: WidgetData[];
@@ -406,11 +408,11 @@ const CreateProgram: React.FC = () => {
     eligibilityCriteria: {
       minTeamSize: 1,
       maxTeamSize: 10,
-      requiredStages: [],
-      requiredIndustries: [],
+      requiredStages: ["Pre-seed", "Seed", "Growth"],
+      requiredIndustries: ["Technology", "Healthcare", "Fintech"],
       minRevenue: 0,
       maxRevenue: 1000000,
-      requiredDocuments: []
+      requiredDocuments: ["Pitch Deck", "Business Plan", "Team Bios"]
     },
     mentors: [],
     status: 'active'
@@ -520,7 +522,7 @@ const CreateProgram: React.FC = () => {
   const [isDraft, setIsDraft] = useState(false);
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { createProgram: contextCreateProgram } = useProgramContext();
+  const { createProgram: contextCreateProgram, setSelectedProgramId } = useProgramContext();
 
   // Charger les modèles enregistrés au chargement de la page
   React.useEffect(() => {
@@ -706,12 +708,286 @@ const CreateProgram: React.FC = () => {
 
   const isStepCompleted = (step: number) => completedSteps.includes(step);
 
-  const createProgram = (programData: any) => {
+  const createProgram = async (programData: any) => {
     try {
       // Vérifier et réparer le stockage local avant de créer un programme
       checkAndRepairStorage();
-      // Convert the program data to the format expected by the context
+
+      // Map template names to their corresponding types
+      const programTypeMap: Record<string, string> = {
+        "Programme d'accélération": "Accélération",
+        "Programme d'incubation": "Incubation",
+        "Hackathon": "Hackathon",
+        "Défi d'innovation": "Défi d'innovation", // Use the exact format from the backend
+        "Programme personnalisé": "Personnalisé"
+      };
+
+      // Get the correct type based on the program name
+      const programType = programData.type || (programTypeMap[programData.name] || 'Accélération');
+
+      console.log(`Creating program with name: ${programData.name}, using type: ${programType}`);
+
+      // Log the eligibility criteria for debugging
+      console.log("Original eligibility criteria:", {
+        phases: programData.eligibilityCriteria?.requiredStages,
+        industries: programData.eligibilityCriteria?.requiredIndustries,
+        documents: programData.eligibilityCriteria?.requiredDocuments
+      });
+
+      // Ensure we have the complete eligibility criteria
+      const phases = programData.eligibilityCriteria?.requiredStages || [];
+      const industries = programData.eligibilityCriteria?.requiredIndustries || [];
+      const documents = programData.eligibilityCriteria?.requiredDocuments || [];
+
+      console.log("Phases to send:", phases);
+      console.log("Industries to send:", industries);
+      console.log("Documents to send:", documents);
+
+      // Convert the program data to the format expected by the API
+      // Create a clean object with exactly the fields needed by the backend
       const programToCreate = {
+        type: programType, // Use the mapped type
+        nom: programData.name,
+        description: programData.description,
+        date_debut: programData.startDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        date_fin: programData.endDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        phases_requises: phases,
+        industries_requises: industries,
+        documents_requis: documents,
+        taille_equipe_min: programData.eligibilityCriteria?.minTeamSize || 1,
+        taille_equipe_max: programData.eligibilityCriteria?.maxTeamSize || 10,
+        ca_min: programData.eligibilityCriteria?.minRevenue || 0,
+        ca_max: programData.eligibilityCriteria?.maxRevenue || 1000000,
+        admin_id: 1 // Default admin ID
+      };
+
+      // Convert to string and back to ensure proper JSON formatting
+      const jsonString = JSON.stringify(programToCreate);
+      const cleanObject = JSON.parse(jsonString);
+
+      // Clean JSON object is not logged to avoid cluttering the console
+
+      console.log("Creating program...");
+
+      // Call the API to create the program
+      let newProgramId;
+      try {
+        const response = await apiCreateProgram(cleanObject);
+        newProgramId = response.id;
+
+        console.log("Program created successfully with ID:", newProgramId);
+
+        // Ensure newProgramId is a string for consistency
+        if (typeof newProgramId === 'number') {
+          newProgramId = String(newProgramId);
+        }
+      } catch (error) {
+        console.error("Failed to create program:", error);
+        alert(`Failed to create program: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return; // Exit the function early to prevent further processing
+      }
+
+      // Add mentors to the program if any
+      if (programData.mentors && programData.mentors.length > 0) {
+        for (const mentor of programData.mentors) {
+          try {
+            await addMentorToProgram(newProgramId, { mentorId: mentor.id });
+            console.log(`Added mentor ${mentor.id} to program ${newProgramId}`);
+          } catch (error) {
+            console.error(`Failed to add mentor ${mentor.id} to program:`, error);
+          }
+        }
+      }
+
+      // Create phases for the program if any
+      if (programPhases && programPhases.length > 0) {
+        for (const phase of programPhases) {
+          try {
+            const phaseData = {
+              nom: phase.name,
+              description: phase.description || "",
+              date_debut: phase.startDate.toISOString().split('T')[0],
+              date_fin: phase.endDate.toISOString().split('T')[0],
+              gagnant: phase.hasWinner || false
+            };
+
+            const phaseResponse = await createPhase(newProgramId, phaseData);
+
+            // Get the latest phases to find the one we just created
+            const phasesResponse = await fetch(`http://localhost:8083/api/phase/${newProgramId}`);
+            const phases = await phasesResponse.json();
+
+            // Find the created phase by name
+            const createdPhase = phases.find((p: any) => p.nom === phase.name);
+
+            if (!createdPhase) {
+              throw new Error("Failed to find created phase");
+            }
+
+            if (createdPhase) {
+              // Create tasks for the phase
+              if (phase.tasks && phase.tasks.length > 0) {
+                for (const task of phase.tasks) {
+                  try {
+                    // Handle both Task interfaces (one with title, one with name)
+                    // Use type assertion to access properties that might not exist on the Task type
+                    const taskTitle = (task as any).title;
+                    const taskName = taskTitle || task.name || "Nouvelle tâche";
+
+                    const taskData = {
+                      nom: taskName,
+                      description: task.description || "",
+                      date_decheance: task.dueDate ?
+                        (task.dueDate instanceof Date ?
+                          task.dueDate.toISOString().split('T')[0] :
+                          new Date(task.dueDate).toISOString().split('T')[0]) :
+                        new Date().toISOString().split('T')[0]
+                    };
+
+                    await createTask(createdPhase.id, taskData);
+                  } catch (error) {
+                    console.error("Failed to create task:", error);
+                  }
+                }
+              }
+
+              // Create evaluation criteria for the phase
+              if (phase.evaluationCriteria && phase.evaluationCriteria.length > 0) {
+                console.log(`Creating evaluation criteria for phase ${createdPhase.id}`);
+                for (const criterion of phase.evaluationCriteria) {
+                  try {
+                    // Map frontend criterion type to backend type
+                    let backendType = 'etoiles'; // Default type
+
+                    if (criterion.type) {
+                      const typeStr = String(criterion.type);
+                      if (typeStr === 'numeric') {
+                        backendType = 'numerique';
+                      } else if (typeStr === 'star_rating') {
+                        backendType = 'etoiles';
+                      } else if (typeStr === 'yes_no' || typeStr === 'boolean') {
+                        backendType = 'oui_non';
+                      } else if (typeStr === 'liste_deroulante' || typeStr === 'select' || typeStr === 'dropdown') {
+                        backendType = 'liste_deroulante';
+                      }
+                    }
+
+                    // Handle the accessibleBy field
+                    let accessibleMentors = true; // Default value
+                    let accessibleEquipes = false; // Default value
+
+                    if (Array.isArray(criterion.accessibleBy)) {
+                      accessibleMentors = criterion.accessibleBy.includes('mentors');
+                      accessibleEquipes = criterion.accessibleBy.includes('teams');
+                    }
+
+                    // Handle the filledBy field
+                    let rempliPar = 'mentors'; // Default value
+                    if (criterion.filledBy) {
+                      if (criterion.filledBy === 'teams') {
+                        rempliPar = 'equipes';
+                      } else if (criterion.filledBy === 'mentors') {
+                        rempliPar = 'mentors';
+                      }
+                    }
+
+                    const criterionData = {
+                      nom_critere: criterion.name,
+                      type: backendType,
+                      poids: criterion.weight || 10,
+                      accessible_mentors: accessibleMentors,
+                      accessible_equipes: accessibleEquipes,
+                      rempli_par: rempliPar,
+                      necessite_validation: criterion.requiresValidation || false
+                    };
+
+                    await createCritere(createdPhase.id, criterionData);
+                  } catch (error) {
+                    console.error("Failed to create evaluation criterion:", error);
+                  }
+                }
+              }
+
+              // Create meetings for the phase
+              if (phase.meetings && phase.meetings.length > 0) {
+                console.log(`Creating meetings for phase ${createdPhase.id}`);
+                for (const meeting of phase.meetings) {
+                  try {
+                    // Format the date properly for the backend
+                    let formattedDate: string;
+
+                    // Handle different date formats
+                    if (meeting.date instanceof Date) {
+                      formattedDate = meeting.date.toISOString().split('T')[0];
+                    } else {
+                      formattedDate = new Date().toISOString().split('T')[0];
+                    }
+
+                    const meetingData = {
+                      nom_reunion: meeting.title || meeting.name || 'Untitled Meeting',
+                      date: formattedDate,
+                      heure: meeting.time || '12:00',
+                      lieu: meeting.location || 'Online'
+                    };
+
+                    await createReunion(createdPhase.id, meetingData);
+                  } catch (error) {
+                    console.error("Failed to create meeting:", error);
+                  }
+                }
+              }
+
+              // Create deliverables for the phase
+              if (phase.deliverables && phase.deliverables.length > 0) {
+                console.log(`Creating deliverables for phase ${createdPhase.id}`);
+                for (const deliverable of phase.deliverables) {
+                  try {
+                    // Process the allowed file types
+                    let fileTypes = ['.pdf', '.docx', '.pptx']; // Default file types
+                    if (deliverable.allowedFileTypes && Array.isArray(deliverable.allowedFileTypes) && deliverable.allowedFileTypes.length > 0) {
+                      fileTypes = deliverable.allowedFileTypes;
+                    }
+
+                    // Format the due date properly for the backend
+                    let formattedDueDate: string;
+
+                    // Handle different date formats
+                    if (deliverable.dueDate instanceof Date) {
+                      formattedDueDate = deliverable.dueDate.toISOString().split('T')[0];
+                    } else {
+                      formattedDueDate = new Date().toISOString().split('T')[0];
+                    }
+
+                    // Convert fileTypes array to a comma-separated string if it's an array
+                    const processedFileTypes = Array.isArray(fileTypes)
+                      ? fileTypes
+                          .map(type => type.startsWith('.') ? type : `.${type}`)
+                          .join(', ')
+                      : fileTypes;
+
+                    const deliverableData = {
+                      nom: deliverable.name,
+                      description: deliverable.description || 'No description provided',
+                      date_echeance: formattedDueDate,
+                      types_fichiers: processedFileTypes
+                    };
+
+                    await createLivrable(createdPhase.id, deliverableData);
+                  } catch (error) {
+                    console.error("Failed to create deliverable:", error);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Failed to create phase:", error);
+          }
+        }
+      }
+
+      // For compatibility with the existing code, also use the context method
+      // Convert the program data to the format expected by the context
+      const programToCreateForContext = {
         name: programData.name,
         description: programData.description,
         startDate: programData.startDate,
@@ -771,8 +1047,21 @@ const CreateProgram: React.FC = () => {
         applicationForm: applicationForm // Add the application form to the program data
       };
 
-      // Use the context method instead of API request
-      const newProgramId = contextCreateProgram(programToCreate);
+      // We don't need to call contextCreateProgram here because the program is already created through the API
+      // This was causing duplication of programs
+      console.log("Program already created through API, skipping contextCreateProgram");
+
+      // Force the selection of the new program ID in the context
+      console.log("Setting selected program ID to the newly created program:", newProgramId);
+
+      // Use the API-returned ID as the primary ID
+      if (newProgramId) {
+        // Force the selection of the new program ID in the context
+        setTimeout(() => {
+          console.log("Forcing selection of newly created program with ID:", newProgramId);
+          setSelectedProgramId(newProgramId);
+        }, 200);
+      }
 
       // Create application form for the program
       // Même si aucune question n'est fournie, créer un formulaire par défaut
@@ -797,8 +1086,8 @@ const CreateProgram: React.FC = () => {
         // Prepare form data to save
         const formData = {
           id: Date.now(), // Use timestamp as ID
-          name: applicationForm.settings?.title || `Formulaire de candidature - ${programToCreate.name}`,
-          description: applicationForm.settings?.description || `Formulaire de candidature pour le programme ${programToCreate.name}`,
+          name: applicationForm.settings?.title || `Formulaire de candidature - ${programData.name}`,
+          description: applicationForm.settings?.description || `Formulaire de candidature pour le programme ${programData.name}`,
           programId: newProgramId, // Utiliser directement l'UUID sans conversion
           questions: questions, // Utiliser les questions par défaut si aucune n'est fournie
           settings: applicationForm.settings,
@@ -826,7 +1115,7 @@ const CreateProgram: React.FC = () => {
         }
 
         // Vérifier si le programId est un UUID (chaîne de caractères avec des tirets)
-        const isUuid = typeof newProgramId === 'string' && newProgramId.includes('-');
+        const isUuid = typeof newProgramId === 'string' && String(newProgramId).includes('-');
         console.log(`%c Le newProgramId est-il un UUID? ${isUuid}`, "background: orange; color: black; padding: 5px; font-size: 14px;");
 
         // Utiliser directement l'UUID comme programId sans le convertir en nombre
@@ -864,8 +1153,8 @@ const CreateProgram: React.FC = () => {
       }
 
       // Create evaluation criteria for the program
-      // Check if program has evaluation criteria, if not, add default ones
-      if (!programToCreate.evaluationCriteria || programToCreate.evaluationCriteria.length === 0) {
+      // Check if programToCreateForContext has evaluation criteria, if not, add default ones
+      if (!programToCreateForContext.evaluationCriteria || programToCreateForContext.evaluationCriteria.length === 0) {
         console.log("No evaluation criteria found, adding default criteria");
 
         // Default evaluation criteria
@@ -932,14 +1221,20 @@ const CreateProgram: React.FC = () => {
           }
         ];
 
-        // Add default criteria to the program
-        programToCreate.evaluationCriteria = defaultCriteria;
+        // Add default criteria to the context program
+        programToCreateForContext.evaluationCriteria = defaultCriteria;
       }
 
+      // Count total items created
+      const totalTasks = programPhases.reduce((count, phase) => count + (phase.tasks?.length || 0), 0);
+      const totalMeetings = programPhases.reduce((count, phase) => count + (phase.meetings?.length || 0), 0);
+      const totalCriteria = programPhases.reduce((count, phase) => count + (phase.evaluationCriteria?.length || 0), 0);
+      const totalDeliverables = programPhases.reduce((count, phase) => count + (phase.deliverables?.length || 0), 0);
+
       // Process evaluation criteria
-      if (programToCreate.evaluationCriteria && programToCreate.evaluationCriteria.length > 0) {
+      if (programToCreateForContext.evaluationCriteria && programToCreateForContext.evaluationCriteria.length > 0) {
         // Process each evaluation criterion
-        programToCreate.evaluationCriteria.forEach((criterion: any) => {
+        programToCreateForContext.evaluationCriteria.forEach((criterion: any) => {
           // Prepare criterion data to save
           const criterionData = {
             id: criterion.id || `criterion_${Date.now()}`,
@@ -966,6 +1261,16 @@ const CreateProgram: React.FC = () => {
         });
       }
 
+      // Dispatch a custom event to notify other components about the program creation
+      const programCreatedEvent = new CustomEvent('program-created', {
+        detail: {
+          programId: newProgramId,
+          phasesCount: programPhases.length,
+          meetingsCount: totalMeetings
+        }
+      });
+      document.dispatchEvent(programCreatedEvent);
+
       // Show success toast and navigate
       toast({
         title: "Success",
@@ -982,9 +1287,10 @@ const CreateProgram: React.FC = () => {
     }
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     setIsDraft(true);
-    createProgram({
+    // Use the same createProgram function but with draft status
+    await createProgram({
       ...currentProgram,
       status: 'draft'
     });
@@ -1039,12 +1345,7 @@ const CreateProgram: React.FC = () => {
     }
   };
 
-  const handleWidgetsChange = (widgets: WidgetData[]) => {
-    setCurrentProgram(prev => ({
-      ...prev,
-      dashboardWidgets: widgets
-    }));
-  };
+
 
   const handleUpdatePhase = (updatedPhase: PhaseDetails) => {
     setProgramPhases(phases =>
@@ -1197,11 +1498,11 @@ const CreateProgram: React.FC = () => {
                   eligibilityCriteria: {
                     minTeamSize: 2,
                     maxTeamSize: 5,
-                    requiredStages: ["Pré-amorçage", "Amorçage"],
-                    requiredIndustries: ["Technologie", "Santé", "Fintech"],
+                    requiredStages: ["Pre-seed", "Seed"],
+                    requiredIndustries: ["Technology", "Healthcare", "Fintech"],
                     minRevenue: 0,
                     maxRevenue: 100000,
-                    requiredDocuments: ["Présentation", "Projections financières", "Biographies de l'équipe"]
+                    requiredDocuments: ["Pitch Deck", "Financial Projections", "Team Bios"]
       }
     },
     {
@@ -1294,11 +1595,11 @@ const CreateProgram: React.FC = () => {
       eligibilityCriteria: {
         minTeamSize: 1,
         maxTeamSize: 4,
-        requiredStages: ["Idée", "Pré-amorçage"],
-        requiredIndustries: ["Technologie", "Impact social", "Durabilité"],
+        requiredStages: ["Pre-seed", "Seed"],
+        requiredIndustries: ["Technology", "Social Impact", "Education"],
         minRevenue: 0,
         maxRevenue: 50000,
-        requiredDocuments: ["Plan d'affaires", "Documentation du prototype", "CV de l'équipe"]
+        requiredDocuments: ["Business Plan", "Pitch Deck", "Team Bios"]
       }
     },
     {
@@ -1406,10 +1707,10 @@ const CreateProgram: React.FC = () => {
         minTeamSize: 1,
                     maxTeamSize: 10,
         requiredStages: [],
-        requiredIndustries: [],
+        requiredIndustries: ["Technology"],
                     minRevenue: 0,
         maxRevenue: 0,
-        requiredDocuments: []
+        requiredDocuments: ["Pitch Deck"]
       }
     },
     {
@@ -1506,19 +1807,34 @@ const CreateProgram: React.FC = () => {
                   eligibilityCriteria: {
         minTeamSize: 1,
         maxTeamSize: 8,
-        requiredStages: ["MVP", "Croissance"],
-        requiredIndustries: ["Logiciel d'entreprise", "Industrie 4.0", "Analyse de données"],
+        requiredStages: ["Pre-seed", "Growth", "Series A"],
+        requiredIndustries: ["Technology", "Healthcare", "Fintech", "Social Impact"],
         minRevenue: 0,
         maxRevenue: 500000,
-        requiredDocuments: ["Résumé de la solution", "Profil de l'entreprise", "Plan de mise en œuvre"]
+        requiredDocuments: ["Pitch Deck", "Team Bios", "Business Plan", "Financial Projections"]
       }
     }
   ];
 
   const onTemplateSelect = (template: ProgramTemplate) => {
+    // Map template names to their corresponding types
+    const programTypeMap: Record<string, string> = {
+      "Programme d'accélération": "Accélération",
+      "Programme d'incubation": "Incubation",
+      "Hackathon": "Hackathon",
+      "Défi d'innovation": "Défi d'innovation", // Use the exact format from the backend
+      "Programme personnalisé": "Personnalisé"
+    };
+
+    // Get the correct type based on the template name
+    const programType = programTypeMap[template.name] || template.name;
+
+    console.log(`Selected template: ${template.name}, setting type to: ${programType}`);
+
     const newProgram: ProgramState = {
       name: template.name,
       description: template.description,
+      type: programType, // Set the correct program type
       startDate: template.startDate || new Date(),
       endDate: template.endDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
       dashboardWidgets: template.dashboardWidgets.map(widget => ({
@@ -1580,10 +1896,23 @@ const CreateProgram: React.FC = () => {
   const onSavedTemplateSelect = (template: any) => {
     console.log('Saved template selected:', template);
 
+    // Map template names to their corresponding types
+    const programTypeMap: Record<string, string> = {
+      "Programme d'accélération": "Accélération",
+      "Programme d'incubation": "Incubation",
+      "Hackathon": "Hackathon",
+      "Défi d'innovation": "Défi d'innovation", // Use the exact format from the backend
+      "Programme personnalisé": "Personnalisé"
+    };
+
+    // Get the correct type based on the template name
+    const programType = programTypeMap[template.name] || template.name;
+
     // Créer un nouveau programme à partir du modèle enregistré
     const newProgram: ProgramState = {
       name: template.name,
       description: template.description,
+      type: programType, // Set the correct program type
       startDate: new Date(template.programData.startDate),
       endDate: new Date(template.programData.endDate),
       dashboardWidgets: template.programData.dashboardWidgets || [],
@@ -1647,11 +1976,11 @@ const CreateProgram: React.FC = () => {
     const defaultEligibilityCriteria = {
                     minTeamSize: 1,
                     maxTeamSize: 10,
-                    requiredStages: [],
-                    requiredIndustries: [],
+                    requiredStages: ["Pre-seed", "Seed", "Growth"],
+                    requiredIndustries: ["Technology", "Healthcare", "Fintech"],
                     minRevenue: 0,
                     maxRevenue: 1000000,
-                    requiredDocuments: []
+                    requiredDocuments: ["Pitch Deck", "Business Plan", "Team Bios"]
     };
 
     const customTemplate: ProgramTemplate = {
@@ -1682,6 +2011,7 @@ const CreateProgram: React.FC = () => {
                 setCurrentProgram({
       name: "",
       description: "",
+      type: "Personnalisé", // Set the correct program type
       startDate: new Date(),
       endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
       dashboardWidgets: [],
@@ -2118,9 +2448,10 @@ const CreateProgram: React.FC = () => {
                   </>
                 )}
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (currentStep === 4) {
-                      createProgram({
+                      // Create the program with active status
+                      await createProgram({
                         ...currentProgram,
                         status: 'active'
                       });

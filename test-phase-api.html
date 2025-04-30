@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase API Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .settings {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        .error-message {
+            color: red;
+            font-size: 14px;
+            margin-top: -10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            display: block;
+            margin: 0 auto;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #results {
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: scroll;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: blue;
+        }
+        .alert {
+            padding: 10px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            color: #721c24;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Phase API Tester</h1>
+    
+    <div class="settings">
+        <label for="phaseId">Phase ID: <span class="info">(Must be a valid positive integer)</span></label>
+        <input type="number" id="phaseId" min="1" placeholder="Enter a valid phase ID" value="1" required>
+        <div id="phaseIdError" class="error-message">Please enter a valid positive number</div>
+        
+        <label for="apiBaseUrl">API Base URL:</label>
+        <input type="text" id="apiBaseUrl" placeholder="Enter your API base URL" value="http://localhost:8083/api">
+    </div>
+    
+    <button id="runTests">Run API Tests</button>
+    <div id="results">Instructions:
+1. Enter a valid phase ID from your database
+2. Verify the API Base URL is correct
+3. Click "Run All Tests"
+
+The tests will create:
+- A new evaluation criterion
+- A new meeting
+- A new deliverable
+
+Results will be displayed here.
+    </div>
+    
+    <script src="test-phase-api.js"></script>
+    <script>
+        // Get elements
+        const phaseIdInput = document.getElementById('phaseId');
+        const phaseIdError = document.getElementById('phaseIdError');
+        const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+        const runButton = document.getElementById('runTests');
+        const resultsElem = document.getElementById('results');
+        
+        // Validate phase ID input
+        phaseIdInput.addEventListener('input', validatePhaseId);
+        
+        function validatePhaseId() {
+            const phaseIdValue = phaseIdInput.value;
+            const isValid = phaseIdValue && !isNaN(phaseIdValue) && parseInt(phaseIdValue) > 0;
+            
+            if (isValid) {
+                phaseIdError.style.display = 'none';
+                phaseIdInput.style.borderColor = '';
+                runButton.disabled = false;
+            } else {
+                phaseIdError.style.display = 'block';
+                phaseIdInput.style.borderColor = 'red';
+                runButton.disabled = true;
+            }
+            
+            return isValid;
+        }
+        
+        // Initial validation
+        validatePhaseId();
+        
+        // Run tests when button is clicked
+        runButton.addEventListener('click', () => {
+            if (!validatePhaseId()) {
+                resultsElem.innerHTML = '<div class="alert">❌ Cannot run tests: Invalid Phase ID. Please enter a valid positive number.</div>';
+                return;
+            }
+            
+            // Get user settings
+            const phaseId = parseInt(phaseIdInput.value, 10);
+            const apiBaseUrl = apiBaseUrlInput.value;
+            
+            // Update values in the test script
+            window.phaseId = phaseId;
+            window.API_BASE_URL = apiBaseUrl;
+            
+            // Clear previous results
+            resultsElem.innerHTML = 'Running tests...\n\n';
+            
+            // Run the tests
+            runTests();
+        });
+    </script>
+</body>
+</html>

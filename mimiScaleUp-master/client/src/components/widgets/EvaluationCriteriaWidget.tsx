@@ -15,6 +15,9 @@ interface EvaluationCriterion {
   programId?: string | number; // Allow both string and number programIds
   programIdStr?: string; // String representation of programId
   programIdNum?: number; // Numeric representation of programId
+  // Backend properties
+  nom_critere?: string;
+  poids?: number;
 }
 
 // Add type definition for the window object
@@ -24,7 +27,7 @@ declare global {
   }
 }
 
-// Create a global in-memory store for evaluation criteria
+// Initialize global in-memory store for evaluation criteria
 if (typeof window !== 'undefined' && !window.globalEvaluationCriteria) {
   window.globalEvaluationCriteria = [];
 }
@@ -40,8 +43,32 @@ const EvaluationCriteriaWidget: React.FC = () => {
   const { data: apiCriteria = [] } = useQuery<EvaluationCriterion[]>({
     queryKey: ['/api/evaluation-criteria', selectedProgramId],
     queryFn: async () => {
-      // In a real app, this would fetch from an API
-      // For now, we'll just return an empty array and rely on localStorage and global store
+      // Get criteria from the backend API via the ProgramContext
+      if (selectedProgram && selectedProgram.phases) {
+        const allCriteria: EvaluationCriterion[] = [];
+
+        // Collect criteria from all phases
+        selectedProgram.phases.forEach(phase => {
+          if (phase.evaluationCriteria && Array.isArray(phase.evaluationCriteria)) {
+            console.log(`Found ${phase.evaluationCriteria.length} criteria in phase ${phase.id}`);
+
+            const phaseCriteria = phase.evaluationCriteria.map((criterion: any) => ({
+              id: String(criterion.id),
+              name: criterion.name || criterion.nom_critere || 'Unnamed Criterion',
+              description: criterion.description || '',
+              weight: criterion.weight || criterion.poids || 10,
+              importance: 3 as 1 | 2 | 3 | 4 | 5,
+              color: 'rgba(79, 70, 229, 1)',
+              programId: selectedProgramId
+            }));
+
+            allCriteria.push(...phaseCriteria);
+          }
+        });
+
+        console.log(`Total criteria found across all phases: ${allCriteria.length}`);
+        return allCriteria;
+      }
       return [];
     },
     enabled: !!selectedProgramId
@@ -49,117 +76,43 @@ const EvaluationCriteriaWidget: React.FC = () => {
 
   // Function to get all criteria from all possible sources without state updates
   const getAllCriteriaWithoutStateUpdates = (): EvaluationCriterion[] => {
-    // Default criteria to use if none found
-    const defaultCriteria: EvaluationCriterion[] = [];
+    // Map to store unique criteria by ID
     const allCriteriaMap = new Map<string | number, EvaluationCriterion>();
 
     console.log('Getting all criteria - selectedProgramId:', selectedProgramId);
 
-    // 1. Check global in-memory store
-    if (typeof window !== 'undefined' &&
-        window.globalEvaluationCriteria &&
-        Array.isArray(window.globalEvaluationCriteria)) {
-      console.log('Found global evaluation criteria:', window.globalEvaluationCriteria.length);
-      window.globalEvaluationCriteria.forEach((criterion: any) => {
-        if (criterion && criterion.id) {
-          console.log('Processing global criterion:', criterion.id, 'programId:', criterion.programId);
-          // Convert ID to string for consistent key handling
-          const criterionId = String(criterion.id);
-          allCriteriaMap.set(criterionId, {
-            ...criterion,
-            // Ensure icon is compatible with React rendering
-            icon: criterion.icon || <Activity className="h-4 w-4" />
-          });
-        }
-      });
-    } else {
-      console.log('No global evaluation criteria found or not an array');
-    }
+    // ONLY get criteria directly from the selected program - no other sources
+    if (selectedProgram && selectedProgram.phases) {
+      // Use a Set to track unique criterion IDs we've already processed
+      const processedIds = new Set<string>();
 
-    // 2. Check localStorage - first try program-specific criteria
-    try {
-      // If we have a selected program, try to get program-specific criteria first
-      if (selectedProgramId) {
-        const programSpecificKey = `evaluationCriteria_program_${String(selectedProgramId)}`;
-        const programSpecificCriteria = localStorage.getItem(programSpecificKey);
+      selectedProgram.phases.forEach(phase => {
+        if (phase.evaluationCriteria && Array.isArray(phase.evaluationCriteria)) {
+          console.log(`Processing ${phase.evaluationCriteria.length} criteria from phase ${phase.id}`);
 
-        if (programSpecificCriteria) {
-          const parsedCriteria = JSON.parse(programSpecificCriteria);
-          if (Array.isArray(parsedCriteria)) {
-            console.log(`Found ${parsedCriteria.length} program-specific criteria for program ${selectedProgramId}`);
-            parsedCriteria.forEach((criterion: any) => {
-              if (criterion && criterion.id) {
-                console.log('Processing program-specific criterion:', criterion.id, 'programId:', criterion.programId);
-                // Convert ID to string for consistent key handling
-                const criterionId = String(criterion.id);
-                allCriteriaMap.set(criterionId, {
-                  ...criterion,
-                  // Ensure icon is compatible with React rendering
-                  icon: <Activity className="h-4 w-4" />
-                });
-              }
-            });
-          }
-        } else {
-          console.log(`No program-specific criteria found for program ${selectedProgramId}`);
-        }
-      }
-
-      // Then check global criteria
-      const storedCriteria = localStorage.getItem('evaluationCriteria');
-      if (storedCriteria) {
-        const localStorageCriteria = JSON.parse(storedCriteria);
-        if (Array.isArray(localStorageCriteria)) {
-          console.log('Found localStorage evaluation criteria:', localStorageCriteria.length);
-          localStorageCriteria.forEach((criterion: any) => {
+          phase.evaluationCriteria.forEach((criterion: any) => {
             if (criterion && criterion.id) {
-              console.log('Processing localStorage criterion:', criterion.id, 'programId:', criterion.programId);
-              // Convert ID to string for consistent key handling
+              // Skip if we've already processed this criterion
               const criterionId = String(criterion.id);
+              if (processedIds.has(criterionId)) {
+                console.log(`Skipping duplicate criterion with ID ${criterionId}`);
+                return;
+              }
+
+              processedIds.add(criterionId);
+              console.log(`Adding criterion from phase ${phase.id}:`, criterion);
+
               allCriteriaMap.set(criterionId, {
-                ...criterion,
-                // Ensure icon is compatible with React rendering
+                id: criterionId,
+                name: criterion.name || criterion.nom_critere || 'Unnamed Criterion',
+                description: criterion.description || '',
+                weight: criterion.weight || criterion.poids || 10,
+                importance: 3 as 1 | 2 | 3 | 4 | 5,
+                color: 'rgba(79, 70, 229, 1)',
+                programId: selectedProgramId,
                 icon: <Activity className="h-4 w-4" />
               });
             }
-          });
-        }
-      } else {
-        console.log('No localStorage evaluation criteria found');
-      }
-    } catch (error) {
-      console.error("Error parsing localStorage criteria:", error);
-    }
-
-    // 3. Check React Query cache
-    const cachedCriteria = queryClient.getQueryData(['/api/evaluation-criteria']) || [];
-    if (Array.isArray(cachedCriteria)) {
-      cachedCriteria.forEach((criterion: any) => {
-        if (criterion && criterion.id) {
-          allCriteriaMap.set(criterion.id, {
-            ...criterion,
-            icon: <Activity className="h-4 w-4" />
-          });
-        }
-      });
-    }
-
-    // 4. Include local state criteria
-    if (localCriteria.length > 0) {
-      localCriteria.forEach(criterion => {
-        if (criterion && criterion.id) {
-          allCriteriaMap.set(criterion.id, criterion);
-        }
-      });
-    }
-
-    // 5. Include criteria from API response
-    if (apiCriteria && Array.isArray(apiCriteria) && apiCriteria.length > 0) {
-      apiCriteria.forEach(criterion => {
-        if (criterion && criterion.id) {
-          allCriteriaMap.set(criterion.id, {
-            ...criterion,
-            icon: <Activity className="h-4 w-4" />
           });
         }
       });
@@ -188,16 +141,16 @@ const EvaluationCriteriaWidget: React.FC = () => {
     return validatedCriteria;
   };
 
-  // Load criteria on component mount
+  // Load criteria on component mount and when selectedProgram changes
   useEffect(() => {
     const allCriteria = getAllCriteriaWithoutStateUpdates();
-    console.log('Initial criteria load:', allCriteria);
+    console.log('Loading criteria - selectedProgram changed:', allCriteria);
     setLocalCriteria(allCriteria);
 
     // Set up event listener for criteria creation
     const handleCriterionCreated = (event: CustomEvent<any>) => {
       console.log("Evaluation criterion created event received:", event.detail);
-      const { programId, programIdStr, programIdNum, criterion } = event.detail;
+      const { programId, criterion } = event.detail;
 
       // Ensure the criterion has a programId - use the original programId from the criterion if available
       const enhancedCriterion = {
@@ -227,42 +180,25 @@ const EvaluationCriteriaWidget: React.FC = () => {
         return [...prev, enhancedCriterion];
       });
 
-      // Also save to localStorage as backup
-      try {
-        const existingCriteria = JSON.parse(localStorage.getItem('evaluationCriteria') || '[]');
-        const updatedCriteria = [...existingCriteria];
-
-        // Remove icon for localStorage (can't store React elements)
-        const storableCriterion = {
-          ...enhancedCriterion,
-          icon: null
-        };
-
-        const existingIndex = updatedCriteria.findIndex(c => c.id === storableCriterion.id);
-        if (existingIndex >= 0) {
-          // Update existing
-          updatedCriteria[existingIndex] = storableCriterion;
-        } else {
-          // Add new
-          updatedCriteria.push(storableCriterion);
-        }
-
-        localStorage.setItem('evaluationCriteria', JSON.stringify(updatedCriteria));
-        console.log('Updated localStorage with criteria:', updatedCriteria);
-      } catch (error) {
-        console.error('Error updating localStorage with new criterion:', error);
-      }
-
-      // Also update the global store
-      if (window.globalEvaluationCriteria) {
-        const existingIndex = window.globalEvaluationCriteria.findIndex((c: any) => c.id === enhancedCriterion.id);
-        if (existingIndex >= 0) {
-          window.globalEvaluationCriteria[existingIndex] = enhancedCriterion;
-        } else {
-          window.globalEvaluationCriteria.push(enhancedCriterion);
-        }
-        console.log('Updated global store with criteria:', window.globalEvaluationCriteria);
-      }
+      // TODO: Add API call to save criterion to backend
+      // Example:
+      // try {
+      //   await fetch(`http://localhost:8083/api/critere/create/${phaseId}`, {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({
+      //       nom_critere: enhancedCriterion.name,
+      //       type: 'numerique',
+      //       poids: enhancedCriterion.weight,
+      //       accessible_mentors: true,
+      //       accessible_equipes: true,
+      //       rempli_par: 'mentors',
+      //       necessite_validation: false
+      //     })
+      //   });
+      // } catch (error) {
+      //   console.error('Error saving criterion to backend:', error);
+      // }
     };
 
     document.addEventListener('evaluation-criterion-created', handleCriterionCreated as EventListener);
@@ -270,7 +206,7 @@ const EvaluationCriteriaWidget: React.FC = () => {
     return () => {
       document.removeEventListener('evaluation-criterion-created', handleCriterionCreated as EventListener);
     };
-  }, [queryClient]);
+  }, [queryClient, selectedProgram]);
 
   // Filter criteria for the selected program
   const programCriteria = React.useMemo(() => {
@@ -361,27 +297,6 @@ const EvaluationCriteriaWidget: React.FC = () => {
       // Force a refresh of the criteria from all sources
       const refreshedCriteria = getAllCriteriaWithoutStateUpdates();
       setLocalCriteria(refreshedCriteria);
-
-      // Also check for program-specific criteria in localStorage
-      try {
-        const programSpecificKey = `evaluationCriteria_program_${String(selectedProgramId)}`;
-        const programSpecificCriteria = localStorage.getItem(programSpecificKey);
-
-        if (programSpecificCriteria) {
-          const parsedCriteria = JSON.parse(programSpecificCriteria);
-          if (Array.isArray(parsedCriteria) && parsedCriteria.length > 0) {
-            console.log(`Found ${parsedCriteria.length} program-specific criteria for program ${selectedProgramId} in localStorage`);
-            // Add icons to the criteria
-            const enhancedCriteria = parsedCriteria.map((criterion: any) => ({
-              ...criterion,
-              icon: <Activity className="h-4 w-4" />
-            }));
-            setLocalCriteria(enhancedCriteria);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading program-specific criteria from localStorage:", error);
-      }
     }
   }, [selectedProgramId]);
 

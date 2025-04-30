@@ -3,15 +3,17 @@ import { MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTasks } from '@/context/TasksContext';
+import { useProgramContext } from '@/context/ProgramContext';
 
 const OverallTasksWidget: React.FC = () => {
   const { tasks, filteredTasks, priorityColors, statusIcons } = useTasks();
-  
+  const { selectedProgram } = useProgramContext();
+
   // Get counts for each status
   const todoCount = filteredTasks.filter(t => t.status === 'todo').length;
   const inProgressCount = filteredTasks.filter(t => t.status === 'in_progress').length;
   const completedCount = filteredTasks.filter(t => t.status === 'completed').length;
-  
+
   // Get only the first 4 tasks for display
   const displayTasks = filteredTasks.slice(0, 4);
 
@@ -79,4 +81,4 @@ const OverallTasksWidget: React.FC = () => {
   );
 };
 
-export default OverallTasksWidget; 
+export default OverallTasksWidget;

@@ -3,13 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 
-// Fonction pour naviguer sans rechargement de page
-const navigateWithoutReload = (path: string): void => {
-  window.history.pushState({}, '', path);
-  // Déclencher un événement de navigation pour que les composants puissent réagir
-  const navEvent = new PopStateEvent('popstate');
-  window.dispatchEvent(navEvent);
-};
+import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -61,6 +55,7 @@ const StartupDetailPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
+  const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
 
   // Check localStorage for teams first
   const [localStartup, setLocalStartup] = useState<any>(null);
@@ -952,7 +947,7 @@ const StartupDetailPage = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigateWithoutReload('/teams')}
+          onClick={() => setLocation('/teams')}
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useProgramContext } from './ProgramContext';
-import { FileText, Video, ExternalLink } from 'lucide-react';
-import { format, isBefore, isToday } from 'date-fns';
+import { FileText, ExternalLink } from 'lucide-react';
+import { isBefore, isToday } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
 // Interfaces
@@ -150,64 +150,52 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
   useEffect(() => {
     const handleProgramCreated = (event: Event) => {
       const customEvent = event as CustomEvent;
-      const { programId, program } = customEvent.detail;
+      const { programId } = customEvent.detail;
 
-      // Update phases from the new program
-      if (program && program.phases && Array.isArray(program.phases)) {
-        const mappedPhases = program.phases.map((phase: any) => {
-          // Format dates
-          const formatDate = (date: Date | string) => {
-            if (date instanceof Date) {
-              return date.toISOString().split('T')[0];
-            }
-            return date;
-          };
+      // Fetch the program data to get the phases and deliverables
+      const fetchProgramData = async () => {
+        try {
+          // Convert string ID to number if needed
+          const programIdNumber = parseInt(programId);
 
-          // Map status
-          let mappedStatus: 'not_started' | 'in_progress' | 'completed' = 'not_started';
-          if (phase.status === 'completed') {
-            mappedStatus = 'completed';
-          } else if (phase.status === 'in_progress') {
-            mappedStatus = 'in_progress';
+          if (isNaN(programIdNumber)) {
+            return;
           }
 
-          return {
-            id: phase.id.toString(),
-            name: phase.name,
-            color: phase.color || "#3b82f6", // Default to blue
-            startDate: formatDate(phase.startDate),
-            endDate: formatDate(phase.endDate),
-            status: mappedStatus
-          };
-        });
+          // Import the getProgram function from programService
+          const { getProgram } = await import('@/services/programService');
 
-        setPhases(mappedPhases);
-      }
+          // Fetch program details
+          const programDetails = await getProgram(programIdNumber);
 
-      // Update deliverables from the new program if any
-      if (program && program.phases && Array.isArray(program.phases)) {
-        // Extract deliverables from each phase
-        const allDeliverables: any[] = [];
+          // Extract deliverables from all phases
+          const allDeliverables: any[] = [];
 
-        program.phases.forEach((phase: any) => {
-          if (phase.deliverables && Array.isArray(phase.deliverables)) {
-            const phaseDeliverables = phase.deliverables.map((deliverable: any) => ({
-              ...deliverable,
-              id: deliverable.id || uuidv4(),
-              programId: String(programId),
-              phaseId: phase.id,
-              phaseName: phase.name
-            }));
+          if (programDetails && programDetails.phases && Array.isArray(programDetails.phases)) {
+            programDetails.phases.forEach((phase: any) => {
+              if (phase.deliverables && Array.isArray(phase.deliverables)) {
+                const phaseDeliverables = phase.deliverables.map((deliverable: any) => ({
+                  ...deliverable,
+                  id: deliverable.id || uuidv4(),
+                  programId: String(programId),
+                  phaseId: phase.id,
+                  phaseName: phase.name
+                }));
 
-            allDeliverables.push(...phaseDeliverables);
+                allDeliverables.push(...phaseDeliverables);
+              }
+            });
           }
-        });
 
-        if (allDeliverables.length > 0) {
-          console.log(`Adding ${allDeliverables.length} deliverables from program ${programId}`);
-          setDeliverables(prevDeliverables => [...prevDeliverables, ...allDeliverables]);
+          if (allDeliverables.length > 0) {
+            setDeliverables(prevDeliverables => [...prevDeliverables, ...allDeliverables]);
+          }
+        } catch (error) {
+          console.error('Error fetching program data:', error);
         }
-      }
+      };
+
+      fetchProgramData();
     };
 
     document.addEventListener('program-created', handleProgramCreated);
@@ -217,7 +205,8 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
     };
   }, []);
 
-  // Mock deliverables data
+  // We no longer use mock data
+  /*
   const initialDeliverables: Deliverable[] = [
     {
       id: "1",
@@ -340,11 +329,103 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
       teamsAssigned: ["All Teams"]
     }
   ];
+  */
 
-  // Initialize deliverables with initial data
+  // Initialize deliverables with program data or fallback to initial data
   useEffect(() => {
-    setDeliverables(initialDeliverables);
-  }, []);
+    if (selectedProgram && selectedProgram.phases) {
+      console.log('Loading deliverables from program phases...', selectedProgram);
+
+      // No need to create test deliverables - we're using backend data
+
+      // Extract deliverables from all phases
+      const programDeliverables: Deliverable[] = [];
+
+      // Also extract phases for the phase filter
+      const programPhases: Phase[] = [];
+
+      selectedProgram.phases.forEach((phase: any) => {
+        // Add phase to phases list for filtering
+        programPhases.push({
+          id: String(phase.id),
+          name: phase.name,
+          color: phase.color || '#818cf8',
+          startDate: phase.startDate instanceof Date ? phase.startDate.toISOString().split('T')[0] : String(phase.startDate),
+          endDate: phase.endDate instanceof Date ? phase.endDate.toISOString().split('T')[0] : String(phase.endDate),
+          status: phase.status || 'not_started'
+        });
+
+        if (phase.deliverables && Array.isArray(phase.deliverables)) {
+          console.log(`Processing ${phase.deliverables.length} deliverables for phase ${phase.id}`);
+
+          // Use a Set to track unique deliverable IDs we've already processed
+          const processedIds = new Set<string>();
+
+          const phaseDeliverables = phase.deliverables.map((deliverable: any) => {
+            console.log(`Processing deliverable:`, deliverable);
+
+            // Skip if we've already processed this deliverable
+            const deliverableId = String(deliverable.id || '');
+            if (processedIds.has(deliverableId)) {
+              console.log(`Skipping duplicate deliverable with ID ${deliverableId}`);
+              return null;
+            }
+
+            processedIds.add(deliverableId);
+
+            // Format date if it's a Date object
+            const formatDate = (date: Date | string) => {
+              if (date instanceof Date) {
+                return date.toISOString().split('T')[0];
+              }
+              return String(date);
+            };
+
+            // Create a properly formatted deliverable object
+            const formattedDeliverable = {
+              id: deliverableId,
+              name: deliverable.name || deliverable.nom || '',
+              description: deliverable.description || '',
+              dueDate: formatDate(deliverable.dueDate || deliverable.date_echeance),
+              status: deliverable.status as 'pending' | 'submitted' | 'reviewed' || 'pending',
+              phaseId: String(phase.id),
+              phaseName: phase.name,
+              submissionType: deliverable.submissionType as 'file' | 'link' | 'text' || 'file',
+              required: deliverable.required !== undefined ? deliverable.required : true,
+              programId: String(selectedProgram.id),
+              assignedBy: deliverable.assignedBy || 'Program Manager',
+              assignmentDate: deliverable.assignmentDate || new Date().toISOString(),
+              teamsAssigned: Array.isArray(deliverable.teamsAssigned) ? deliverable.teamsAssigned : ['All Teams']
+            };
+
+            console.log(`Formatted deliverable:`, formattedDeliverable);
+            return formattedDeliverable;
+          }).filter(Boolean); // Filter out null values
+
+          console.log(`Adding ${phaseDeliverables.length} deliverables from phase ${phase.id} to program deliverables`);
+          programDeliverables.push(...phaseDeliverables);
+        } else {
+          console.log(`No deliverables found for phase ${phase.id}`);
+        }
+      });
+
+      // Update phases for filtering
+      setPhases(programPhases);
+
+      if (programDeliverables.length > 0) {
+        // Use ONLY program deliverables when available
+        console.log(`Using ${programDeliverables.length} deliverables from selected program`);
+        setDeliverables(programDeliverables);
+        return; // Exit early to avoid setting mock deliverables
+      }
+    }
+
+    // Only use empty array if no program is selected or no program deliverables are available
+    console.log('No deliverables found in selected program, using empty array');
+    setDeliverables([]);
+
+    // We're now using backend data, no need to load from localStorage
+  }, [selectedProgram, selectedProgramId]);
 
   // Filter deliverables based on selected filters, search query, and program
   const filteredDeliverables = deliverables.filter(deliverable => {
@@ -450,6 +531,26 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
     };
 
     setDeliverables(prevDeliverables => [...prevDeliverables, newDeliverable]);
+
+    // TODO: Add API call to save deliverable to backend
+    // Example:
+    // if (deliverable.phaseId) {
+    //   try {
+    //     await fetch(`http://localhost:8083/api/liverable/create/${deliverable.phaseId}`, {
+    //       method: 'POST',
+    //       headers: { 'Content-Type': 'application/json' },
+    //       body: JSON.stringify({
+    //         nom: deliverable.name,
+    //         description: deliverable.description || '',
+    //         date_echeance: deliverable.dueDate,
+    //         types_fichiers: '.pdf,.docx'
+    //       })
+    //     });
+    //   } catch (error) {
+    //     console.error('Error saving deliverable to backend:', error);
+    //   }
+    // }
+
     return newDeliverableId;
   };
 
