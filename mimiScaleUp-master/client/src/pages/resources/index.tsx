@@ -93,8 +93,29 @@ const ResourceTypeIcon = ({ type }: { type: string }) => {
   }
 };
 
-const ResourceCard = ({ resource }: { resource: Resource }) => {
+const ResourceCard = ({ resource, onDelete }: { resource: Resource; onDelete: (id: string) => Promise<void> }) => {
   const { getResourceTypeIcon } = useResources();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Format the date
+  const formattedDate = new Date(resource.createdAt).toLocaleDateString('fr-FR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer "${resource.title}" ?`)) {
+      setIsDeleting(true);
+      try {
+        await onDelete(resource.id);
+      } catch (error) {
+        console.error("Error deleting resource:", error);
+        setIsDeleting(false);
+      }
+    }
+  };
 
   return (
     <Card className="h-full">
@@ -104,15 +125,31 @@ const ResourceCard = ({ resource }: { resource: Resource }) => {
             {getResourceTypeIcon(resource.type)}
             <CardTitle className="text-lg">{resource.title}</CardTitle>
           </div>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="text-red-500 hover:text-red-700 transition-colors"
+            title="Supprimer cette ressource"
+          >
+            {isDeleting ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+            ) : (
+              <X className="h-4 w-4" />
+            )}
+          </button>
         </div>
         <CardDescription>{resource.description}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-between items-center">
           <div className="text-sm text-gray-500">
-            Added on {new Date(resource.createdAt).toLocaleDateString()}
+            Ajouté le {formattedDate}
           </div>
-          <button
+          <a
+            href={resource.url}
+            target={resource.is_external ? "_blank" : "_self"}
+            rel="noopener noreferrer"
+            download={!resource.is_external}
             style={{
               backgroundColor: 'white',
               color: '#0c4c80',
@@ -123,43 +160,79 @@ const ResourceCard = ({ resource }: { resource: Resource }) => {
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              textDecoration: 'none'
             }}
           >
             <Download className="h-4 w-4" />
-            Download
-          </button>
+            {resource.is_external ? 'Visiter' : 'Télécharger'}
+          </a>
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const ExternalResourceItem = ({ title, url }: { title: string; url: string }) => {
+const ExternalResourceItem = ({
+  resource,
+  onDelete
+}: {
+  resource: ExternalResource;
+  onDelete: (id: string) => Promise<void>
+}) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer "${resource.title}" ?`)) {
+      setIsDeleting(true);
+      try {
+        await onDelete(resource.id);
+      } catch (error) {
+        console.error("Error deleting external resource:", error);
+        setIsDeleting(false);
+      }
+    }
+  };
+
   return (
     <div className="flex items-center justify-between p-3 border rounded-md mb-2">
-      <div className="font-medium">{title}</div>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          backgroundColor: 'transparent',
-          color: '#0c4c80',
-          border: 'none',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          fontSize: '0.875rem',
-          textDecoration: 'none'
-        }}
-      >
-        <ExternalLink className="h-4 w-4" />
-        Visit
-      </a>
+      <div className="font-medium">{resource.title}</div>
+      <div className="flex items-center gap-2">
+        <a
+          href={resource.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            backgroundColor: 'transparent',
+            color: '#0c4c80',
+            border: 'none',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '0.875rem',
+            textDecoration: 'none'
+          }}
+        >
+          <ExternalLink className="h-4 w-4" />
+          Visiter
+        </a>
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="text-red-500 hover:text-red-700 transition-colors p-1"
+          title="Supprimer cette ressource"
+        >
+          {isDeleting ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+          ) : (
+            <X className="h-4 w-4" />
+          )}
+        </button>
+      </div>
     </div>
   );
 };
@@ -185,7 +258,7 @@ const FileUpload = ({ onFileSelect }: { onFileSelect: (file: File | null) => voi
         <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
           <div className="flex flex-col items-center justify-center pt-3 pb-3">
             <Upload className="w-6 h-6 mb-1 text-gray-500" />
-            <p className="mb-1 text-sm text-gray-500"><span className="font-semibold">Click to upload</span></p>
+            <p className="mb-1 text-sm text-gray-500"><span className="font-semibold">Cliquez pour télécharger</span></p>
             <p className="text-xs text-gray-500">PDF, DOC, XLS, PPT, MP4 (MAX 10MB)</p>
           </div>
           <input
@@ -229,36 +302,41 @@ const AddResourceDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExternalLink, setIsExternalLink] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
       if (isExternalLink) {
         // Add as external resource
         const newExternalResource: ExternalResource = {
-          id: uuidv4(),
+          id: uuidv4(), // This ID will be replaced by the backend
           title,
           url
         };
-        onAddExternalResource(newExternalResource);
+        await onAddExternalResource(newExternalResource);
       } else {
         // Add as program resource
         const newResource = {
           title,
           description,
           type: type as 'document' | 'spreadsheet' | 'video' | 'presentation' | 'other',
-          url: file ? URL.createObjectURL(file) : '#',
+          url: '#', // Will be set by the backend for file resources
           createdAt: new Date().toISOString(),
-          programId: '1' // Default value, will be overridden
+          file: file, // Pass the actual file object for upload
+          is_external: false // Explicitly mark as non-external
         };
-        onAddResource(newResource);
+        await onAddResource(newResource);
       }
 
       resetForm();
-      setIsSubmitting(false);
       onOpenChange(false);
-    }, 1000);
+    } catch (error) {
+      console.error("Error submitting resource:", error);
+      // Could show an error message here
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -275,21 +353,21 @@ const AddResourceDialog = ({
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="pb-2">
-            <DialogTitle>Add New Resource</DialogTitle>
+            <DialogTitle>Ajouter une Nouvelle Ressource</DialogTitle>
             <DialogDescription>
-              Upload a file or add a link to an external resource.
+              Téléchargez un fichier ou ajoutez un lien vers une ressource externe.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-3 py-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Titre</Label>
               <Input
                 id="title"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Financial Model Template"
+                placeholder="ex: Modèle de Plan Financier"
               />
             </div>
 
@@ -302,18 +380,18 @@ const AddResourceDialog = ({
                   onChange={() => setIsExternalLink(!isExternalLink)}
                   className="h-4 w-4 rounded border-gray-300"
                 />
-                <Label htmlFor="external-link">Add external link</Label>
+                <Label htmlFor="external-link">Ajouter un lien externe</Label>
               </div>
               <p className="text-xs text-gray-500">
                 {isExternalLink
-                  ? "External links will appear in the External Resources section"
-                  : "File uploads will appear in the Program Materials section"}
+                  ? "Les liens externes apparaîtront dans la section Ressources Externes"
+                  : "Les fichiers téléchargés apparaîtront dans la section Matériels du Programme"}
               </p>
             </div>
 
             {isExternalLink ? (
               <div className="grid gap-1.5">
-                <Label htmlFor="url">Resource URL</Label>
+                <Label htmlFor="url">URL de la Ressource</Label>
                 <Input
                   id="url"
                   type="url"
@@ -332,33 +410,33 @@ const AddResourceDialog = ({
                     required
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Brief description of this resource"
+                    placeholder="Brève description de cette ressource"
                     rows={2}
                   />
                 </div>
 
                 <div className="grid gap-1.5">
-                  <Label htmlFor="type">Resource Type</Label>
+                  <Label htmlFor="type">Type de Ressource</Label>
                   <Select value={type} onValueChange={setType}>
                     <SelectTrigger id="type">
-                      <SelectValue placeholder="Select resource type" />
+                      <SelectValue placeholder="Sélectionner le type de ressource" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
                         <SelectItem value="document">Document</SelectItem>
-                        <SelectItem value="spreadsheet">Spreadsheet</SelectItem>
-                        <SelectItem value="video">Video</SelectItem>
-                        <SelectItem value="presentation">Presentation</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="spreadsheet">Tableur</SelectItem>
+                        <SelectItem value="video">Vidéo</SelectItem>
+                        <SelectItem value="presentation">Présentation</SelectItem>
+                        <SelectItem value="other">Autre</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="grid gap-1.5">
-                  <Label>Upload File</Label>
+                  <Label>Télécharger un Fichier</Label>
                   <FileUpload onFileSelect={setFile} />
-                  <p className="text-xs text-gray-500">Max file size: 10MB</p>
+                  <p className="text-xs text-gray-500">Taille maximale du fichier: 10MB</p>
                 </div>
               </>
             )}
@@ -380,7 +458,7 @@ const AddResourceDialog = ({
                 cursor: 'pointer'
               }}
             >
-              Cancel
+              Annuler
             </button>
             <button
               type="submit"
@@ -395,7 +473,7 @@ const AddResourceDialog = ({
                 opacity: (isSubmitting || (isExternalLink ? !url : !file) || !title) ? '0.5' : '1'
               }}
             >
-              {isSubmitting ? 'Adding...' : 'Add Resource'}
+              {isSubmitting ? 'Ajout en cours...' : 'Ajouter la Ressource'}
             </button>
           </DialogFooter>
         </form>
@@ -412,31 +490,80 @@ const ResourcesPage: React.FC = () => {
     filteredResources,
     filteredExternalResources,
     createResource,
-    createExternalResource
+    createExternalResource,
+    deleteResource,
+    deleteExternalResource,
+    isLoading,
+    error
   } = useResources();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleAddResource = (newResource: any) => {
-    // Add programId to the resource
-    const resourceWithProgramId: Omit<ContextResource, 'id'> = {
-      title: newResource.title,
-      description: newResource.description,
-      type: newResource.type as 'document' | 'spreadsheet' | 'video' | 'presentation' | 'other',
-      url: newResource.url,
-      createdAt: newResource.createdAt,
-      programId: selectedProgram?.id || '1' // Default to '1' if no program selected
-    };
-    createResource(resourceWithProgramId);
+  const handleAddResource = async (newResource: any) => {
+    try {
+      // Add programId to the resource
+      const resourceWithProgramId: Omit<ContextResource, 'id'> = {
+        title: newResource.title,
+        description: newResource.description,
+        type: newResource.type as 'document' | 'spreadsheet' | 'video' | 'presentation' | 'other',
+        url: newResource.url,
+        createdAt: newResource.createdAt,
+        programId: selectedProgram?.id || '1', // Default to '1' if no program selected
+        file: newResource.file // Pass the file object for upload
+      };
+
+      // Create the resource (now returns a Promise)
+      const resourceId = await createResource(resourceWithProgramId);
+      console.log(`Resource created with ID: ${resourceId}`);
+    } catch (error) {
+      console.error("Failed to create resource:", error);
+      // Could show an error toast here
+    }
   };
 
-  const handleAddExternalResource = (newResource: ExternalResource) => {
-    // Convert to context type
-    const contextResource: Omit<ContextExternalResource, 'id'> = {
-      title: newResource.title,
-      url: newResource.url,
-      programId: selectedProgram?.id || '1'
-    };
-    createExternalResource(contextResource);
+  const handleAddExternalResource = async (newResource: ExternalResource) => {
+    try {
+      // Convert to context type
+      const contextResource: Omit<ContextExternalResource, 'id'> = {
+        title: newResource.title,
+        url: newResource.url,
+        programId: selectedProgram?.id || '1'
+      };
+
+      // Create the external resource (now returns a Promise)
+      const resourceId = await createExternalResource(contextResource);
+      console.log(`External resource created with ID: ${resourceId}`);
+    } catch (error) {
+      console.error("Failed to create external resource:", error);
+      // Could show an error toast here
+    }
+  };
+
+  // Handle resource deletion
+  const handleDeleteResource = async (resourceId: string) => {
+    try {
+      const success = await deleteResource(resourceId);
+      if (success) {
+        console.log(`Resource deleted with ID: ${resourceId}`);
+      } else {
+        console.error(`Failed to delete resource with ID: ${resourceId}`);
+      }
+    } catch (error) {
+      console.error("Error in handleDeleteResource:", error);
+    }
+  };
+
+  // Handle external resource deletion
+  const handleDeleteExternalResource = async (resourceId: string) => {
+    try {
+      const success = await deleteExternalResource(resourceId);
+      if (success) {
+        console.log(`External resource deleted with ID: ${resourceId}`);
+      } else {
+        console.error(`Failed to delete external resource with ID: ${resourceId}`);
+      }
+    } catch (error) {
+      console.error("Error in handleDeleteExternalResource:", error);
+    }
   };
 
   return (
@@ -444,16 +571,16 @@ const ResourcesPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Resources</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Ressources</h1>
             {selectedProgram && (
               <p className="text-gray-500">
-                Program: <span className="font-medium">{selectedProgram.name}</span>
+                Programme: <span className="font-medium">{selectedProgram.name}</span>
               </p>
             )}
           </div>
           <button onClick={() => setDialogOpen(true)} style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Resource
+            Ajouter une Ressource
           </button>
         </div>
       </div>
@@ -466,31 +593,67 @@ const ResourcesPage: React.FC = () => {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-6">
-        {/* Program Resources */}
-        <div className="mb-8">
-          <h2 className="text-xl font-medium mb-4">Program Materials</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredResources.map((resource) => (
-              <ResourceCard key={resource.id} resource={resource} />
-            ))}
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Chargement...</span>
+              </div>
+              <p className="mt-2 text-gray-600">Chargement des ressources...</p>
+            </div>
           </div>
-        </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <strong className="font-bold">Erreur!</strong>
+            <span className="block sm:inline"> {error}</span>
+          </div>
+        ) : (
+          <>
+            {/* Program Resources */}
+            <div className="mb-8">
+              <h2 className="text-xl font-medium mb-4">Matériels du Programme</h2>
+              {filteredResources.length === 0 ? (
+                <Card>
+                  <CardContent className="py-6 text-center text-gray-500">
+                    Aucun matériel disponible pour ce programme.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredResources.map((resource) => (
+                    <ResourceCard
+                      key={resource.id}
+                      resource={resource}
+                      onDelete={handleDeleteResource}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
 
-        {/* External Resources */}
-        <div>
-          <h2 className="text-xl font-medium mb-4">External Resources</h2>
-          <Card>
-            <CardContent className="pt-6">
-              {filteredExternalResources.map((resource) => (
-                <ExternalResourceItem
-                  key={resource.id}
-                  title={resource.title}
-                  url={resource.url}
-                />
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+            {/* External Resources */}
+            <div>
+              <h2 className="text-xl font-medium mb-4">Ressources Externes</h2>
+              <Card>
+                <CardContent className="pt-6">
+                  {filteredExternalResources.length === 0 ? (
+                    <div className="text-center text-gray-500 py-4">
+                      Aucune ressource externe disponible pour ce programme.
+                    </div>
+                  ) : (
+                    filteredExternalResources.map((resource) => (
+                      <ExternalResourceItem
+                        key={resource.id}
+                        resource={resource}
+                        onDelete={handleDeleteExternalResource}
+                      />
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

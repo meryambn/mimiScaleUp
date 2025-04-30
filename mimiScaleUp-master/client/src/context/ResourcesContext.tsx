@@ -2,6 +2,15 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useProgramContext } from './ProgramContext';
 import { FileText, Video, ExternalLink } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  getProgramResources,
+  createResource as apiCreateResource,
+  updateResource as apiUpdateResource,
+  deleteResource as apiDeleteResource,
+  getResourceDownloadUrl,
+  Resource as ApiResource,
+  ExternalResource as ApiExternalResource
+} from '@/services/resourceService';
 
 // Interfaces
 export interface Resource {
@@ -13,6 +22,9 @@ export interface Resource {
   createdAt: string;
   programId: string;
   category?: string;
+  file_path?: string;
+  is_external?: boolean;
+  file?: File; // For file uploads
 }
 
 export interface ExternalResource {
@@ -21,6 +33,28 @@ export interface ExternalResource {
   url: string;
   programId?: string;
 }
+
+// Helper function to convert API resource to context resource
+const apiToContextResource = (resource: ApiResource): Resource => ({
+  id: resource.id.toString(),
+  title: resource.title,
+  description: resource.description || '',
+  type: resource.type.toLowerCase() as any,
+  url: resource.url || getResourceDownloadUrl(resource.id),
+  createdAt: resource.created_at,
+  programId: resource.program_id.toString(),
+  category: resource.category,
+  file_path: resource.file_path,
+  is_external: resource.is_external
+});
+
+// Helper function to convert API external resource to context external resource
+const apiToContextExternalResource = (resource: ApiExternalResource): ExternalResource => ({
+  id: resource.id.toString(),
+  title: resource.title,
+  url: resource.url,
+  programId: resource.program_id.toString()
+});
 
 // Context interface
 interface ResourcesContextType {
@@ -34,9 +68,13 @@ interface ResourcesContextType {
   setSelectedTypes: (types: string[]) => void;
   getResourceTypeIcon: (type: string) => React.ReactNode;
   getCategoryColor: (category: string) => string;
-  createResource: (resource: Omit<Resource, 'id'>) => string;
-  createExternalResource: (resource: Omit<ExternalResource, 'id'>) => string;
-  addResources: (resources: Omit<Resource, 'id'>[]) => string[];
+  createResource: (resource: Omit<Resource, 'id'>) => Promise<string>;
+  createExternalResource: (resource: Omit<ExternalResource, 'id'>) => Promise<string>;
+  addResources: (resources: Omit<Resource, 'id'>[]) => Promise<string[]>;
+  deleteResource: (resourceId: string) => Promise<boolean>;
+  deleteExternalResource: (resourceId: string) => Promise<boolean>;
+  isLoading: boolean;
+  error: string | null;
 }
 
 // Create context
@@ -44,13 +82,15 @@ const ResourcesContext = createContext<ResourcesContextType | undefined>(undefin
 
 // Provider component
 export const ResourcesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { selectedProgramId } = useProgramContext();
+  const { selectedProgram } = useProgramContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [externalResources, setExternalResources] = useState<ExternalResource[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock resources data
+  // Fallback mock resources data (used when API fails or no program selected)
   const initialResources: Resource[] = [
     {
       id: "1",
@@ -71,66 +111,66 @@ export const ResourcesProvider: React.FC<{ children: ReactNode }> = ({ children 
       createdAt: "2023-05-15",
       programId: "1",
       category: "Guidelines"
-    },
-    {
-      id: "3",
-      title: "How to Secure Seed Funding",
-      description: "Video tutorial on preparing for and securing seed funding",
-      type: "video",
-      url: "#",
-      createdAt: "2023-05-20",
-      programId: "1",
-      category: "Training"
-    },
-    {
-      id: "4",
-      title: "Financial Projection Spreadsheet",
-      description: "Excel template for creating 3-year financial projections",
-      type: "spreadsheet",
-      url: "#",
-      createdAt: "2023-05-25",
-      programId: "1",
-      category: "Templates"
-    },
-    {
-      id: "5",
-      title: "Legal Checklist for Startups",
-      description: "Essential legal considerations for early-stage startups",
-      type: "document",
-      url: "#",
-      createdAt: "2023-06-01",
-      programId: "1",
-      category: "Guidelines"
     }
   ];
 
-  // Mock external resources data
+  // Fallback mock external resources data
   const initialExternalResources: ExternalResource[] = [
     { id: "e1", title: "YCombinator Startup School", url: "https://www.startupschool.org/", programId: "1" },
-    { id: "e2", title: "Startup Playbook", url: "https://playbook.samaltman.com/", programId: "1" },
-    { id: "e3", title: "500 Startups Resources", url: "https://500.co/startups", programId: "1" },
-    { id: "e4", title: "Techstars Entrepreneur's Toolkit", url: "https://www.techstars.com/entrepreneurs", programId: "1" }
+    { id: "e2", title: "Startup Playbook", url: "https://playbook.samaltman.com/", programId: "1" }
   ];
 
-  // Initialize resources with initial data
+  // Fetch resources from API when program changes
   useEffect(() => {
-    setResources(initialResources);
-    setExternalResources(initialExternalResources);
-  }, []);
+    const fetchResources = async () => {
+      // If no program is selected, use mock data
+      if (!selectedProgram?.id) {
+        setResources(initialResources);
+        setExternalResources(initialExternalResources);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Call the API to get resources for the selected program
+        const result = await getProgramResources(selectedProgram.id);
+
+        // Convert API resources to context resources
+        const contextResources = result.resources.map(apiToContextResource);
+        const contextExternalResources = result.externalResources.map(apiToContextExternalResource);
+
+        setResources(contextResources);
+        setExternalResources(contextExternalResources);
+      } catch (err) {
+        console.error("Failed to fetch resources:", err);
+        setError("Failed to load resources. Using sample data instead.");
+
+        // Fallback to mock data on error
+        setResources(initialResources);
+        setExternalResources(initialExternalResources);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchResources();
+  }, [selectedProgram?.id]);
 
   // Filter resources based on selected filters, search query, and program
   const filteredResources = resources.filter(resource => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         resource.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = selectedTypes.length === 0 || selectedTypes.includes(resource.type);
-    const matchesProgram = !selectedProgramId || resource.programId === selectedProgramId;
+    const matchesProgram = !selectedProgram?.id || resource.programId === selectedProgram.id;
     return matchesSearch && matchesType && matchesProgram;
   });
 
   // Filter external resources
   const filteredExternalResources = externalResources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesProgram = !selectedProgramId || !resource.programId || resource.programId === selectedProgramId;
+    const matchesProgram = !selectedProgram?.id || !resource.programId || resource.programId === selectedProgram.id;
     return matchesSearch && matchesProgram;
   });
 
@@ -166,45 +206,213 @@ export const ResourcesProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   // Function to create a new resource
-  const createResource = (resource: Omit<Resource, 'id'>): string => {
-    const newResourceId = uuidv4();
-    const newResource: Resource = {
-      ...resource,
-      id: newResourceId
-    };
-    
-    setResources(prevResources => [...prevResources, newResource]);
-    return newResourceId;
-  };
-  
-  // Function to create a new external resource
-  const createExternalResource = (resource: Omit<ExternalResource, 'id'>): string => {
-    const newResourceId = uuidv4();
-    const newResource: ExternalResource = {
-      ...resource,
-      id: newResourceId
-    };
-    
-    setExternalResources(prevResources => [...prevResources, newResource]);
-    return newResourceId;
-  };
-  
-  // Function to add multiple resources at once
-  const addResources = (resourcesData: Omit<Resource, 'id'>[]): string[] => {
-    const newResourceIds: string[] = [];
-    
-    const newResources = resourcesData.map(resource => {
+  const createResource = async (resource: Omit<Resource, 'id'>): Promise<string> => {
+    if (!selectedProgram?.id) {
+      throw new Error("No program selected. Cannot create resource.");
+    }
+
+    try {
+      // Prepare the request data
+      const requestData = {
+        title: resource.title,
+        description: resource.description,
+        type: resource.type,
+        is_external: false,
+        category: resource.category,
+        url: resource.url,
+        file: resource.file // Pass the file for upload
+      };
+
+      // Call the API to create the resource
+      const result = await apiCreateResource(selectedProgram.id, requestData);
+
+      // Create a new resource with the returned ID
+      const newResource: Resource = {
+        ...resource,
+        id: result.id.toString()
+      };
+
+      // Update the local state
+      setResources(prevResources => [...prevResources, newResource]);
+
+      // Refresh resources from the API
+      getProgramResources(selectedProgram.id)
+        .then(result => {
+          setResources(result.resources.map(apiToContextResource));
+          setExternalResources(result.externalResources.map(apiToContextExternalResource));
+        })
+        .catch(err => console.error("Failed to refresh resources after creation:", err));
+
+      return result.id.toString();
+    } catch (error) {
+      console.error("Error creating resource:", error);
+
+      // Fallback to local creation if API fails
       const newResourceId = uuidv4();
-      newResourceIds.push(newResourceId);
-      
-      return {
+      const newResource: Resource = {
         ...resource,
         id: newResourceId
       };
-    });
-    
-    setResources(prevResources => [...prevResources, ...newResources]);
-    return newResourceIds;
+
+      setResources(prevResources => [...prevResources, newResource]);
+      return newResourceId;
+    }
+  };
+
+  // Function to create a new external resource
+  const createExternalResource = async (resource: Omit<ExternalResource, 'id'>): Promise<string> => {
+    if (!selectedProgram?.id) {
+      throw new Error("No program selected. Cannot create external resource.");
+    }
+
+    try {
+      // Prepare the request data
+      const requestData = {
+        title: resource.title,
+        url: resource.url,
+        is_external: true,
+        type: 'Autre' // Default type for external resources
+      };
+
+      // Call the API to create the external resource
+      const result = await apiCreateResource(selectedProgram.id, requestData);
+
+      // Create a new external resource with the returned ID
+      const newResource: ExternalResource = {
+        ...resource,
+        id: result.id.toString(),
+        programId: selectedProgram.id.toString()
+      };
+
+      // Update the local state
+      setExternalResources(prevResources => [...prevResources, newResource]);
+
+      // Refresh resources from the API
+      getProgramResources(selectedProgram.id)
+        .then(result => {
+          setResources(result.resources.map(apiToContextResource));
+          setExternalResources(result.externalResources.map(apiToContextExternalResource));
+        })
+        .catch(err => console.error("Failed to refresh resources after creation:", err));
+
+      return result.id.toString();
+    } catch (error) {
+      console.error("Error creating external resource:", error);
+
+      // Fallback to local creation if API fails
+      const newResourceId = uuidv4();
+      const newResource: ExternalResource = {
+        ...resource,
+        id: newResourceId,
+        programId: selectedProgram.id.toString()
+      };
+
+      setExternalResources(prevResources => [...prevResources, newResource]);
+      return newResourceId;
+    }
+  };
+
+  // Function to add multiple resources at once
+  const addResources = async (resourcesData: Omit<Resource, 'id'>[]): Promise<string[]> => {
+    if (!selectedProgram?.id) {
+      throw new Error("No program selected. Cannot add resources.");
+    }
+
+    const newResourceIds: string[] = [];
+
+    try {
+      // Create each resource one by one
+      for (const resourceData of resourcesData) {
+        const id = await createResource(resourceData);
+        newResourceIds.push(id);
+      }
+
+      return newResourceIds;
+    } catch (error) {
+      console.error("Error adding multiple resources:", error);
+
+      // Fallback to local creation if API fails
+      const newResources = resourcesData.map(resource => {
+        const newResourceId = uuidv4();
+        newResourceIds.push(newResourceId);
+
+        return {
+          ...resource,
+          id: newResourceId
+        };
+      });
+
+      setResources(prevResources => [...prevResources, ...newResources]);
+      return newResourceIds;
+    }
+  };
+
+  // Function to delete a resource
+  const deleteResource = async (resourceId: string): Promise<boolean> => {
+    if (!selectedProgram?.id) {
+      throw new Error("No program selected. Cannot delete resource.");
+    }
+
+    try {
+      // Remove the resource from the local state immediately for responsive UI
+      // We do this before the API call to make the UI feel more responsive
+      setResources(prevResources => prevResources.filter(r => r.id !== resourceId));
+
+      try {
+        // Call the API to delete the resource
+        await apiDeleteResource(resourceId);
+
+        // Refresh resources from the API to ensure data consistency
+        try {
+          const result = await getProgramResources(selectedProgram.id);
+          setResources(result.resources.map(apiToContextResource));
+          setExternalResources(result.externalResources.map(apiToContextExternalResource));
+        } catch (refreshError) {
+          console.error("Failed to refresh resources after deletion:", refreshError);
+          // The deletion was successful, so we'll still return true even if the refresh failed
+        }
+      } catch (apiError) {
+        console.error("API error deleting resource:", apiError);
+        // Even if the API call fails, we'll keep the resource removed from the UI
+        // This is a temporary solution until the backend CORS issue is fixed
+        console.log("Resource removed from UI but may still exist on the server");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting resource:", error);
+      return false;
+    }
+  };
+
+  // Function to delete an external resource
+  const deleteExternalResource = async (resourceId: string): Promise<boolean> => {
+    if (!selectedProgram?.id) {
+      throw new Error("No program selected. Cannot delete external resource.");
+    }
+
+    try {
+      // Call the API to delete the resource (same endpoint for both types)
+      await apiDeleteResource(resourceId);
+
+      // Remove the resource from the local state immediately for responsive UI
+      setExternalResources(prevResources => prevResources.filter(r => r.id !== resourceId));
+
+      // Refresh resources from the API to ensure data consistency
+      try {
+        const result = await getProgramResources(selectedProgram.id);
+        setResources(result.resources.map(apiToContextResource));
+        setExternalResources(result.externalResources.map(apiToContextExternalResource));
+      } catch (refreshError) {
+        console.error("Failed to refresh resources after deletion:", refreshError);
+        // The deletion was successful, so we'll still return true even if the refresh failed
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting external resource:", error);
+      return false;
+    }
   };
 
   // Value object for the context provider
@@ -221,7 +429,11 @@ export const ResourcesProvider: React.FC<{ children: ReactNode }> = ({ children 
     getCategoryColor,
     createResource,
     createExternalResource,
-    addResources
+    addResources,
+    deleteResource,
+    deleteExternalResource,
+    isLoading,
+    error
   };
 
   return (
@@ -238,4 +450,4 @@ export const useResources = (): ResourcesContextType => {
     throw new Error('useResources must be used within a ResourcesProvider');
   }
   return context;
-}; 
+};

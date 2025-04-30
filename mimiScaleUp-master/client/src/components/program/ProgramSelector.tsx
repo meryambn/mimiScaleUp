@@ -24,12 +24,16 @@ const ProgramSelector: React.FC = () => {
             <SelectItem key={program.id} value={program.id} className="flex items-center">
               <div className="flex items-center space-x-2">
                 <span>{program.name}</span>
-                <Badge
-                  variant={program.status === "draft" ? "outline" : program.status === "active" ? "secondary" : "default"}
-                  className="ml-2 text-xs"
-                >
+                <div className={`
+                  ml-2 px-2 py-0.5 rounded-full text-xs font-medium
+                  ${program.status === "draft"
+                    ? "bg-gray-100 text-gray-800 border border-gray-300"
+                    : program.status === "active"
+                      ? "bg-green-100 text-green-800 border border-green-300"
+                      : "bg-blue-100 text-blue-800 border border-blue-300"}
+                `}>
                   {program.status === "draft" ? "Brouillon" : program.status === "active" ? "Actif" : "Terminé"}
-                </Badge>
+                </div>
               </div>
             </SelectItem>
           ))}

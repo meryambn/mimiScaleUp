@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { useLocation } from "wouter";
 import { Program, Phase } from "@/types/program";
 import { v4 as uuidv4 } from 'uuid';
+import * as programService from "@/services/programService";
 import {
   getProgram,
   getPhases,
@@ -318,6 +319,7 @@ interface ProgramContextType {
   setSelectedProgram: (program: Program) => void;
   createProgram: (program: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateProgram: (updatedProgram: Program) => void;
+  deleteProgram: (programId: string) => Promise<boolean>;
   isLoading: boolean;
 }
 
@@ -1389,6 +1391,30 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
     }
   };
 
+  // Function to delete a program
+  const deleteProgram = async (programId: string): Promise<boolean> => {
+    try {
+      console.log(`Deleting program ${programId}`);
+
+      // Call the API to delete the program
+      // Use the imported function from programService.ts
+      await programService.deleteProgram(programId);
+
+      // Remove the program from the local state
+      setPrograms(prevPrograms => prevPrograms.filter(p => p.id !== programId));
+
+      // If the deleted program was selected, clear the selection
+      if (selectedProgramId === programId) {
+        setSelectedProgramId(null);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      return false;
+    }
+  };
+
   return (
     <ProgramContext.Provider
       value={{
@@ -1402,6 +1428,7 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
         setSelectedProgram,
         createProgram,
         updateProgram,
+        deleteProgram,
         isLoading
       }}
     >

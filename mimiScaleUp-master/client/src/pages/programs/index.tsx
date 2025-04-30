@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, BarChart, Users, Target, Check } from "lucide-react";
+import { Plus, Calendar, BarChart, Users, Target, Check, Trash2 } from "lucide-react";
 import { useProgramContext } from "@/context/ProgramContext";
 import { format, isValid, parseISO } from "date-fns";
 import { Program, Phase } from "@/types/program";
@@ -19,6 +19,7 @@ interface ProgramCardProps {
   phases: Phase[];
   status: "draft" | "active" | "completed";
   onSelect: () => void;
+  onDelete?: (id: string) => Promise<void>;
   program?: any; // Programme complet pour l'édition
 }
 
@@ -31,10 +32,12 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
   phases,
   status,
   onSelect,
+  onDelete,
   program,
 }) => {
   const { selectedProgramId, setSelectedProgramId } = useProgramContext();
   const [, setLocation] = useLocation();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatDate = (dateString: string) => {
     const date = parseISO(dateString);
@@ -44,6 +47,22 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
   const handleSelectProgram = () => {
     setSelectedProgramId(id);
     setLocation('/dashboard');
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onDelete) return;
+
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer le programme "${name}" ?`)) {
+      setIsDeleting(true);
+      try {
+        await onDelete(id);
+      } catch (error) {
+        console.error("Error deleting program:", error);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
   };
 
   // Fonction pour éditer un programme en brouillon
@@ -72,9 +91,32 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
             </h3>
             {isSelected && <Check className="h-5 w-5 text-primary" />}
           </div>
-          <Badge variant={status === "draft" ? "outline" : status === "active" ? "default" : "secondary"}>
-            {status === "draft" ? "Brouillon" : status === "active" ? "Actif" : "Terminé"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <div className={`
+              px-2.5 py-0.5 rounded-full text-xs font-medium
+              ${status === "draft"
+                ? "bg-gray-100 text-gray-800 border border-gray-300"
+                : status === "active"
+                  ? "bg-green-100 text-green-800 border border-green-300"
+                  : "bg-blue-100 text-blue-800 border border-blue-300"}
+            `}>
+              {status === "draft" ? "Brouillon" : status === "active" ? "Actif" : "Terminé"}
+            </div>
+            {onDelete && (
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-50"
+                title="Supprimer ce programme"
+              >
+                {isDeleting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-sm text-gray-500 mb-4">{description}</p>
         <div className="space-y-2">
@@ -125,7 +167,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
 };
 
 const Programs: React.FC = () => {
-  const { programs, selectedProgramId, setSelectedProgramId } = useProgramContext();
+  const { programs, selectedProgramId, setSelectedProgramId, deleteProgram } = useProgramContext();
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
 
@@ -138,6 +180,20 @@ const Programs: React.FC = () => {
   const getStartupsCount = (programId: string) => {
     // In a real app, this would come from the program data
     return programId === "1" ? 12 : 8;
+  };
+
+  // Handle program deletion
+  const handleDeleteProgram = async (programId: string) => {
+    try {
+      const success = await deleteProgram(programId);
+      if (success) {
+        console.log(`Program deleted with ID: ${programId}`);
+      } else {
+        console.error(`Failed to delete program with ID: ${programId}`);
+      }
+    } catch (error) {
+      console.error("Error in handleDeleteProgram:", error);
+    }
   };
 
   return (
@@ -180,6 +236,7 @@ const Programs: React.FC = () => {
                     phases={program.phases || []}
                     status={program.status}
                     onSelect={() => setSelectedProgramId(program.id)}
+                    onDelete={handleDeleteProgram}
                     program={program}
                   />
                 ))}
@@ -218,6 +275,7 @@ const Programs: React.FC = () => {
                   phases={program.phases || []}
                   status={program.status}
                   onSelect={() => setSelectedProgramId(program.id)}
+                  onDelete={handleDeleteProgram}
                   program={program}
                 />
               ))}
@@ -241,6 +299,7 @@ const Programs: React.FC = () => {
                   phases={program.phases || []}
                   status={program.status}
                   onSelect={() => setSelectedProgramId(program.id)}
+                  onDelete={handleDeleteProgram}
                   program={program}
                 />
               ))}
