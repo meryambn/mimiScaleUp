@@ -8,6 +8,7 @@ import CreateProgram from './pages/programs/create';
 import Mentors from './pages/mentors';
 import Applications from './pages/applications';
 import CreateApplicationForm from './pages/applications/create';
+import CreateFormPage from './pages/forms/create';
 import MeetingsPage from './pages/meetings';
 import TasksPage from './pages/tasks';
 import DeliverablesPage from './pages/deliverables';
@@ -88,6 +89,145 @@ const TeamsRedirect = () => {
   return null;
 };
 
+// Additional redirect components
+const RedirectToHome = () => {
+  const [, setLocation] = useLocation();
+  React.useEffect(() => {
+    setLocation('/home');
+  }, [setLocation]);
+  return null;
+};
+
+const RedirectToLoginPage = () => {
+  const [, setLocation] = useLocation();
+  React.useEffect(() => {
+    setLocation('/home');
+  }, [setLocation]);
+  return null;
+};
+
+const ProgramsRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation('/admin/programs');
+    } else if (user?.role === 'mentor') {
+      setLocation('/mentors/programs');
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation]);
+  return null;
+};
+
+const ProgramsCreateRedirect = () => {
+  const [, setLocation] = useLocation();
+  React.useEffect(() => {
+    setLocation('/admin/programs/create');
+  }, [setLocation]);
+  return null;
+};
+
+const MentorsRedirect = () => {
+  const [, setLocation] = useLocation();
+  React.useEffect(() => {
+    setLocation('/admin/mentors');
+  }, [setLocation]);
+  return null;
+};
+
+const ApplicationsRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation('/admin/applications');
+    } else if (user?.role === 'mentor') {
+      setLocation('/mentors/applications');
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation]);
+  return null;
+};
+
+const ApplicationsCreateRedirect = () => {
+  const [, setLocation] = useLocation();
+  React.useEffect(() => {
+    setLocation('/admin/applications/create');
+  }, [setLocation]);
+  return null;
+};
+
+const MeetingsRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation('/admin/meetings');
+    } else if (user?.role === 'mentor') {
+      setLocation('/mentors/meetings');
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation]);
+  return null;
+};
+
+const TasksRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation('/admin/tasks');
+    } else if (user?.role === 'mentor') {
+      setLocation('/mentors/tasks');
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation]);
+  return null;
+};
+
+const DeliverablesRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation('/admin/deliverables');
+    } else if (user?.role === 'mentor') {
+      setLocation('/mentors/deliverables');
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation]);
+  return null;
+};
+
+const ResourcesRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation('/admin/resources');
+    } else if (user?.role === 'mentor') {
+      setLocation('/mentors/resources');
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation]);
+  return null;
+};
+
+const TestCreateTeamRedirect = () => {
+  const [, setLocation] = useLocation();
+  React.useEffect(() => {
+    setLocation('/admin/test/create-team');
+  }, [setLocation]);
+  return null;
+};
+
 const App = () => {
   // Removed redundant redirection logic from main component
   // since it's handled in the route component
@@ -101,17 +241,7 @@ const App = () => {
                 <DeliverablesProvider>
                   <Switch>
                     <Route path="/">
-                      {() => {
-                        // Create a separate component to handle redirection
-                        const RedirectToHome = () => {
-                          const [, setLocation] = useLocation();
-                          React.useEffect(() => {
-                            setLocation('/home');
-                          }, []);
-                          return null;
-                        };
-                        return <RedirectToHome />;
-                      }}
+                      {() => <RedirectToHome />}
                     </Route>
 
                     <Route path="/home">
@@ -123,13 +253,7 @@ const App = () => {
                     </Route>
 
                     <Route path="/login">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        React.useEffect(() => {
-                          setLocation('/home');
-                        }, [setLocation]);
-                        return null;
-                      }}
+                      {() => <RedirectToLoginPage />}
                     </Route>
 
                     <Route path="/startup/dashboard">
@@ -222,6 +346,13 @@ const App = () => {
                       {() => (
                         <Layout>
                           <CreateApplicationForm />
+                        </Layout>
+                      )}
+                    </Route>
+                    <Route path="/forms/create/:programId">
+                      {({ programId }) => (
+                        <Layout>
+                          <CreateFormPage />
                         </Layout>
                       )}
                     </Route>
@@ -330,135 +461,39 @@ const App = () => {
                     </Route>
 
                     <Route path="/programs">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        const { user } = useAuth();
-                        React.useEffect(() => {
-                          if (user?.role === 'admin') {
-                            setLocation('/admin/programs');
-                          } else if (user?.role === 'mentor') {
-                            setLocation('/mentors/programs');
-                          } else {
-                            setLocation('/home');
-                          }
-                        }, []);
-                        return null;
-                      }}
+                      {() => <ProgramsRedirect />}
                     </Route>
 
                     <Route path="/programs/create">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        React.useEffect(() => {
-                          setLocation('/admin/programs/create');
-                        }, []);
-                        return null;
-                      }}
+                      {() => <ProgramsCreateRedirect />}
                     </Route>
 
                     <Route path="/mentors">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        React.useEffect(() => {
-                          setLocation('/admin/mentors');
-                        }, []);
-                        return null;
-                      }}
+                      {() => <MentorsRedirect />}
                     </Route>
 
                     <Route path="/applications">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        const { user } = useAuth();
-                        React.useEffect(() => {
-                          if (user?.role === 'admin') {
-                            setLocation('/admin/applications');
-                          } else if (user?.role === 'mentor') {
-                            setLocation('/mentors/applications');
-                          } else {
-                            setLocation('/home');
-                          }
-                        }, []);
-                        return null;
-                      }}
+                      {() => <ApplicationsRedirect />}
                     </Route>
 
                     <Route path="/applications/create">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        React.useEffect(() => {
-                          setLocation('/admin/applications/create');
-                        }, []);
-                        return null;
-                      }}
+                      {() => <ApplicationsCreateRedirect />}
                     </Route>
 
                     <Route path="/meetings">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        const { user } = useAuth();
-                        React.useEffect(() => {
-                          if (user?.role === 'admin') {
-                            setLocation('/admin/meetings');
-                          } else if (user?.role === 'mentor') {
-                            setLocation('/mentors/meetings');
-                          } else {
-                            setLocation('/home');
-                          }
-                        }, []);
-                        return null;
-                      }}
+                      {() => <MeetingsRedirect />}
                     </Route>
 
                     <Route path="/tasks">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        const { user } = useAuth();
-                        React.useEffect(() => {
-                          if (user?.role === 'admin') {
-                            setLocation('/admin/tasks');
-                          } else if (user?.role === 'mentor') {
-                            setLocation('/mentors/tasks');
-                          } else {
-                            setLocation('/home');
-                          }
-                        }, []);
-                        return null;
-                      }}
+                      {() => <TasksRedirect />}
                     </Route>
 
                     <Route path="/deliverables">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        const { user } = useAuth();
-                        React.useEffect(() => {
-                          if (user?.role === 'admin') {
-                            setLocation('/admin/deliverables');
-                          } else if (user?.role === 'mentor') {
-                            setLocation('/mentors/deliverables');
-                          } else {
-                            setLocation('/home');
-                          }
-                        }, []);
-                        return null;
-                      }}
+                      {() => <DeliverablesRedirect />}
                     </Route>
 
                     <Route path="/resources">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        const { user } = useAuth();
-                        React.useEffect(() => {
-                          if (user?.role === 'admin') {
-                            setLocation('/admin/resources');
-                          } else if (user?.role === 'mentor') {
-                            setLocation('/mentors/resources');
-                          } else {
-                            setLocation('/home');
-                          }
-                        }, []);
-                        return null;
-                      }}
+                      {() => <ResourcesRedirect />}
                     </Route>
 
                     <Route path="/admin/test/create-team">
@@ -471,13 +506,7 @@ const App = () => {
 
                     {/* Legacy route for backward compatibility */}
                     <Route path="/test/create-team">
-                      {() => {
-                        const [, setLocation] = useLocation();
-                        React.useEffect(() => {
-                          setLocation('/admin/test/create-team');
-                        }, []);
-                        return null;
-                      }}
+                      {() => <TestCreateTeamRedirect />}
                     </Route>
 
                     <Route path="/startup/meetings">

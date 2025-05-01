@@ -36,9 +36,9 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
         </ul>
       );
     } else if (typeof value === 'boolean') {
-      return value ? 'Yes' : 'No';
+      return value ? 'Oui' : 'Non';
     } else if (value === null || value === undefined) {
-      return <span className="text-gray-400">Not provided</span>;
+      return <span className="text-gray-400">Non fourni</span>;
     } else {
       return value.toString();
     }
@@ -48,17 +48,17 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Application from {submission.teamName}</DialogTitle>
+          <DialogTitle>Candidature de {submission.teamName}</DialogTitle>
           <DialogDescription>
-            Submitted on {new Date(submission.submittedAt).toLocaleString()}
+            Soumise le {new Date(submission.submittedAt).toLocaleString()}
           </DialogDescription>
         </DialogHeader>
-        
-        <ScrollArea className="flex-grow">
+
+        <ScrollArea className="flex-grow max-h-[60vh] overflow-y-auto pr-4" style={{ scrollbarWidth: 'thin' }}>
           <div className="space-y-6 p-1">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Team Name</h3>
+                <h3 className="text-sm font-medium text-gray-500">Nom de l'équipe</h3>
                 <p className="mt-1">{submission.teamName}</p>
               </div>
               <div>
@@ -66,17 +66,17 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
                 <p className="mt-1">{submission.teamEmail}</p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Industry</h3>
+                <h3 className="text-sm font-medium text-gray-500">Secteur</h3>
                 <p className="mt-1">{submission.industry}</p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Team Size</h3>
-                <p className="mt-1">{submission.teamSize} members</p>
+                <h3 className="text-sm font-medium text-gray-500">Taille de l'équipe</h3>
+                <p className="mt-1">{submission.teamSize} membres</p>
               </div>
             </div>
 
             <div className="border-t pt-4">
-              <h3 className="text-lg font-medium mb-4">Application Form Responses</h3>
+              <h3 className="text-lg font-medium mb-4">Réponses au formulaire</h3>
               <div className="space-y-4">
                 {Object.entries(submission.formData).map(([key, value]) => (
                   <div key={key} className="border-b pb-3">
@@ -88,17 +88,24 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
             </div>
           </div>
         </ScrollArea>
-        
+
         <DialogFooter className="flex justify-between">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Fermer
           </Button>
           {submission.status === 'pending' && onAddTeam && (
-            <Button onClick={() => {
-              onAddTeam(submission);
-              onOpenChange(false);
-            }}>
-              Add to Program
+            <Button
+              onClick={() => {
+                onAddTeam(submission);
+                onOpenChange(false);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: 'white',
+                border: 'none'
+              }}
+            >
+              Ajouter au programme
             </Button>
           )}
         </DialogFooter>

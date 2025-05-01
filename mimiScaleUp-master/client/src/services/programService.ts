@@ -1215,19 +1215,7 @@ export async function deleteProgram(programId: number | string): Promise<{ messa
   try {
     console.log(`Deleting program ${programId}`);
 
-    // Since there's no specific endpoint for program deletion in the backend yet,
-    // we'll create a mock implementation that simulates deletion
-    // In a real implementation, this would call the backend API
-
-    // For now, we'll just return a success message
-    // In a real implementation, this would be replaced with an actual API call
-    console.log(`Program ${programId} deleted successfully (mock)`);
-
-    // Return a mock success response
-    return { message: "Programme supprimé avec succès" };
-
-    /*
-    // This is how the real implementation would look once the backend endpoint is available
+    // Call the actual backend endpoint for program deletion
     const response = await fetch(`${API_BASE_URL}/programmes/delete/${programId}`, {
       method: 'DELETE',
       headers: {
@@ -1248,7 +1236,6 @@ export async function deleteProgram(programId: number | string): Promise<{ messa
       // If the response is empty or not valid JSON, return a default success message
       return { message: "Programme supprimé avec succès" };
     }
-    */
   } catch (error) {
     console.error("Error deleting program:", error);
     throw error;

@@ -1,11 +1,10 @@
 import * as React from "react";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardFooter
+  CardHeader
 } from "@/components/ui/card";
 import {
   Dialog,
@@ -25,9 +24,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 import {
   Plus,
   Trash2,
@@ -72,11 +69,12 @@ interface ApplicationFormBuilderProps {
   onSave: (questions: FormQuestion[]) => void;
 }
 
-const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
-  programId,
-  defaultQuestions = [],
-  onSave
-}) => {
+const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = (props) => {
+  // Extract props with defaults to avoid hooks issues
+  const { onSave } = props;
+  const defaultQuestions = props.defaultQuestions || [];
+
+  // Always initialize all hooks in the same order
   const [questions, setQuestions] = useState<FormQuestion[]>(defaultQuestions);
   const [newQuestion, setNewQuestion] = useState<FormQuestion>({
     id: uuidv4(),
@@ -84,7 +82,9 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
     text: "",
     description: "",
     required: false,
-    options: []
+    options: [],
+    minRating: 1,
+    maxRating: 5
   });
   const [isAddingQuestion, setIsAddingQuestion] = useState(false);
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
@@ -94,7 +94,28 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
       return;
     }
 
-    const updatedQuestions = [...questions, newQuestion];
+    // Ensure rating questions have min and max values
+    let questionToAdd = {...newQuestion};
+    if (questionToAdd.type === 'rating') {
+      if (questionToAdd.minRating === undefined) {
+        questionToAdd.minRating = 1;
+        console.log('Setting default minRating to 1 for new question');
+      }
+
+      if (questionToAdd.maxRating === undefined) {
+        questionToAdd.maxRating = 5;
+        console.log('Setting default maxRating to 5 for new question');
+      }
+
+      // Ensure min is less than max
+      if (questionToAdd.minRating >= questionToAdd.maxRating) {
+        console.warn('minRating must be less than maxRating, adjusting values');
+        questionToAdd.minRating = 1;
+        questionToAdd.maxRating = 5;
+      }
+    }
+
+    const updatedQuestions = [...questions, questionToAdd];
     setQuestions(updatedQuestions);
     onSave(updatedQuestions);
 
@@ -105,7 +126,9 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
       text: "",
       description: "",
       required: false,
-      options: []
+      options: [],
+      minRating: 1,
+      maxRating: 5
     });
     setIsAddingQuestion(false);
   };
@@ -119,8 +142,29 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
   const handleUpdateQuestion = () => {
     if (editingQuestionIndex === null) return;
 
+    // Ensure rating questions have min and max values
+    let questionToUpdate = {...newQuestion};
+    if (questionToUpdate.type === 'rating') {
+      if (questionToUpdate.minRating === undefined) {
+        questionToUpdate.minRating = 1;
+        console.log('Setting default minRating to 1 for updated question');
+      }
+
+      if (questionToUpdate.maxRating === undefined) {
+        questionToUpdate.maxRating = 5;
+        console.log('Setting default maxRating to 5 for updated question');
+      }
+
+      // Ensure min is less than max
+      if (questionToUpdate.minRating >= questionToUpdate.maxRating) {
+        console.warn('minRating must be less than maxRating, adjusting values');
+        questionToUpdate.minRating = 1;
+        questionToUpdate.maxRating = 5;
+      }
+    }
+
     const updatedQuestions = [...questions];
-    updatedQuestions[editingQuestionIndex] = newQuestion;
+    updatedQuestions[editingQuestionIndex] = questionToUpdate;
 
     setQuestions(updatedQuestions);
     onSave(updatedQuestions);
@@ -132,7 +176,9 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
       text: "",
       description: "",
       required: false,
-      options: []
+      options: [],
+      minRating: 1,
+      maxRating: 5
     });
     setIsAddingQuestion(false);
     setEditingQuestionIndex(null);
@@ -144,16 +190,7 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
     onSave(updatedQuestions);
   };
 
-  const handleMoveQuestion = (dragIndex: number, hoverIndex: number) => {
-    const updatedQuestions = [...questions];
-    const dragQuestion = updatedQuestions[dragIndex];
-
-    updatedQuestions.splice(dragIndex, 1);
-    updatedQuestions.splice(hoverIndex, 0, dragQuestion);
-
-    setQuestions(updatedQuestions);
-    onSave(updatedQuestions);
-  };
+  // Removed unused handleMoveQuestion function
 
   const handleAddOption = () => {
     const newOption: QuestionOption = {
@@ -323,7 +360,9 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
                 text: "",
                 description: "",
                 required: false,
-                options: []
+                options: [],
+                minRating: 1,
+                maxRating: 5
               });
               setEditingQuestionIndex(null);
               setIsAddingQuestion(true);
@@ -333,18 +372,30 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
             Ajouter une question
           </button>
         </DialogTrigger>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>
               {editingQuestionIndex !== null ? "Modifier la question" : "Ajouter une nouvelle question"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4" style={{ scrollbarWidth: 'thin' }}>
             <div className="space-y-2">
               <Label htmlFor="question-type">Type de question</Label>
               <Select
                 value={newQuestion.type}
-                onValueChange={(value: QuestionType) => setNewQuestion({...newQuestion, type: value})}
+                onValueChange={(value: QuestionType) => {
+                  // When changing to rating type, ensure minRating and maxRating are set
+                  if (value === 'rating') {
+                    setNewQuestion({
+                      ...newQuestion,
+                      type: value,
+                      minRating: newQuestion.minRating || 1,
+                      maxRating: newQuestion.maxRating || 5
+                    });
+                  } else {
+                    setNewQuestion({...newQuestion, type: value});
+                  }
+                }}
               >
                 <SelectTrigger id="question-type">
                   <SelectValue placeholder="Sélectionnez le type de question" />
@@ -458,7 +509,13 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
                     min={1}
                     max={10}
                     value={newQuestion.minRating || 1}
-                    onChange={(e) => setNewQuestion({...newQuestion, minRating: parseInt(e.target.value)})}
+                    onChange={(e) => {
+                      // Ensure we always have a valid number
+                      const value = e.target.value;
+                      const parsedValue = parseInt(value);
+                      const validValue = isNaN(parsedValue) ? 1 : parsedValue;
+                      setNewQuestion({...newQuestion, minRating: validValue});
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -469,7 +526,13 @@ const SimpleApplicationFormBuilder: React.FC<ApplicationFormBuilderProps> = ({
                     min={1}
                     max={10}
                     value={newQuestion.maxRating || 5}
-                    onChange={(e) => setNewQuestion({...newQuestion, maxRating: parseInt(e.target.value)})}
+                    onChange={(e) => {
+                      // Ensure we always have a valid number
+                      const value = e.target.value;
+                      const parsedValue = parseInt(value);
+                      const validValue = isNaN(parsedValue) ? 5 : parsedValue;
+                      setNewQuestion({...newQuestion, maxRating: validValue});
+                    }}
                   />
                 </div>
               </div>

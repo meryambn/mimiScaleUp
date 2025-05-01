@@ -6,14 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { FormQuestion } from "./ApplicationFormBuilder";
+import { FormQuestion } from "./SimpleApplicationFormBuilder";
 import SimpleApplicationFormBuilder from "./SimpleApplicationFormBuilder";
+import { createFormWithQuestions } from "@/services/formService";
 import {
   PlusCircle,
   Check,
   Settings,
   Eye,
-  Copy
+  Copy,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,9 +37,15 @@ interface ApplicationFormTabsProps {
   programId: number;
 }
 
-const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
-  defaultQuestions = [],
-  defaultSettings = {
+const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = (props) => {
+  // Extract props with defaults to avoid hooks issues
+  const {
+    onSave,
+    programId
+  } = props;
+
+  const defaultQuestions = props.defaultQuestions || [];
+  const defaultSettings = props.defaultSettings || {
     title: "Formulaire de candidature",
     description: "Veuillez remplir ce formulaire pour postuler à notre programme.",
     submitButtonText: "Soumettre la candidature",
@@ -46,14 +54,14 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
     confirmationMessage: "Merci pour votre candidature ! Nous l'examinerons et reviendrons vers vous bientôt.",
     notificationEmail: "",
     applicationFormLink: ""
-  },
-  onSave,
-  programId
-}) => {
+  };
+
+  // Always initialize all hooks in the same order
   const [activeTab, setActiveTab] = useState<string>("questions");
   const [questions, setQuestions] = useState<FormQuestion[]>(defaultQuestions);
   const [settings, setSettings] = useState<FormSettings>(defaultSettings);
   const [previewMode, setPreviewMode] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const { toast } = useToast();
 
   const handleQuestionsChange = (newQuestions: FormQuestion[]) => {
@@ -67,8 +75,38 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
     });
   };
 
-  const handleFormSave = () => {
-    onSave(questions, settings);
+  const handleFormSave = async () => {
+    try {
+      setIsSaving(true);
+
+      // First, call the parent component's onSave function
+      onSave(questions, settings);
+
+      // Save to backend
+      if (programId) {
+        await createFormWithQuestions(
+          programId,
+          settings.title,
+          settings.description,
+          questions,
+          settings
+        );
+      }
+
+      toast({
+        title: "Formulaire enregistré",
+        description: "Le formulaire de candidature a été enregistré avec succès.",
+      });
+    } catch (error) {
+      console.error("Error saving form:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'enregistrement du formulaire.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -93,17 +131,32 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = ({
 
             <button
               onClick={handleFormSave}
+              disabled={isSaving}
               className="ml-auto"
-              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+              style={{
+                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                border: 'none',
+                opacity: isSaving ? 0.7 : 1
+              }}
             >
-              <Check className="h-4 w-4 mr-2" />
-              Enregistrer le formulaire
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              {isSaving ? "Enregistrement..." : "Enregistrer le formulaire"}
             </button>
           </div>
 
           <TabsContent value="questions" className="space-y-6">
             <SimpleApplicationFormBuilder
-              programId={1}
+              programId={programId}
               defaultQuestions={questions}
               onSave={handleQuestionsChange}
             />

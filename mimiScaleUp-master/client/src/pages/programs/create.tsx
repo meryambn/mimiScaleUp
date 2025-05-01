@@ -13,11 +13,12 @@ import WidgetContainer from "@/components/dashboard/WidgetContainer";
 import MentorSelection from "@/components/mentor/MentorSelection";
 import ApplicationFormTabs from "@/components/application/ApplicationFormTabs";
 import { useProgramContext } from "@/context/ProgramContext";
-import { saveFormDirect, checkAndRepairStorage } from "@/utils/directStorage";
+// No longer using localStorage for form storage
 import { saveProgramAsTemplate, getSavedProgramTemplates } from "@/utils/programTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { createProgram as apiCreateProgram, createPhase, createTask, createLivrable, createCritere, createReunion, addMentorToProgram } from "@/services/programService";
+import { createFormWithQuestions } from "@/services/formService";
 import { Plus, PlusCircle, BarChart, Calendar, Users, BarChart2, Flag, MessageSquare, Filter } from "lucide-react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -86,141 +87,81 @@ if (!window.globalEvaluationCriteria) {
 
 // Create utility functions to reliably dispatch creation events
 // Function to dispatch when an application form is created
-function dispatchApplicationFormCreated(programId: string, formData: any, queryClient: any) {
-
+async function dispatchApplicationFormCreated(programId: string, formData: any, queryClient: any) {
   console.log("*** DISPATCHING APPLICATION FORM CREATED EVENT ***");
   console.log("Program ID:", programId);
   console.log("Form Data:", formData);
 
-  // Vérifier et réparer le stockage local avant de créer un formulaire
-  checkAndRepairStorage();
-
-  // Vérifier si le programId est un UUID (chaîne de caractères avec des tirets)
-  const isUuid = typeof programId === 'string' && programId.includes('-');
-  console.log(`%c Le programId est-il un UUID? ${isUuid}`, "background: orange; color: black; padding: 3px;");
-
-  // Utiliser directement l'UUID comme programId sans le convertir en nombre
-  console.log(`%c programId original dans dispatchApplicationFormCreated: ${programId} (${typeof programId})`, "background: green; color: white; padding: 3px;");
-
-  // Utiliser saveFormDirect pour créer le formulaire de manière cohérente
-  const savedForm = saveFormDirect({
-    name: formData.name || '',
-    description: formData.description || '',
-    programId: programId, // Utiliser l'ID original sans conversion
-    questions: formData.questions || [],
-    settings: formData.settings || {}
-  }, programId); // Utiliser l'ID original sans conversion
-
-  console.log("Formulaire sauvegardé avec saveFormDirect:", savedForm);
-
-  // Normalize the form data structure for React Query cache
-  const normalizedFormData = savedForm;
-
-  console.log("Normalized form data:", normalizedFormData);
-
-  // CRITICAL FIX: Initialize global store if it doesn't exist
-  if (!window.globalApplicationForms) {
-    window.globalApplicationForms = [];
-  }
-
-  // Add the form to the global store with uniqueness check
-  const formExists = window.globalApplicationForms.some((f: any) =>
-    f && f.id && f.id === normalizedFormData.id
-  );
-
-  if (!formExists) {
-    window.globalApplicationForms.push(normalizedFormData);
-    console.log("Added form to global store. Total forms:", window.globalApplicationForms.length);
-    console.log("Global forms:", JSON.stringify(window.globalApplicationForms));
-  } else {
-    console.log("Form already exists in global store");
-
-    // Update the existing form
-    const index = window.globalApplicationForms.findIndex((f: any) => f.id === normalizedFormData.id);
-    if (index !== -1) {
-      window.globalApplicationForms[index] = normalizedFormData;
-      console.log("Updated existing form in global store");
-    }
-  }
-
-  // Store in localStorage for persistence
   try {
-    // Get existing forms
-    let existingForms = [];
-    const storedForms = localStorage.getItem('applicationForms');
-    if (storedForms) {
-      existingForms = JSON.parse(storedForms);
-    }
-
-    // Add the new form if it doesn't exist already
-    const localFormExists = existingForms.some((f: any) => f.id === normalizedFormData.id);
-
-    if (!localFormExists) {
-      existingForms.push(normalizedFormData);
-      console.log("Adding form to localStorage. Total forms:", existingForms.length);
-    } else {
-      // Update the existing form
-      const index = existingForms.findIndex((f: any) => f.id === normalizedFormData.id);
-      if (index !== -1) {
-        existingForms[index] = normalizedFormData;
-        console.log("Updated existing form in localStorage");
-      }
-    }
-
-    localStorage.setItem('applicationForms', JSON.stringify(existingForms));
-    console.log("Saved forms to localStorage");
-
-  } catch (error) {
-    console.error("Error saving to localStorage:", error);
-  }
-
-  // Update the React Query cache
-  if (queryClient) {
-    // Force a direct cache update for both global and program-specific queries
-    console.log("Updating React Query cache");
-
-    // Get the latest global forms
-    const allForms = window.globalApplicationForms;
-
-    // Update the global forms cache
-    queryClient.setQueryData(['/api/application-forms'], allForms);
-
-    // Vérifier si le programId est un UUID (chaîne de caractères avec des tirets)
-    const isUuid = typeof programId === 'string' && programId.includes('-');
-
-    // Filtrer les formulaires en fonction du type de programId
-    const programForms = allForms.filter((f: any) => {
-      if (isUuid) {
-        // Si c'est un UUID, faire une comparaison de chaînes
-        return String(f.programId) === String(programId);
-      } else {
-        // Sinon, faire une comparaison numérique
-        const formProgramId = Number(f.programId);
-        const programIdNum = Number(programId);
-        return formProgramId === programIdNum;
-      }
+    // Create the form via the backend API
+    const response = await apiRequest('POST', '/api/application-forms', {
+      titre: formData.name || '',
+      description: formData.description || '',
+      programme_id: programId,
+      questions: formData.questions || [],
+      message_confirmation: formData.settings?.confirmationMessage || "Merci pour votre candidature!"
     });
 
-    console.log(`Found ${programForms.length} forms for program ${programId}`);
-    // Utiliser l'ID original pour mettre à jour le cache
-    queryClient.setQueryData(['/api/application-forms', programId], programForms);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error creating form:", errorData);
+      throw new Error(errorData.message || 'Erreur lors de la création du formulaire');
+    }
 
-    // Invalidate queries to force refetches
-    console.log("Invalidating React Query cache");
-    queryClient.invalidateQueries({queryKey: ['/api/application-forms']});
-    queryClient.invalidateQueries({queryKey: ['/api/application-forms', programId]});
+    const savedForm = await response.json();
+    console.log("Form created successfully via API:", savedForm);
+
+    // Normalize the form data structure for React Query cache
+    const normalizedFormData = {
+      id: savedForm.id,
+      name: savedForm.titre || formData.name || '',
+      description: savedForm.description || formData.description || '',
+      programId: programId,
+      questions: savedForm.questions || formData.questions || [],
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      settings: {
+        title: savedForm.titre || formData.name || '',
+        description: savedForm.description || formData.description || '',
+        submitButtonText: "Soumettre la candidature",
+        showProgressBar: true,
+        allowSaveDraft: true,
+        confirmationMessage: savedForm.message_confirmation || formData.settings?.confirmationMessage || "Merci pour votre candidature!"
+      }
+    };
+
+    console.log("Normalized form data:", normalizedFormData);
+
+    // Update the React Query cache
+    if (queryClient) {
+      // Invalidate queries to force refetches
+      console.log("Invalidating React Query cache");
+      queryClient.invalidateQueries({queryKey: ['/api/application-forms']});
+      queryClient.invalidateQueries({queryKey: ['/api/application-forms', programId]});
+    }
+
+    // Dispatch a custom event that can be listened to elsewhere
+    const formEvent = new CustomEvent('application-form-updated', {
+      detail: { form: normalizedFormData, action: 'create', programId: programId }
+    });
+    document.dispatchEvent(formEvent);
+    console.log("Dispatched application-form-updated event with action 'create'");
+
+    // Also dispatch the legacy event for backward compatibility
+    const legacyEvent = new CustomEvent('application-form-created', {
+      detail: { form: normalizedFormData, programId: programId }
+    });
+    document.dispatchEvent(legacyEvent);
+
+    // CRITICAL: Alert to verify form has been created
+    console.log("%c FORM CREATED AND STORED! Check Applications tab to view it", "background: green; color: white; padding: 5px; font-weight: bold;");
+
+    return normalizedFormData;
+  } catch (error) {
+    console.error("Error in dispatchApplicationFormCreated:", error);
+    throw error;
   }
-
-  // Dispatch a custom event that can be listened to elsewhere
-  // Utiliser 'application-form-updated' pour être cohérent avec les autres parties de l'application
-  const formEvent = new CustomEvent('application-form-updated', {
-    detail: { form: normalizedFormData, action: 'create' }
-  });
-  document.dispatchEvent(formEvent);
-  console.log("Dispatched application-form-updated event with action 'create'");
-
-  // CRITICAL: Alert to verify form has been created
-  console.log("%c FORM CREATED AND STORED! Check Applications tab to view it", "background: green; color: white; padding: 5px; font-weight: bold;");
 }
 
 // Function to dispatch when an evaluation criterion is created
@@ -710,8 +651,7 @@ const CreateProgram: React.FC = () => {
 
   const createProgram = async (programData: any) => {
     try {
-      // Vérifier et réparer le stockage local avant de créer un programme
-      checkAndRepairStorage();
+      // No longer using localStorage for form storage
 
       // Map template names to their corresponding types
       const programTypeMap: Record<string, string> = {
@@ -1064,9 +1004,10 @@ const CreateProgram: React.FC = () => {
       }
 
       // Create application form for the program
-      // Même si aucune question n'est fournie, créer un formulaire par défaut
-      if (applicationForm) {
-        // Si aucune question n'est fournie, créer des questions par défaut
+      if (newProgramId && applicationForm) {
+        console.log("%c Creating application form with backend API", "background: blue; color: white; padding: 5px; font-size: 14px;");
+
+        // Default questions if none provided
         const questions = (applicationForm.questions && applicationForm.questions.length > 0)
           ? applicationForm.questions
           : [
@@ -1083,73 +1024,42 @@ const CreateProgram: React.FC = () => {
                 required: true
               }
             ];
-        // Prepare form data to save
-        const formData = {
-          id: Date.now(), // Use timestamp as ID
-          name: applicationForm.settings?.title || `Formulaire de candidature - ${programData.name}`,
-          description: applicationForm.settings?.description || `Formulaire de candidature pour le programme ${programData.name}`,
-          programId: newProgramId, // Utiliser directement l'UUID sans conversion
-          questions: questions, // Utiliser les questions par défaut si aucune n'est fournie
-          settings: applicationForm.settings,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+
+        // Form settings
+        const formTitle = applicationForm.settings?.title || `Formulaire de candidature - ${programData.name}`;
+        const formDescription = applicationForm.settings?.description || `Formulaire de candidature pour le programme ${programData.name}`;
+        const formSettings = applicationForm.settings || {
+          title: formTitle,
+          description: formDescription,
+          submitButtonText: "Soumettre la candidature",
+          showProgressBar: true,
+          allowSaveDraft: true,
+          confirmationMessage: "Merci pour votre candidature ! Nous l'examinerons et reviendrons vers vous bientôt.",
+          notificationEmail: "",
+          applicationFormLink: ""
         };
 
-        console.log("%c Creating application form with programId:", "background: blue; color: white; padding: 5px; font-size: 14px;", newProgramId, "type:", typeof newProgramId, "Form data:", formData);
+        try {
+          // Create form with questions using the backend API
+          const formResult = await createFormWithQuestions(
+            newProgramId,
+            formTitle,
+            formDescription,
+            questions,
+            formSettings
+          );
 
-        // HIGHEST PRIORITY: DIRECT STORAGE METHOD
-        // Utiliser saveFormDirect pour être cohérent avec le reste de l'application
-        console.log("%c === SAUVEGARDE DU FORMULAIRE DANS LE PROGRAMME ====", "background: blue; color: white; padding: 5px; font-size: 14px;");
-        console.log("formData avant saveFormDirect:", formData);
-        console.log("programId avant saveFormDirect:", formData.programId);
-
-        // Vérifier que le programId est bien défini
-        if (!formData.programId) {
-          console.error("%c ERREUR: programId non défini dans formData", "background: red; color: white; padding: 5px; font-size: 14px;");
-
-          // Modifier directement la propriété programId en utilisant une conversion de type
-          (formData as any).programId = newProgramId;
-
-          console.log("%c programId corrigé:", "background: green; color: white; padding: 5px; font-size: 14px;", formData.programId, typeof formData.programId);
+          if (formResult.success) {
+            console.log("%c Form created successfully with backend API", "background: green; color: white; padding: 5px; font-size: 14px;");
+            console.log("Form creation result:", formResult);
+          } else {
+            console.log("%c Form creation returned success: false", "background: orange; color: black; padding: 5px; font-size: 14px;");
+            // Don't show an error toast here, as the program was still created successfully
+          }
+        } catch (error) {
+          console.error("Error creating application form:", error);
+          // Don't show an error toast here, as the program was still created successfully
         }
-
-        // Vérifier si le programId est un UUID (chaîne de caractères avec des tirets)
-        const isUuid = typeof newProgramId === 'string' && String(newProgramId).includes('-');
-        console.log(`%c Le newProgramId est-il un UUID? ${isUuid}`, "background: orange; color: black; padding: 5px; font-size: 14px;");
-
-        // Utiliser directement l'UUID comme programId sans le convertir en nombre
-        console.log(`%c newProgramId original: ${newProgramId} (${typeof newProgramId})`, "background: green; color: white; padding: 5px; font-size: 14px;");
-
-        const savedForm = saveFormDirect({
-          name: formData.name,
-          description: formData.description,
-          programId: newProgramId, // Utiliser l'ID original sans conversion
-          questions: formData.questions,
-          settings: formData.settings
-        }, newProgramId); // Utiliser l'ID original sans conversion
-
-        console.log("%c FORMULAIRE SAUVEGARDÉ AVEC SUCCÈS", "background: green; color: white; padding: 5px; font-size: 14px;");
-        console.log("Formulaire sauvegardé:", savedForm);
-
-        // Pas besoin d'appeler dispatchApplicationFormCreated car saveFormDirect déclenche déjà l'événement
-        // dispatchApplicationFormCreated(String(newProgramId), formData, queryClient);
-
-        // Mettre à jour le cache React Query directement
-        queryClient.setQueryData(['/api/application-forms'], (oldData: any[] = []) => {
-          console.log("%c Setting global form cache data", "background: green; color: white; padding: 3px;");
-          return [...(oldData || []), savedForm];
-        });
-
-        // Force an immediate refetch
-        queryClient.invalidateQueries({queryKey: ['/api/application-forms']});
-
-        // Déclencher un événement pour notifier les autres composants
-        console.log("%c Déclenchement de l'événement application-form-updated", "background: purple; color: white; padding: 3px;");
-        const event = new CustomEvent('application-form-updated', {
-          detail: { form: savedForm, action: 'create', programId: newProgramId }
-        });
-        document.dispatchEvent(event);
       }
 
       // Create evaluation criteria for the program

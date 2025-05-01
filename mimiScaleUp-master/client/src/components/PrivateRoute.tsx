@@ -20,21 +20,25 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ path, component: Component,
     return allowedRoles.includes(user.role);
   };
 
-  const render = () => {
-    if (!isAuthenticated()) {
-      setLocation('/');
-      return null;
-    }
+  // Instead of using a function that returns a component (which causes React hooks issues),
+  // we'll use the children prop pattern which is more reliable with hooks
+  return (
+    <Route path={path}>
+      {() => {
+        if (!isAuthenticated()) {
+          setLocation('/');
+          return null;
+        }
 
-    if (!hasRequiredRole()) {
-      setLocation('/dashboard');
-      return null;
-    }
+        if (!hasRequiredRole()) {
+          setLocation('/dashboard');
+          return null;
+        }
 
-    return <Component />;
-  };
-
-  return <Route path={path} component={render} />;
+        return <Component />;
+      }}
+    </Route>
+  );
 };
 
-export default PrivateRoute; 
+export default PrivateRoute;

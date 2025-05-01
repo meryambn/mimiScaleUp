@@ -8,7 +8,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { InsertApplicationForm } from "@/types/schema";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useProgramContext } from "@/context/ProgramContext";
-import { saveFormDirect } from "@/utils/directStorage";
+import { apiRequest } from "@/lib/queryClient";
 
 // Form settings are used in the form content object below
 // in the handleSaveForm function
@@ -32,24 +32,31 @@ const CreateApplicationForm: React.FC = () => {
   });
 
   const createFormMutation = useMutation({
-    mutationFn: (formData: InsertApplicationForm) => {
+    mutationFn: async (formData: InsertApplicationForm) => {
       console.log('💙 Création du formulaire avec les données:', formData);
 
       if (!programId) {
         throw new Error('Aucun programme sélectionné');
       }
 
-      // Utiliser notre solution ultra-directe
-      const savedForm = saveFormDirect(formData, programId);
+      // Créer le formulaire via l'API backend
+      const response = await apiRequest('POST', '/api/application-forms', {
+        titre: formData.name,
+        description: formData.description,
+        programme_id: programId,
+        questions: formData.questions,
+        message_confirmation: formData.settings?.confirmationMessage || "Merci pour votre candidature!"
+      });
 
-      if (!savedForm) {
-        throw new Error('Erreur lors de la sauvegarde du formulaire');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors de la sauvegarde du formulaire');
       }
 
+      const savedForm = await response.json();
       console.log('💙 Formulaire sauvegardé avec succès:', savedForm);
 
-      // Simuler une réponse API réussie
-      return Promise.resolve({ success: true, formId: savedForm.id });
+      return { success: true, formId: savedForm.id };
     },
     onSuccess: (data) => {
       console.log('💙 Formulaire créé avec succès:', data);

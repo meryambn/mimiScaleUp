@@ -40,7 +40,7 @@ const Sidebar: React.FC = () => {
   const { data: applicationForms = [] } = useQuery<ApplicationForm[]>({
     queryKey: ['/api/application-forms', selectedProgram?.id],
     queryFn: async () => {
-      const response = await apiRequest(`/api/application-forms${selectedProgram?.id ? `?programId=${selectedProgram.id}` : ''}`, 'GET');
+      const response = await apiRequest('GET', `/api/application-forms${selectedProgram?.id ? `?programId=${selectedProgram.id}` : ''}`);
       const data = await response.json();
       return data;
     },
