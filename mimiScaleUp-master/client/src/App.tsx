@@ -24,7 +24,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { ProgramProvider } from "@/context/ProgramContext";
+import { ProgramProvider, useProgramContext } from "@/context/ProgramContext";
 import { MeetingsProvider } from "@/context/MeetingsContext";
 import { TasksProvider } from "@/context/TasksContext";
 import { ResourcesProvider } from "@/context/ResourcesContext";
@@ -43,6 +43,7 @@ import ParticulierResourcePage from './pages/particulier/resources';
 import StartupTasksPage from './pages/startup/tasks';
 import ParticulierTasksPage from './pages/particulier/tasks';
 import StartupAnalytics from './pages/startup/analytics';
+import FormulairePage from './pages/particulier/formulaire';
 
 // Redirect components to fix hooks issues
 const DashboardRedirect = () => {
@@ -225,6 +226,74 @@ const TestCreateTeamRedirect = () => {
   React.useEffect(() => {
     setLocation('/admin/test/create-team');
   }, [setLocation]);
+  return null;
+};
+
+const NotificationsRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { programs } = useProgramContext();
+
+  React.useEffect(() => {
+    // Trouver le premier programme actif
+    const activeProgram = programs.find(p => p.status === "active");
+    if (activeProgram) {
+      setLocation(`/particulier/notifications/${activeProgram.id}`);
+    } else {
+      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
+      setLocation('/particulier/dashboard');
+    }
+  }, [setLocation, programs]);
+  return null;
+};
+
+const FormulaireRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { programs } = useProgramContext();
+
+  React.useEffect(() => {
+    // Trouver le premier programme actif
+    const activeProgram = programs.find(p => p.status === "active");
+    if (activeProgram) {
+      setLocation(`/particulier/formulaire/${activeProgram.id}`);
+    } else {
+      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
+      setLocation('/particulier/dashboard');
+    }
+  }, [setLocation, programs]);
+  return null;
+};
+
+const StartupNotificationsRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { programs } = useProgramContext();
+
+  React.useEffect(() => {
+    // Trouver le premier programme actif
+    const activeProgram = programs.find(p => p.status === "active");
+    if (activeProgram) {
+      setLocation(`/startup/notifications/${activeProgram.id}`);
+    } else {
+      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
+      setLocation('/startup/dashboard');
+    }
+  }, [setLocation, programs]);
+  return null;
+};
+
+const StartupFormulaireRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { programs } = useProgramContext();
+
+  React.useEffect(() => {
+    // Trouver le premier programme actif
+    const activeProgram = programs.find(p => p.status === "active");
+    if (activeProgram) {
+      setLocation(`/startup/formulaire/${activeProgram.id}`);
+    } else {
+      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
+      setLocation('/startup/dashboard');
+    }
+  }, [setLocation, programs]);
   return null;
 };
 
@@ -530,12 +599,40 @@ const App = () => {
                       {() => <MentorDashboardRedirect />}
                     </Route>
 
+                    {/* Route de base pour les notifications */}
                     <Route path="/particulier/notifications">
+                      {() => <NotificationsRedirect />}
+                    </Route>
+
+                    {/* Route avec ID pour les notifications */}
+                    <Route path="/particulier/notifications/:id">
                       {() => <NotificationsPage />}
                     </Route>
 
                     <Route path="/startup/notifications">
+                      {() => <StartupNotificationsRedirect />}
+                    </Route>
+
+                    <Route path="/startup/notifications/:id">
                       {() => <StartupNotificationsPage />}
+                    </Route>
+
+                    {/* Route de base pour le formulaire */}
+                    <Route path="/particulier/formulaire">
+                      {() => <FormulaireRedirect />}
+                    </Route>
+
+                    {/* Route avec ID pour le formulaire */}
+                    <Route path="/particulier/formulaire/:id">
+                      {() => <FormulairePage />}
+                    </Route>
+
+                    <Route path="/startup/formulaire">
+                      {() => <StartupFormulaireRedirect />}
+                    </Route>
+
+                    <Route path="/startup/formulaire/:id">
+                      {() => <FormulairePage />}
                     </Route>
 
                     <Route>
