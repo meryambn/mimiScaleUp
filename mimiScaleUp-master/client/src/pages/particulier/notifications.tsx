@@ -1,172 +1,151 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
-import { FaArrowLeft, FaBell, FaCheck, FaTrash, FaSearch, FaFilter, FaRegBell, FaRegCheckCircle, FaRegClock, FaUser } from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation, useParams } from 'wouter';
+import { FaArrowLeft, FaUser } from 'react-icons/fa';
+import Modal from '../../components/Modal';
 
-interface Notification {
+interface Programme {
   id: string;
-  type: 'success' | 'info' | 'warning' | 'error';
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-  category?: 'program' | 'meeting' | 'task' | 'resource' | 'general';
-  priority?: 'high' | 'medium' | 'low';
+  nom: string;
+  description: string;
+  date_debut: string;
+  date_fin: string;
+  statut: string;
+  formulaire_soumis?: boolean;
+}
+
+interface FormQuestion {
+  id: string;
+  texte_question: string;
+  type: string;
+  options?: string[];
+  required: boolean;
+}
+
+interface Form {
+  id: string;
+  titre: string;
+  description: string;
+  message_confirmation: string;
+  url_formulaire: string;
+  programme_id: string;
+  questions: FormQuestion[];
 }
 
 const NotificationsPage: React.FC = () => {
   const [, setLocation] = useLocation();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedPriority, setSelectedPriority] = useState<string>('all');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const params = useParams();
+  const [programme, setProgramme] = useState<Programme | null>(null);
+  const [isLoadingProgramme, setIsLoadingProgramme] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [currentForm, setCurrentForm] = useState<Form | null>(null);
+  const [isLoadingForm, setIsLoadingForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Catégories et priorités
-  const categories = [
-    { id: 'all', label: 'Toutes', icon: FaRegBell },
-    { id: 'program', label: 'Programme', icon: FaRegCheckCircle },
-    { id: 'meeting', label: 'Réunions', icon: FaRegClock },
-    { id: 'task', label: 'Tâches', icon: FaRegCheckCircle },
-    { id: 'resource', label: 'Ressources', icon: FaRegBell },
-    { id: 'general', label: 'Général', icon: FaRegBell }
-  ];
-
-  const priorities = [
-    { id: 'all', label: 'Toutes' },
-    { id: 'high', label: 'Haute' },
-    { id: 'medium', label: 'Moyenne' },
-    { id: 'low', label: 'Basse' }
-  ];
-
-  // Charger les notifications initiales
+  // Vérifier si le formulaire a été soumis
   useEffect(() => {
-    const initialNotifications: Notification[] = [
-      {
-        id: '1',
-        type: 'success',
-        title: 'Progression du programme',
-        message: 'Vous avez complété 75% de votre programme d\'accélération',
-        timestamp: new Date(Date.now() - 3600000),
-        read: false,
-        category: 'program',
-        priority: 'high'
-      },
-      {
-        id: '2',
-        type: 'info',
-        title: 'Nouvelle ressource disponible',
-        message: 'Un nouveau guide sur le pitch deck est disponible dans la section Ressources',
-        timestamp: new Date(Date.now() - 7200000),
-        read: false,
-        category: 'resource',
-        priority: 'medium'
-      },
-      {
-        id: '3',
-        type: 'warning',
-        title: 'Échéance approchante',
-        message: 'La date limite pour soumettre votre rapport mensuel est dans 2 jours',
-        timestamp: new Date(Date.now() - 86400000),
-        read: false,
-        category: 'task',
-        priority: 'high'
-      },
-      {
-        id: '4',
-        type: 'info',
-        title: 'Réunion programmée',
-        message: 'Une réunion avec votre mentor est prévue demain à 14h',
-        timestamp: new Date(Date.now() - 172800000),
-        read: true,
-        category: 'meeting',
-        priority: 'medium'
-      },
-      {
-        id: '5',
-        type: 'success',
-        title: 'Tâche complétée',
-        message: 'Votre business plan a été validé par le comité',
-        timestamp: new Date(Date.now() - 259200000),
-        read: true,
-        category: 'task',
-        priority: 'low'
+    const checkFormSubmission = async () => {
+      const programId = params?.id;
+      if (!programId) return;
+
+      try {
+        const response = await fetch(`http://localhost:8083/api/soum/check/${programId}`, {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (programme) {
+            setProgramme(prev => prev ? { ...prev, formulaire_soumis: data.soumis } : null);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking form submission:', error);
       }
-    ];
+    };
 
-    setNotifications(initialNotifications);
-    setUnreadCount(initialNotifications.filter(n => !n.read).length);
-  }, []);
+    checkFormSubmission();
+  }, [params?.id, programme]);
 
-  // Filtrer les notifications
-  const filteredNotifications = notifications.filter(notification => {
-    const matchesSearch = notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         notification.message.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || notification.category === selectedCategory;
-    const matchesPriority = selectedPriority === 'all' || notification.priority === selectedPriority;
-    return matchesSearch && matchesCategory && matchesPriority;
-  });
+  // Charger le formulaire immédiatement
+  useEffect(() => {
+    const fetchForm = async () => {
+      const programId = params?.id;
+      if (!programId) {
+        setError('ID du programme non spécifié');
+        return;
+      }
 
-  // Actions sur les notifications
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  };
+      try {
+        setIsLoadingForm(true);
+        const response = await fetch(`http://localhost:8083/api/form/programmes/${programId}/form`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch form');
+        }
+        
+        const data = await response.json();
+        setCurrentForm(data.formulaire);
+      } catch (error) {
+        console.error('Error fetching form:', error);
+      } finally {
+        setIsLoadingForm(false);
+      }
+    };
 
-  const deleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  };
+    fetchForm();
+  }, [params?.id]);
 
-  const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notification => ({ ...notification, read: true }))
-    );
-    setUnreadCount(0);
-  };
+  // Charger un programme spécifique
+  useEffect(() => {
+    const fetchProgramme = async () => {
+      const programId = params?.id;
+      if (!programId) {
+        setError('ID du programme non spécifié');
+        return;
+      }
 
-  // Styles dynamiques
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'success': return 'bg-emerald-500';
-      case 'info': return 'bg-blue-500';
-      case 'warning': return 'bg-amber-500';
-      case 'error': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      try {
+        setIsLoadingProgramme(true);
+        setError(null);
+        const response = await fetch(`http://localhost:8083/api/programmes/${programId}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Programme non trouvé');
+            return;
+          }
+          throw new Error('Failed to fetch programme');
+        }
+        const data = await response.json();
+        setProgramme(data);
+      } catch (error) {
+        console.error('Error fetching programme:', error);
+        setError('Erreur lors du chargement du programme');
+      } finally {
+        setIsLoadingProgramme(false);
+      }
+    };
+
+    fetchProgramme();
+  }, [params?.id]);
+
+  // Fonction pour charger le formulaire
+  const loadForm = async (programmeId: string) => {
+    try {
+      setIsLoadingForm(true);
+      const response = await fetch(`http://localhost:8083/api/form/programmes/${programmeId}/form`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch form');
+      }
+      const data = await response.json();
+      setCurrentForm(data.formulaire);
+      setIsFormModalOpen(true);
+    } catch (error) {
+      console.error('Error loading form:', error);
+    } finally {
+      setIsLoadingForm(false);
     }
-  };
-
-  const getCategoryColor = (category?: string) => {
-    switch (category) {
-      case 'program': return 'bg-purple-100 text-purple-800';
-      case 'meeting': return 'bg-sky-100 text-sky-800';
-      case 'task': return 'bg-amber-100 text-amber-800';
-      case 'resource': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
   };
 
   return (
@@ -191,24 +170,6 @@ const NotificationsPage: React.FC = () => {
                 <FaUser className="h-5 w-5" />
                 <span className="font-medium">Profil</span>
               </button>
-              <div className="relative">
-                <FaBell className="text-gray-500 text-xl hover:text-gray-700 transition-colors cursor-pointer" />
-                {unreadCount > 0 && (
-                  <motion.span 
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg"
-                  >
-                    {unreadCount}
-                  </motion.span>
-                )}
-              </div>
-              <button
-                onClick={markAllAsRead}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0"
-              >
-                Tout marquer comme lu
-              </button>
             </div>
           </div>
 
@@ -216,188 +177,152 @@ const NotificationsPage: React.FC = () => {
             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-700">
               Notifications
             </h1>
-            <p className="mt-2 text-gray-600">Restez informé de toutes vos activités</p>
+            <p className="text-gray-600 mt-2">
+              Consultez vos notifications et restez informé des dernières mises à jour.
+            </p>
           </div>
         </div>
       </header>
 
-      {/* Contenu principal */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Barre de recherche et filtres avec effet de verre */}
-        <div className="mb-8 bg-white/80 backdrop-blur-lg rounded-xl shadow-sm p-6 border border-gray-200/50">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaSearch className="text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Rechercher des notifications..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 sm:text-sm shadow-sm transition-all duration-200 bg-white/50"
-              />
+        {/* Programme */}
+        <div className="mb-8">
+          {isLoadingProgramme ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
             </div>
-            
-            <div className="flex gap-3">
-              <div className="relative">
-                <button
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 shadow-sm transition-all duration-200 hover:shadow-md"
-                >
-                  <FaFilter className="text-gray-500" />
-                  <span className="text-sm font-medium">Filtrer</span>
-                </button>
-                
-                <AnimatePresence>
-                  {isFilterOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-64 bg-white/90 backdrop-blur-lg rounded-lg shadow-lg z-10 border border-gray-200"
-                    >
-                      <div className="p-2">
-                        <h3 className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Catégorie</h3>
-                        {categories.map(category => (
-                          <button
-                            key={category.id}
-                            onClick={() => setSelectedCategory(category.id)}
-                            className={`w-full text-left px-3 py-2.5 text-sm rounded-md flex items-center gap-3 ${
-                              selectedCategory === category.id 
-                                ? 'bg-red-50 text-red-700' 
-                                : 'text-gray-700 hover:bg-gray-50'
-                            } transition-all duration-200`}
-                          >
-                            <category.icon className={`w-4 h-4 ${selectedCategory === category.id ? 'text-red-600' : 'text-gray-500'}`} />
-                            {category.label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="border-t border-gray-200 p-2">
-                        <h3 className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Priorité</h3>
-                        {priorities.map(priority => (
-                          <button
-                            key={priority.id}
-                            onClick={() => setSelectedPriority(priority.id)}
-                            className={`w-full text-left px-3 py-2.5 text-sm rounded-md ${
-                              selectedPriority === priority.id 
-                                ? 'bg-red-50 text-red-700' 
-                                : 'text-gray-700 hover:bg-gray-50'
-                            } transition-all duration-200`}
-                          >
-                            {priority.label}
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+          ) : error ? (
+            <div className="text-center py-8 bg-white rounded-xl shadow-sm">
+              <p className="text-red-500">{error}</p>
             </div>
-          </div>
-        </div>
-
-        {/* Liste des notifications avec animations */}
-        <div className="space-y-3">
-          {filteredNotifications.length > 0 ? (
-            <AnimatePresence>
-              {filteredNotifications.map(notification => (
-                <motion.div
-                  key={notification.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.2 }}
-                  className={`bg-white/80 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border-l-4 ${
-                    !notification.read 
-                      ? 'border-red-500 shadow-md' 
-                      : 'border-transparent'
-                  } transition-all duration-200 hover:shadow-md hover:bg-white`}
-                >
-                  <div className="p-5">
-                    <div className="flex justify-between">
-                      <div className="flex items-start space-x-4">
-                        <div className={`mt-1 flex-shrink-0 h-3 w-3 rounded-full ${getTypeColor(notification.type)}`}></div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h3 className={`text-lg font-medium ${
-                              !notification.read 
-                                ? 'text-gray-900' 
-                                : 'text-gray-700'
-                            }`}>
-                              {notification.title}
-                            </h3>
-                            <div className="flex space-x-2">
-                              {notification.category && (
-                                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getCategoryColor(notification.category)}`}>
-                                  {categories.find(c => c.id === notification.category)?.label}
-                                </span>
-                              )}
-                              {notification.priority && (
-                                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getPriorityColor(notification.priority)}`}>
-                                  {notification.priority}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <p className={`mt-2 ${
-                            !notification.read 
-                              ? 'text-gray-600' 
-                              : 'text-gray-500'
-                          }`}>
-                            {notification.message}
-                          </p>
-                          <div className="mt-4 flex items-center justify-between">
-                            <span className="text-xs text-gray-400">
-                              {formatDate(notification.timestamp)}
-                            </span>
-                            <div className="flex space-x-3">
-                              {!notification.read && (
-                                <button
-                                  onClick={() => markAsRead(notification.id)}
-                                  className="text-gray-400 hover:text-red-600 transition-colors duration-200"
-                                  title="Marquer comme lu"
-                                >
-                                  <FaCheck className="w-4 h-4" />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteNotification(notification.id)}
-                                className="text-gray-400 hover:text-red-600 transition-colors duration-200"
-                                title="Supprimer"
-                              >
-                                <FaTrash className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+          ) : programme ? (
+            <div className={`bg-white rounded-xl shadow-sm overflow-hidden border ${programme.formulaire_soumis ? 'border-green-500' : 'border-gray-200'} hover:shadow-md transition-shadow`}>
+              <div className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">{programme.nom}</h3>
+                      {programme.formulaire_soumis && (
+                        <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                          Formulaire soumis
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4">{programme.description}</p>
+                    <div className="flex items-center text-sm text-gray-500">
+                      <span className="mr-4">Du {new Date(programme.date_debut).toLocaleDateString()}</span>
+                      <span>Au {new Date(programme.date_fin).toLocaleDateString()}</span>
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm p-8 text-center border border-gray-200/50"
-            >
-              <div className="mx-auto h-24 w-24 bg-gray-100/50 rounded-full flex items-center justify-center mb-4">
-                <FaBell className="h-10 w-10 text-gray-400" />
+                  <div className="flex items-center space-x-3 ml-6">
+                    {!programme.formulaire_soumis ? (
+                      <button
+                        onClick={() => loadForm(programme.id)}
+                        className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-sm hover:shadow-md"
+                      >
+                        Voir le formulaire
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+                      >
+                        Formulaire soumis
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lien du formulaire en bas des informations */}
+                {isLoadingForm ? (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="flex flex-col items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600"></div>
+                    </div>
+                  </div>
+                ) : currentForm?.url_formulaire && !programme.formulaire_soumis ? (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="flex flex-col items-center">
+                      <p className="text-gray-600 mb-4">{currentForm.message_confirmation}</p>
+                      <p className="text-gray-700">
+                        <button
+                          onClick={() => setLocation(`/particulier/formulaire/${params?.id}`)}
+                          className="text-red-600 hover:text-red-700 underline transition-colors duration-300 cursor-pointer"
+                        >
+                          {currentForm.url_formulaire}
+                        </button>
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-1">Aucune notification</h3>
-              <p className="text-gray-500 max-w-md mx-auto">
-                {searchQuery || selectedCategory !== 'all' || selectedPriority !== 'all'
-                  ? 'Aucune notification ne correspond à vos critères de recherche.'
-                  : 'Vous êtes à jour, aucune nouvelle notification pour le moment.'}
-              </p>
-            </motion.div>
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-white rounded-xl shadow-sm">
+              <p className="text-gray-500">Aucun programme disponible</p>
+            </div>
           )}
         </div>
       </main>
+
+      {/* Modal du formulaire */}
+      <Modal
+        isOpen={isFormModalOpen}
+        onClose={() => setIsFormModalOpen(false)}
+        title={currentForm?.titre || 'Formulaire de candidature'}
+      >
+        {isLoadingForm ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+          </div>
+        ) : currentForm ? (
+          <div className="flex flex-col flex-grow justify-center items-center min-h-[350px] w-full">
+            <div className="prose max-w-none text-center mb-6">
+              <p className="text-gray-600">{currentForm.description}</p>
+            </div>
+            <div className="flex flex-col items-center w-full space-y-8 flex-grow justify-center">
+              {currentForm.questions.map((question, index) => (
+                <div key={question.id} className="bg-gray-50 p-6 rounded-lg w-full max-w-xl flex flex-col items-center shadow-sm">
+                  <label className="block text-base font-medium text-gray-700 mb-2 text-center">
+                    {question.texte_question}
+                    {question.required && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  <span className="mb-4 text-xs text-gray-500 italic">Type : {question.type}</span>
+                  {/* Champ de réponse juste en dessous de la question */}
+                  {question.type === 'text' && (
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                      placeholder="Votre réponse..."
+                    />
+                  )}
+                  {question.type === 'textarea' && (
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                      rows={4}
+                      placeholder="Votre réponse..."
+                    />
+                  )}
+                  {question.type === 'select' && question.options && (
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-2">
+                      <option value="">Sélectionnez une option</option>
+                      {question.options.map((option, i) => (
+                        <option key={i} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">Formulaire non disponible</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

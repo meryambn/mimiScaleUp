@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { 
   FaTachometerAlt, 
@@ -8,12 +8,47 @@ import {
   FaFileAlt, 
   FaBook, 
   FaRocket,
-  FaChartBar 
+  FaChartBar,
+  FaBars,
+  FaTimes
 } from 'react-icons/fa';
 import '../styles/sidebar.css';
 
 const Sidebar = () => {
     const [location, setLocation] = useLocation();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    
+    // Close sidebar when clicking outside on mobile
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        const sidebar = document.querySelector('.sidebar');
+        const hamburger = document.querySelector('.hamburger-menu');
+        
+        if (window.innerWidth <= 768 && 
+            sidebar && 
+            hamburger && 
+            !sidebar.contains(event.target as Node) && 
+            !hamburger.contains(event.target as Node)) {
+          setIsMobileMenuOpen(false);
+        }
+      };
+      
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, []);
+    
+    // Close sidebar when route changes on mobile
+    useEffect(() => {
+      if (window.innerWidth <= 768) {
+        setIsMobileMenuOpen(false);
+      }
+    }, [location]);
+
+    const toggleMobileMenu = () => {
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
     
     const isActive = (path: string) => {
       return location === path;
@@ -55,7 +90,16 @@ const Sidebar = () => {
   
     return (
         <>
-          <div className="sidebar">
+          {/* Hamburger menu button */}
+          <div 
+            className={`hamburger-menu ${isMobileMenuOpen ? 'active' : ''}`}
+            onClick={toggleMobileMenu}
+            aria-label="Toggle navigation menu"
+          >
+            {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
+          </div>
+          
+          <div className={`sidebar ${isMobileMenuOpen ? 'active' : ''}`}>
             <div className="logo">
               <div className="logo-icon">
                 <a href="">
@@ -136,8 +180,16 @@ const Sidebar = () => {
               </Link>
             </nav>
           </div>
+          
+          {/* Overlay for mobile when sidebar is open */}
+          {isMobileMenuOpen && (
+            <div 
+              className="sidebar-overlay" 
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+          )}
         </>
     );
 };
 
-export default Sidebar; 
+export default Sidebar;

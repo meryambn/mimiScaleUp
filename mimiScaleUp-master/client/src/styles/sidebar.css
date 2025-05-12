@@ -42,8 +42,8 @@
   width: 280px;
   overflow-y: auto;
   z-index: 100;
-  transition: transform 0.3s ease;
-  box-shadow: #9ca3af 0px 0px 10px 0px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar::after {
@@ -167,60 +167,66 @@
   padding: 2rem;
   min-height: 100vh;
   background-color: #f9fafb;
+  transition: margin-left 0.3s ease;
+}
+
+/* Hamburger Menu */
+.hamburger-menu {
+  display: none; /* Hidden by default */
+  cursor: pointer;
+  z-index: 110;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: var(--primary);
+  color: white;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.hamburger-menu:hover {
+  background: #c53629;
+}
+
+/* Overlay for mobile */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 90;
+  display: none; /* Hidden by default */
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
+    box-shadow: none;
   }
 
   .sidebar.active {
     transform: translateX(0);
+    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.2);
   }
 
   .main-content {
     margin-left: 0;
-    padding-top: 80px;
+    padding-top: 70px;
   }
-}
-
-/* Hamburger Menu */
-.hamburger-menu {
-  display: none;
-  cursor: pointer;
-  padding: 10px;
-  z-index: 101;
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  background: rgba(181, 179, 179, 0.7);
-  border-radius: 5px;
-}
-
-.hamburger-menu span {
-  display: block;
-  width: 25px;
-  height: 3px;
-  background: white;
-  margin: 5px 0;
-  transition: all 0.3s ease;
-}
-
-@media (max-width: 768px) {
+  
   .hamburger-menu {
+    display: flex;
+  }
+  
+  .sidebar-overlay {
     display: block;
   }
-
-  .hamburger-menu.active span:nth-child(1) {
-    transform: rotate(45deg) translate(5px, 5px);
-  }
-
-  .hamburger-menu.active span:nth-child(2) {
-    opacity: 0;
-  }
-
-  .hamburger-menu.active span:nth-child(3) {
-    transform: rotate(-45deg) translate(7px, -6px);
-  }
-} 
+}

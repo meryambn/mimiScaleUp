@@ -316,22 +316,6 @@ const Dashboard = () => {
           margin-left: 280px;
           min-height: 100vh;
         }
-
-        .mobile-menu-btn {
-          display: none;
-          position: absolute;
-          top: 1rem;
-          left: 1rem;
-          background: #e43e32;
-          color: white;
-          border: none;
-          padding: 0.5rem 1rem;
-          border-radius: 4px;
-          cursor: pointer;
-          z-index: 10;
-          font-size: 1.2rem;
-        }
-
         .dashboard-header {
           display: flex;
           justify-content: space-between;

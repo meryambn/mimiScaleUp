@@ -65,6 +65,9 @@ const Profile: React.FC = () => {
   const [equipeError, setEquipeError] = useState<string | null>(null);
   const [stageSuccess, setStageSuccess] = useState<string | null>(null);
   const [stageError, setStageError] = useState<string | null>(null);
+  const [biographie, setBiographie] = useState<string>('');
+  const [biographieError, setBiographieError] = useState<string | null>(null);
+  const [biographieSuccess, setBiographieSuccess] = useState<string | null>(null);
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -305,6 +308,79 @@ const Profile: React.FC = () => {
     }
   };
 
+  const fetchBiographie = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!user?.id) {
+        throw new Error('Utilisateur non authentifié');
+      }
+
+      const response = await fetch(`http://localhost:8083/api/biographie/${user.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Erreur lors de la récupération de la biographie');
+      }
+
+      const data = await response.json();
+      setBiographie(data.biographie || '');
+    } catch (err) {
+      console.error('Erreur:', err);
+      setBiographieError(err instanceof Error ? err.message : 'Une erreur est survenue');
+    }
+  };
+
+  const handleSubmitBiographie = async () => {
+    try {
+      if (!newComment.trim()) {
+        throw new Error('La biographie ne peut pas être vide');
+      }
+
+      setIsSubmitting(true);
+      setBiographieError(null);
+      setBiographieSuccess(null);
+
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!user?.id) {
+        throw new Error('Utilisateur non authentifié');
+      }
+
+      const response = await fetch(`http://localhost:8083/api/biographie/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({ biographie: newComment.trim() })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Erreur lors de l\'enregistrement de la biographie');
+      }
+
+      setBiographieSuccess('Biographie enregistrée avec succès!');
+      setBiographie(newComment.trim());
+      setNewComment('');
+      setTimeout(() => setBiographieSuccess(null), 10000);
+    } catch (err) {
+      console.error('Erreur:', err);
+      setBiographieError(err instanceof Error ? err.message : 'Une erreur est survenue');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBiographie();
+  }, []);
+
   if (loading) {
     return <div>Chargement...</div>;
   }
@@ -516,30 +592,36 @@ const Profile: React.FC = () => {
 
               <h2>Votre Biographie</h2>
               <div className="comments-list">
-                {comments.length > 0 ? (
-                  comments.map((comment, index) => (
-                    <div className="comment" key={index}>
-                      <p><strong>{comment.author}</strong> {comment.text}</p>
-                      <small>{comment.date}</small>
-                    </div>
-                  ))
+                {biographie ? (
+                  <div className="comment">
+                    <p>{biographie}</p>
+                    <small>Dernière mise à jour</small>
+                  </div>
                 ) : (
-                  <p></p>
+                  <p>Aucune biographie disponible</p>
                 )}
               </div>
 
-              <form className="comment-form" onSubmit={handleAddComment}>
-                <textarea
-                  placeholder="Ajouter..."
-                  rows={3}
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  required
-                />
-                <button type="submit" className="btn-primary">
-                  Envoyer
-                </button>
-              </form>
+              {!biographie && (
+                <form className="comment-form" onSubmit={(e) => { e.preventDefault(); handleSubmitBiographie(); }}>
+                  <textarea
+                    placeholder="Écrivez votre biographie..."
+                    rows={3}
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    required
+                  />
+                  {biographieError && <div className="error-message">{biographieError}</div>}
+                  {biographieSuccess && <div className="success-message">{biographieSuccess}</div>}
+                  <button 
+                    type="submit" 
+                    className="btn-primary"
+                    disabled={isSubmitting || !newComment.trim()}
+                  >
+                    {isSubmitting ? 'Enregistrement...' : 'Enregistrer la biographie'}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </section>
@@ -992,20 +1074,7 @@ const Profile: React.FC = () => {
             grid-template-columns: 1fr;
           }
 
-          .navbar {
-            flex-direction: column;
-            height: auto;
-            padding: 1rem;
-          }
-            .notification-link {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          text-decoration: none;
-          color: var(--dark-text);
-          transition: var(--transition);
-        }
-
+         
         .notification-badge {
           position: absolute;
           top: -8px;

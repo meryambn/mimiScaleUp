@@ -40,11 +40,11 @@ const HomePage: React.FC = () => {
 
   const slides = [
     {
-      image: '/images/slide1.svg',
+      image: '/images/young-team-leader-big-corporation-briefing-coworkers-pointing-graph-meeting-corporate-staff.jpg',
       title: 'Écosystème Dynamique'
     },
     {
-      image: '/images/slide2.svg',
+      image: '/images/top-viewtop-view-manager-employee-doing-teamwork-business-office-looking-charts-laptop-display.jpg',
       title: 'Analytique Avancée'
     }
   ];
