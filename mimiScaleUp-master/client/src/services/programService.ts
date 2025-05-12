@@ -90,8 +90,8 @@ export interface CreateLivrableResponse {
 }
 
 // Base URL for the API
-// Use the original port 8083
-const API_BASE_URL = "http://localhost:8083/api";
+// Using relative URL to leverage Vite's proxy
+import { API_BASE_URL } from '@/lib/constants';
 
 // Base URL for the API endpoints
 

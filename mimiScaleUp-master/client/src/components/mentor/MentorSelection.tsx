@@ -4,14 +4,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { Input } from "@/components/ui/input";
+import { getAdminMentors } from "@/services/mentorService";
+import { useToast } from "@/hooks/use-toast";
 
+// Define the internal Mentor interface for this component
 interface Mentor {
   id: number;
   name: string;
   expertise: string[];
   bio: string;
+}
+
+// Define the API Mentor interface from the backend
+interface ApiMentor {
+  id: number;
+  nom: string;
+  prenom: string;
+  profession: string;
+  email?: string;
 }
 
 interface MentorSelectionProps {
@@ -25,33 +37,40 @@ const MentorSelection: React.FC<MentorSelectionProps> = ({
   onMentorsChange,
   availableMentors: externalMentors
 }) => {
+  const { toast } = useToast();
+  const [availableMentors, setAvailableMentors] = useState<Mentor[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [availableMentors, setAvailableMentors] = useState<Mentor[]>(externalMentors || [
-    {
-      id: 1,
-      name: "John Doe",
-      expertise: ["Technology", "Teams"],
-      bio: "Serial entrepreneur with 10+ years of experience"
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      expertise: ["Healthcare", "Innovation"],
-      bio: "Healthcare industry expert and startup advisor"
-    },
-    {
-      id: 3,
-      name: "Mike Johnson",
-      expertise: ["Social Impact", "Technology"],
-      bio: "Social entrepreneur and startup mentor"
-    },
-    {
-      id: 4,
-      name: "Sarah Wilson",
-      expertise: ["Fintech", "Marketing"],
-      bio: "Fintech marketing specialist and growth advisor"
-    }
-  ]);
+  // Fetch mentors from the admin's pool
+  useEffect(() => {
+    const fetchMentors = async () => {
+      setIsLoading(true);
+      try {
+        const mentorsData = await getAdminMentors();
+
+        // Convert API mentors to the format expected by this component
+        const formattedMentors: Mentor[] = mentorsData.map((mentor: ApiMentor) => ({
+          id: mentor.id,
+          name: `${mentor.prenom} ${mentor.nom}`,
+          expertise: mentor.profession ? [mentor.profession] : [],
+          bio: mentor.profession || ""
+        }));
+
+        setAvailableMentors(formattedMentors);
+      } catch (error) {
+        console.error('Error fetching mentors:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de récupérer les mentors. Veuillez réessayer.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMentors();
+  }, [toast]);
 
   // Update availableMentors when externalMentors changes
   useEffect(() => {
@@ -112,43 +131,55 @@ const MentorSelection: React.FC<MentorSelectionProps> = ({
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Mentors disponibles</h3>
           <ScrollArea className="h-[400px] rounded-md border p-4">
-      <div className="space-y-4">
-              {filteredMentors.map((mentor) => (
-                <Card key={mentor.id} className="cursor-pointer hover:bg-gray-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
-                        <Avatar>
-                          <AvatarFallback>{mentor.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                          <h4 className="font-medium">{mentor.name}</h4>
-                          <p className="text-sm text-gray-500">{mentor.bio}</p>
-
+            {isLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredMentors.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Aucun mentor disponible dans votre réseau.</p>
+                <p className="mt-2">Ajoutez des mentors à votre réseau depuis la page "Réseau de mentors".</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredMentors.map((mentor) => (
+                  <Card key={mentor.id} className="cursor-pointer hover:bg-gray-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-4">
+                          <Avatar>
+                            <AvatarFallback>{mentor.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h4 className="font-medium">{mentor.name}</h4>
+                            <p className="text-sm text-gray-500">{mentor.bio}</p>
+                          </div>
                         </div>
+                        <button
+                          onClick={() => handleSelectMentor(mentor)}
+                          disabled={selectedMentors.some(m => m.id === mentor.id)}
+                          style={{
+                            background: selectedMentors.some(m => m.id === mentor.id)
+                              ? '#d1d5db'
+                              : 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            cursor: selectedMentors.some(m => m.id === mentor.id) ? 'not-allowed' : 'pointer',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          {selectedMentors.some(m => m.id === mentor.id) ? 'Ajouté' : 'Ajouter'}
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleSelectMentor(mentor)}
-                        disabled={selectedMentors.some(m => m.id === mentor.id)}
-                        style={{
-                          backgroundColor: selectedMentors.some(m => m.id === mentor.id) ? '#d1d5db' : '#0c4c80',
-                          color: 'white',
-                          border: 'none',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          cursor: selectedMentors.some(m => m.id === mentor.id) ? 'not-allowed' : 'pointer',
-                          fontSize: '0.875rem'
-                        }}
-                      >
-                        {selectedMentors.some(m => m.id === mentor.id) ? 'Ajouté' : 'Ajouter'}
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </ScrollArea>
-      </div>
+        </div>
 
       <div className="space-y-4">
           <h3 className="text-lg font-medium">Mentors sélectionnés</h3>

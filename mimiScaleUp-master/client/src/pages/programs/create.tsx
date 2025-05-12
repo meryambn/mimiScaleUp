@@ -1272,57 +1272,15 @@ const CreateProgram: React.FC = () => {
     }
   };
 
-  // Import the mentors from the MentorManagement component
-  // This ensures we use the same mentors in both places
-  const sampleMentors = [
-    {
-      id: 1,
-      name: "John Doe",
-      expertise: ["Technologie", "Équipes"],
-      bio: "Entrepreneur en série avec plus de 10 ans d'expérience",
-      email: "john.doe@example.com",
-      rating: 4.8,
-      isTopMentor: true,
-      title: "PDG, TechVentures"
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      expertise: ["Santé", "Innovation"],
-      bio: "Expert de l'industrie de la santé et conseiller en startups",
-      email: "jane.smith@example.com",
-      rating: 4.9,
-      isTopMentor: true,
-      title: "Fondateur, HealthTech Innovations"
-    },
-    {
-      id: 3,
-      name: "Mike Johnson",
-      expertise: ["Impact social", "Technologie"],
-      bio: "Entrepreneur social et mentor de startups",
-      email: "mike.johnson@example.com",
-      rating: 4.7,
-      isTopMentor: false,
-      title: "Directeur, Impact Ventures"
-    },
-    {
-      id: 4,
-      name: "Sarah Wilson",
-      expertise: ["Fintech", "Marketing"],
-      bio: "Spécialiste en marketing fintech et conseiller en croissance",
-      email: "sarah.wilson@example.com",
-      rating: 4.6,
-      isTopMentor: false,
-      title: "Directeur marketing, FinGrowth"
-    }
-  ];
+  // We no longer need sample mentors as we'll fetch them from the backend
+  // through the MentorSelection component
 
   const templates: ProgramTemplate[] = [
     {
       id: "1",
                   name: "Programme d'accélération",
       description: "Un programme d'accélération complet pour les équipes en phase de démarrage",
-      mentors: [sampleMentors[0], sampleMentors[1]],
+      mentors: [],
                   phases: [
                     {
           id: "phase-1",
@@ -1419,7 +1377,7 @@ const CreateProgram: React.FC = () => {
       id: "2",
       name: "Programme d'incubation",
       description: "Un programme de 6 mois conçu pour aider les startups en phase de démarrage à affiner leur modèle d'affaires et à se préparer à la croissance",
-      mentors: [sampleMentors[1], sampleMentors[2]],
+      mentors: [],
       phases: [
         {
           id: "phase-1",
@@ -1516,7 +1474,7 @@ const CreateProgram: React.FC = () => {
       id: "3",
       name: "Hackathon",
       description: "Un événement intensif où les équipes collaborent pour résoudre des défis et construire des prototypes dans un court laps de temps",
-      mentors: [sampleMentors[0], sampleMentors[3]],
+      mentors: [],
                   phases: [
                     {
           id: "phase-1",
@@ -2165,7 +2123,6 @@ const CreateProgram: React.FC = () => {
                     <CardContent className="pt-6">
                     <MentorSelection
                         selectedMentors={currentProgram.mentors}
-                        availableMentors={sampleMentors}
                         onMentorsChange={(mentors) => {
                           setCurrentProgram(prev => ({
                             ...prev,

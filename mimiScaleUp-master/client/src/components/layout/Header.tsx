@@ -46,12 +46,12 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   }, []);
 
   const navLinks = [
-    { name: 'Tableau de bord', href: '/dashboard' },
-    { name: 'Programmes', href: '/programs' }
+    { name: 'Tableau de bord', href: '/admin/dashboard' },
+    { name: 'Programmes', href: '/admin/programs' }
   ];
 
   return (
-    <div className="relative z-10 flex-shrink-0 flex h-16 bg-white border-b border-gray-200">
+    <div className="admin-header relative z-10 flex-shrink-0 flex h-16 bg-white border-b border-gray-200">
       <button
         type="button"
         className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 md:hidden"
@@ -62,25 +62,15 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       </button>
       <div className="flex-1 px-4 flex justify-between">
         <div className="flex items-center">
-          <Link href="/">
-            <div className="flex items-center cursor-pointer">
-              <img
-                src="/images/logo.png"
-                alt="Scale Up Logo"
-                className="h-20 w-23"
-              />
-            </div>
-          </Link>
-
           {/* Navigation Links */}
-          <nav className="hidden md:flex ml-8 space-x-8">
+          <nav className="flex space-x-4" style={{ display: 'flex !important' }}>
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
                 <span className={cn(
-                  "px-1 py-2 text-base font-medium border-b-2 transition-colors cursor-pointer",
+                  "px-3 py-2 text-base font-medium transition-colors cursor-pointer rounded-md",
                   location.startsWith(link.href)
-                    ? "text-primary border-primary"
-                    : "text-gray-600 border-transparent hover:text-primary hover:border-primary/30"
+                    ? "text-primary bg-red-50 border-primary"
+                    : "text-gray-600 hover:text-primary hover:bg-red-50"
                 )}>
                   {link.name}
                 </span>
@@ -94,7 +84,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 ml-6">
+        <div className="admin-header-actions flex items-center space-x-3 ml-6">
           <Button variant="ghost" size="icon" className="rounded-full">
             <HelpCircle className="h-5 w-5 text-gray-500" />
           </Button>
@@ -112,7 +102,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="rounded-full flex items-center gap-2 px-2">
+              <Button variant="ghost" className="admin-header-profile rounded-full flex items-center gap-2 px-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src="" />
                   <AvatarFallback className="bg-primary-100 text-primary-800">AU</AvatarFallback>

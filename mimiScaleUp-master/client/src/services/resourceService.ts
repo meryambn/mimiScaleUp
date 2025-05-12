@@ -58,7 +58,8 @@ export interface UpdateResourceResponse {
 }
 
 // Base URL for the API
-const API_BASE_URL = "http://localhost:8083/api";
+// Using relative URL to leverage Vite's proxy
+import { API_BASE_URL } from '@/lib/constants';
 
 // Map frontend resource types to backend resource types
 function mapResourceType(type: string): string {

@@ -56,11 +56,11 @@ const NotificationsPage: React.FC = () => {
         const response = await fetch(`http://localhost:8083/api/form/programmes/${programId}/form`, {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch form');
         }
-        
+
         const data = await response.json();
         setCurrentForm(data.formulaire);
       } catch (error) {
@@ -130,14 +130,14 @@ const NotificationsPage: React.FC = () => {
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <button 
+            <button
               onClick={() => setLocation('/startup/dashboard')}
               className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-all duration-300 group"
             >
               <FaArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
               <span className="font-medium">Dashboard</span>
             </button>
-            
+
             <div className="flex items-center space-x-6">
               <button
                 onClick={() => setLocation('/startup/profile')}
@@ -206,10 +206,10 @@ const NotificationsPage: React.FC = () => {
                       <p className="text-gray-600 mb-4">{currentForm.message_confirmation}</p>
                       <p className="text-gray-700">
                         <button
-                          onClick={() => setLocation(`/startup/formulaire/${params?.id}`)}
+                          onClick={() => setLocation(`/startup/apply/${params?.id}`)}
                           className="text-blue-600 hover:text-red-700 underline transition-colors duration-300 cursor-pointer"
                         >
-                          {currentForm.url_formulaire}
+                          {`${window.location.origin}/startup/apply/${params?.id}`}
                         </button>
                       </p>
                     </div>
@@ -287,4 +287,4 @@ const NotificationsPage: React.FC = () => {
   );
 };
 
-export default NotificationsPage; 
+export default NotificationsPage;

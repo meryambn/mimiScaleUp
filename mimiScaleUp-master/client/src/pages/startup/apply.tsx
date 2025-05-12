@@ -34,7 +34,7 @@ interface User {
   role: string;
 }
 
-const FormulairePage: React.FC = () => {
+const ApplyPage: React.FC = () => {
   const [, setLocation] = useLocation();
   const params = useParams();
   const [formData, setFormData] = useState<Formulaire | null>(null);
@@ -45,33 +45,6 @@ const FormulairePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFormSubmitted, setIsFormSubmitted] = useState(false);
-
-  useEffect(() => {
-    // Vérifier si le formulaire a déjà été soumis
-    const checkFormSubmission = async () => {
-      const programId = params?.id;
-      if (!programId) return;
-
-      try {
-        const response = await fetch(`http://localhost:8083/api/soum/check/${programId}`, {
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.soumis) {
-            setIsFormSubmitted(true);
-            setLocation(`/particulier/notifications/${programId}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking form submission:', error);
-      }
-    };
-
-    checkFormSubmission();
-  }, [params?.id, setLocation]);
 
   useEffect(() => {
     // Vérifier d'abord le localStorage
@@ -109,7 +82,7 @@ const FormulairePage: React.FC = () => {
         }
 
         const data = await response.json();
-        
+
         if (!data.utilisateur) {
           throw new Error('Format de réponse invalide');
         }
@@ -148,11 +121,11 @@ const FormulairePage: React.FC = () => {
         const response = await fetch(`http://localhost:8083/api/form/programmes/${programId}/form`, {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error(`Erreur HTTP: ${response.status}`);
         }
-        
+
         const data = await response.json();
         setFormData(data.formulaire);
       } catch (err) {
@@ -171,7 +144,7 @@ const FormulairePage: React.FC = () => {
     } else {
       setIsLoading(false);
     }
-    
+
     fetchForm();
   }, [setLocation, params?.id]);
 
@@ -194,7 +167,7 @@ const FormulairePage: React.FC = () => {
     const newValues = currentValues.includes(option)
       ? currentValues.filter(v => v !== option)
       : [...currentValues, option];
-    
+
     handleInputChange(questionId, newValues);
   };
 
@@ -207,8 +180,8 @@ const FormulairePage: React.FC = () => {
     formData.questions.forEach(question => {
       const value = formValues[question.id];
       if (question.obligatoire) {
-        if (!value || 
-            (typeof value === 'string' && !value.trim()) || 
+        if (!value ||
+            (typeof value === 'string' && !value.trim()) ||
             (Array.isArray(value) && value.length === 0)) {
           errors[question.id] = 'Ce champ est obligatoire';
           isValid = false;
@@ -222,7 +195,7 @@ const FormulairePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -239,8 +212,8 @@ const FormulairePage: React.FC = () => {
       // Préparer les réponses pour l'envoi
       const reponses = formData?.questions.map(question => ({
         question_id: question.id,
-        valeur: Array.isArray(formValues[question.id]) 
-          ? (formValues[question.id] as string[]).join(',') 
+        valeur: Array.isArray(formValues[question.id])
+          ? (formValues[question.id] as string[]).join(',')
           : formValues[question.id] || ''
       })) || [];
 
@@ -268,9 +241,7 @@ const FormulairePage: React.FC = () => {
 
       const data: SoumissionResponse = await response.json();
       setSubmitted(true);
-      
-      // Rediriger vers la page de notifications après un court délai
-     
+      setLocation(`/startup/notifications/${params?.id}`);
     } catch (err) {
       console.error('Erreur détaillée:', err);
       if (err instanceof Error) {
@@ -292,7 +263,7 @@ const FormulairePage: React.FC = () => {
         return (
           <input
             type="text"
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white mb-2`}
             placeholder="Votre réponse..."
             value={value as string}
             onChange={e => handleInputChange(question.id, e.target.value)}
@@ -303,7 +274,7 @@ const FormulairePage: React.FC = () => {
       case 'Multi-Line':
         return (
           <textarea
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white mb-2`}
             rows={4}
             placeholder="Votre réponse..."
             value={value as string}
@@ -324,7 +295,7 @@ const FormulairePage: React.FC = () => {
                   checked={value === option}
                   onChange={e => handleInputChange(question.id, e.target.value)}
                   required={question.obligatoire}
-                  className="text-red-500 focus:ring-red-400"
+                  className="text-blue-500 focus:ring-blue-400"
                 />
                 <span>{option}</span>
               </label>
@@ -343,7 +314,7 @@ const FormulairePage: React.FC = () => {
                   checked={(value as string[] || []).includes(option)}
                   onChange={() => handleCheckboxChange(question.id, option)}
                   required={question.obligatoire}
-                  className="text-red-500 focus:ring-red-400"
+                  className="text-blue-500 focus:ring-blue-400"
                 />
                 <span>{option}</span>
               </label>
@@ -353,7 +324,7 @@ const FormulairePage: React.FC = () => {
       case 'liste_deroulante':
         return (
           <select
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white mb-2`}
             value={value as string}
             onChange={e => handleInputChange(question.id, e.target.value)}
             required={question.obligatoire}
@@ -397,7 +368,7 @@ const FormulairePage: React.FC = () => {
                   <p className="mb-2 text-sm text-gray-500">
                     <span className="font-semibold">Cliquez pour télécharger</span> ou glissez-déposez
                   </p>
-                  <p className="text-xs text-gray-500">PDF, DOC, DOCX, PNG, JPG </p>
+                  <p className="text-xs text-gray-500">PDF, DOC, DOCX, PNG, JPG (MAX. 10MB)</p>
                 </div>
                 <input
                   type="file"
@@ -430,7 +401,7 @@ const FormulairePage: React.FC = () => {
         return (
           <input
             type="text"
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white mb-2`}
             placeholder="Votre réponse..."
             value={value as string}
             onChange={e => handleInputChange(question.id, e.target.value)}
@@ -440,33 +411,11 @@ const FormulairePage: React.FC = () => {
     }
   };
 
-  if (isFormSubmitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-          <div className="text-yellow-500 text-center mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-6a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-center mb-4">Formulaire déjà soumis</h2>
-          <p className="text-gray-600 text-center mb-6">Vous avez déjà soumis ce formulaire.</p>
-          <button
-            onClick={() => setLocation(`/particulier/notifications/${params?.id}`)}
-            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-          >
-            Retour aux notifications
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">Chargement...</p>
         </div>
       </div>
@@ -486,7 +435,7 @@ const FormulairePage: React.FC = () => {
           <p className="text-gray-600 text-center mb-6">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
             Réessayer
           </button>
@@ -499,7 +448,7 @@ const FormulairePage: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">Chargement du formulaire...</p>
         </div>
       </div>
@@ -519,7 +468,7 @@ const FormulairePage: React.FC = () => {
           <p className="text-gray-600 text-center mb-6">Veuillez vous connecter pour accéder au formulaire</p>
           <button
             onClick={() => setLocation('/login')}
-            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
             Se connecter
           </button>
@@ -529,12 +478,9 @@ const FormulairePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7fa]">
-      <div className="w-full flex items-center" style={{height: '64px'}}>
-       
-      </div>
+    <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-6 pt-2">
-        <h1 className="text-4xl font-extrabold text-red-600 mb-2 leading-tight">{formData.titre}</h1>
+        <h1 className="text-4xl font-extrabold text-blue-600 mb-2 leading-tight">{formData.titre}</h1>
         <p className="text-lg text-gray-500 mb-10">{formData.description}</p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
           {formData.questions.map((question) => (
@@ -553,13 +499,13 @@ const FormulairePage: React.FC = () => {
             </div>
           ))}
           <div className="flex justify-end">
-          <button
-            type="submit"
+            <button
+              type="submit"
               disabled={isSubmitting}
-              className={`px-8 py-3 text-base font-bold text-white bg-red-600 rounded-lg shadow hover:bg-red-700 transition-all duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
+              className={`px-8 py-3 text-base font-bold text-white bg-blue-600 rounded-lg shadow hover:bg-blue-700 transition-all duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
               {isSubmitting ? 'Envoi en cours...' : 'Soumettre'}
-          </button>
+            </button>
           </div>
         </form>
         {submitted && (
@@ -570,4 +516,4 @@ const FormulairePage: React.FC = () => {
   );
 };
 
-export default FormulairePage;
+export default ApplyPage;

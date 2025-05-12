@@ -220,7 +220,10 @@ const Dashboard: React.FC = () => {
                   <CardDescription>Gérer les mentors du programme</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <MentorManagement showAssignmentControls />
+                  <MentorManagement
+                    showAssignmentControls
+                    programId={selectedProgram?.id ? parseInt(selectedProgram.id) : undefined}
+                  />
                 </CardContent>
               </Card>
             </div>

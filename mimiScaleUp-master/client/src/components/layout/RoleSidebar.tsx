@@ -185,10 +185,10 @@ const RoleSidebar: React.FC = () => {
 
   return (
     <div className={cn(
-      "flex flex-col bg-[#003366] h-full transition-all duration-300",
+      "flex flex-col h-full transition-all duration-300",
       isCollapsed ? "w-20" : "w-64"
     )}>
-      <div className="flex items-center justify-center h-28 flex-shrink-0 px-4 border-b border-[#1a4d80]">
+      <div className="admin-sidebar-logo flex items-center justify-center h-28 flex-shrink-0 px-4">
         <img
           src="/images/logo.png"
           alt="ScaleUp Dashboard Logo"
@@ -210,8 +210,8 @@ const RoleSidebar: React.FC = () => {
       )}
 
       {selectedProgram && !isCollapsed && (
-        <div className="px-4 py-2 mb-2 bg-[#0a4d82]">
-          <p className="text-white text-sm font-medium truncate">
+        <div className="admin-program-selected">
+          <p className="truncate">
             Programme: {selectedProgram.name}
           </p>
         </div>
@@ -220,21 +220,21 @@ const RoleSidebar: React.FC = () => {
       <div className="flex-1 flex flex-col overflow-y-auto thin-scrollbar">
         <div className="px-3 py-2">
           <h3 className={cn(
-            "text-xs font-semibold text-gray-300 uppercase tracking-wider px-2 py-1",
+            "admin-nav-section-title",
             isCollapsed && "text-center"
           )}>
             {isCollapsed ? "" : "Principal"}
           </h3>
-          <nav className="mt-1 space-y-1">
+          <nav className="admin-nav-menu mt-1 space-y-1">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out group",
+                  "admin-nav-item flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out group",
                   isActive(item.path)
-                    ? "bg-white text-[#003366]"
-                    : "text-white hover:bg-[#1a4d80]"
+                    ? "active"
+                    : ""
                 )}
               >
                 <div className="flex items-center">
@@ -253,21 +253,21 @@ const RoleSidebar: React.FC = () => {
 
         <div className="px-3 py-2 mt-auto">
           <h3 className={cn(
-            "text-xs font-semibold text-gray-300 uppercase tracking-wider px-2 py-1",
+            "admin-nav-section-title",
             isCollapsed && "text-center"
           )}>
             {isCollapsed ? "" : "Autres"}
           </h3>
-          <nav className="mt-1 space-y-1">
+          <nav className="admin-nav-menu mt-1 space-y-1">
             {user && getSecondaryNavItems(user.role).map((item) => (
               <Link
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out",
+                  "admin-nav-item flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out",
                   isActive(item.path)
-                    ? "bg-white text-[#003366]"
-                    : "text-white hover:bg-[#1a4d80]"
+                    ? "active"
+                    : ""
                 )}
               >
                 {item.icon}
@@ -276,7 +276,7 @@ const RoleSidebar: React.FC = () => {
             ))}
             <button
               onClick={() => logout()}
-              className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out text-white hover:bg-[#1a4d80]"
+              className="admin-nav-item w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ease-in-out"
             >
               <LogOut className="h-5 w-5" />
               {!isCollapsed && <span className="ml-3">Déconnexion</span>}

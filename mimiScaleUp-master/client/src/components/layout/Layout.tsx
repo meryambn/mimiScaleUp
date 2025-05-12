@@ -4,6 +4,7 @@ import RoleSidebar from "./RoleSidebar";
 import Header from "./Header";
 import { useAuth } from "@/context/AuthContext";
 import { useLocation } from "wouter";
+import "../../styles/adminStyles.css";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -53,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         className={`
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 transition-transform duration-200
-          fixed md:sticky top-0 left-0 z-20 w-64 h-full
+          fixed md:sticky top-0 left-0 z-20 w-64 h-full admin-sidebar
         `}
       >
         {isAuthenticated ? <RoleSidebar /> : <Sidebar />}
@@ -64,7 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Header onToggleSidebar={toggleSidebar} />
 
         {/* Main content */}
-        <main className="flex-1 relative overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 relative overflow-y-auto admin-main-content">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>

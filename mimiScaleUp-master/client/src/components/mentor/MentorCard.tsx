@@ -54,7 +54,7 @@ const MentorCard: React.FC<MentorCardProps> = ({
   };
 
   return (
-    <Card className="overflow-hidden border hover:border-primary/50 transition-colors">
+    <Card className="admin-card overflow-hidden border hover:border-primary/50 transition-colors">
       <CardHeader className="pb-2">
         <div className="flex justify-between">
           <div className="flex items-center gap-4">

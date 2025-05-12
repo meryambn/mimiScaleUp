@@ -43,7 +43,7 @@ import ParticulierResourcePage from './pages/particulier/resources';
 import StartupTasksPage from './pages/startup/tasks';
 import ParticulierTasksPage from './pages/particulier/tasks';
 import StartupAnalytics from './pages/startup/analytics';
-import FormulairePage from './pages/particulier/formulaire';
+import FormulairePage from './pages/particulier/apply';
 
 // Redirect components to fix hooks issues
 const DashboardRedirect = () => {
@@ -239,8 +239,8 @@ const NotificationsRedirect = () => {
     if (activeProgram) {
       setLocation(`/particulier/notifications/${activeProgram.id}`);
     } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
-      setLocation('/particulier/dashboard');
+      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+      setLocation('/particulier/profile');
     }
   }, [setLocation, programs]);
   return null;
@@ -254,10 +254,10 @@ const FormulaireRedirect = () => {
     // Trouver le premier programme actif
     const activeProgram = programs.find(p => p.status === "active");
     if (activeProgram) {
-      setLocation(`/particulier/formulaire/${activeProgram.id}`);
+      setLocation(`/particulier/apply/${activeProgram.id}`);
     } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
-      setLocation('/particulier/dashboard');
+      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+      setLocation('/particulier/profile');
     }
   }, [setLocation, programs]);
   return null;
@@ -273,8 +273,8 @@ const StartupNotificationsRedirect = () => {
     if (activeProgram) {
       setLocation(`/startup/notifications/${activeProgram.id}`);
     } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
-      setLocation('/startup/dashboard');
+      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+      setLocation('/startup/profile');
     }
   }, [setLocation, programs]);
   return null;
@@ -288,10 +288,10 @@ const StartupFormulaireRedirect = () => {
     // Trouver le premier programme actif
     const activeProgram = programs.find(p => p.status === "active");
     if (activeProgram) {
-      setLocation(`/startup/formulaire/${activeProgram.id}`);
+      setLocation(`/startup/apply/${activeProgram.id}`);
     } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le dashboard
-      setLocation('/startup/dashboard');
+      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+      setLocation('/startup/profile');
     }
   }, [setLocation, programs]);
   return null;
@@ -618,13 +618,30 @@ const App = () => {
                     </Route>
 
                     {/* Route de base pour le formulaire */}
-                    <Route path="/particulier/formulaire">
+                    <Route path="/particulier/apply">
                       {() => <FormulaireRedirect />}
                     </Route>
 
                     {/* Route avec ID pour le formulaire */}
-                    <Route path="/particulier/formulaire/:id">
+                    <Route path="/particulier/apply/:id">
                       {() => <FormulairePage />}
+                    </Route>
+
+                    <Route path="/startup/apply">
+                      {() => <StartupFormulaireRedirect />}
+                    </Route>
+
+                    <Route path="/startup/apply/:id">
+                      {() => <FormulairePage />}
+                    </Route>
+
+                    {/* Legacy routes for backward compatibility */}
+                    <Route path="/particulier/formulaire">
+                      {() => <FormulaireRedirect />}
+                    </Route>
+
+                    <Route path="/particulier/formulaire/:id">
+                      {() => <FormulaireRedirect />}
                     </Route>
 
                     <Route path="/startup/formulaire">
@@ -632,7 +649,7 @@ const App = () => {
                     </Route>
 
                     <Route path="/startup/formulaire/:id">
-                      {() => <FormulairePage />}
+                      {() => <StartupFormulaireRedirect />}
                     </Route>
 
                     <Route>

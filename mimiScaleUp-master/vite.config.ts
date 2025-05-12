@@ -12,6 +12,13 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true, // Force the specified port
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8083',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   plugins: [
     react(),

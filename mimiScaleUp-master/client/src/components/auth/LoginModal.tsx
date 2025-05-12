@@ -163,12 +163,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ show, onClose, switchToRegister
         // Attendre un court instant pour s'assurer que le modal est fermé
         setTimeout(() => {
           try {
-            // Determine the correct dashboard path based on user role
+            // Determine the correct path based on user role
             let dashboardPath = '/home';
             if (data.utilisateur.role === 'particulier') {
-              dashboardPath = '/particulier/dashboard';
+              dashboardPath = '/particulier/profile';
             } else if (data.utilisateur.role === 'startup') {
-              dashboardPath = '/startup/dashboard';
+              dashboardPath = '/startup/profile';
             } else if (data.utilisateur.role === 'mentor') {
               dashboardPath = '/mentors/dashboard';
             }

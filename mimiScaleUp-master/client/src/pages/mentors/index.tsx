@@ -1,12 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MentorManagement from "@/components/mentor/MentorManagement";
 import { useProgramContext } from "@/context/ProgramContext";
-import { Plus, User, Mail, X } from "lucide-react";
+import { Plus, UserPlus, Search, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger
@@ -14,25 +13,123 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getAvailableMentors,
+  addMentorToAdminPool,
+  Mentor
+} from "@/services/mentorService";
 
 const MentorsPage: React.FC = () => {
   const { selectedProgram, selectedProgramId } = useProgramContext();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteUsername, setInviteUsername] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [availableMentors, setAvailableMentors] = useState<Mentor[]>([]);
+  const [filteredMentors, setFilteredMentors] = useState<Mentor[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAddingMentor, setIsAddingMentor] = useState(false);
 
-  const handleInviteByEmail = () => {
-    // Logic to invite mentor by email
-    console.log("Inviting mentor with email:", inviteEmail);
-    setInviteEmail("");
-    setOpen(false);
+  // Fetch available mentors when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchAvailableMentors();
+    }
+  }, [open]);
+
+  // Filter mentors based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      // Ne pas afficher de mentors si aucune recherche n'est effectuée
+      setFilteredMentors([]);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = availableMentors.filter(
+        mentor =>
+          mentor.nom.toLowerCase().includes(query) ||
+          mentor.prenom.toLowerCase().includes(query) ||
+          mentor.profession.toLowerCase().includes(query) ||
+          (mentor.email && mentor.email.toLowerCase().includes(query))
+      );
+      setFilteredMentors(filtered);
+    }
+  }, [searchQuery, availableMentors]);
+
+  // Fetch available mentors
+  const fetchAvailableMentors = async () => {
+    setIsLoading(true);
+    try {
+      const mentorsData = await getAvailableMentors();
+
+      if (Array.isArray(mentorsData)) {
+        setAvailableMentors(mentorsData);
+        // Ne pas définir les mentors filtrés ici, seulement quand une recherche est effectuée
+        // Réinitialiser la recherche à chaque ouverture du dialogue
+        setSearchQuery("");
+        setFilteredMentors([]);
+      } else {
+        setAvailableMentors([]);
+        setFilteredMentors([]);
+        toast({
+          title: 'Avertissement',
+          description: 'Format de données incorrect. Veuillez réessayer.',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching available mentors:', error);
+      setAvailableMentors([]);
+      setFilteredMentors([]);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de récupérer les mentors disponibles. Veuillez réessayer.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleInviteByUsername = () => {
-    // Logic to invite mentor by username
-    console.log("Inviting mentor with username:", inviteUsername);
-    setInviteUsername("");
-    setOpen(false);
+  // Add a mentor to the admin's pool
+  const handleAddMentor = async (mentorId: number) => {
+    setIsAddingMentor(true);
+    try {
+      const success = await addMentorToAdminPool(mentorId);
+
+      if (success) {
+        toast({
+          title: 'Succès',
+          description: 'Mentor ajouté au réseau avec succès.',
+        });
+        // Remove the added mentor from the list
+        setAvailableMentors(prev => prev.filter(mentor => mentor.id !== mentorId));
+        setFilteredMentors(prev => prev.filter(mentor => mentor.id !== mentorId));
+      } else {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible d\'ajouter le mentor au réseau. Veuillez réessayer.',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Error adding mentor to pool:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'ajouter le mentor au réseau. Veuillez réessayer.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsAddingMentor(false);
+    }
   };
 
   if (!selectedProgram) {
@@ -46,118 +143,108 @@ const MentorsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="admin-page-header flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mentor Network</h1>
-          <p className="text-muted-foreground">
-            Manage mentors for <span className="font-medium">{selectedProgram.name}</span>
-          </p>
+          <h1>Réseau de mentors</h1>
+          <p className="admin-subtitle">Gérez les mentors de votre réseau</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(newOpen) => {
+            setOpen(newOpen);
+            if (newOpen) {
+              fetchAvailableMentors();
+            }
+          }}
+        >
           <DialogTrigger asChild>
-            <button
-              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+            <Button
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', border: 'none' }}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Invite Mentor
-            </button>
+              Inviter un mentor
+            </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Invite Mentor</DialogTitle>
+              <DialogTitle>Inviter un mentor</DialogTitle>
               <DialogDescription>
-                Invite a mentor to join the program by email or username.
+                Recherchez et invitez un mentor à rejoindre votre réseau.
               </DialogDescription>
             </DialogHeader>
 
-            <Tabs defaultValue="email" className="w-full mt-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="email">By Email</TabsTrigger>
-                <TabsTrigger value="username">By Username</TabsTrigger>
+            <Tabs defaultValue="search" className="w-full mt-4">
+              <TabsList className="grid w-full grid-cols-1">
+                <TabsTrigger value="search">Rechercher</TabsTrigger>
               </TabsList>
-              <TabsContent value="email" className="pt-4">
+
+              <TabsContent value="search" className="pt-4">
                 <div className="grid gap-4 py-2">
                   <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="search">Rechercher un mentor</Label>
                     <div className="relative">
-                      <Mail className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="email"
-                        placeholder="mentor@example.com"
+                        id="search"
+                        placeholder="Rechercher par nom, prénom ou profession..."
                         className="pl-8"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                       />
-                      {inviteEmail && (
-                        <button
-                          className="absolute right-2 top-2.5"
-                          onClick={() => setInviteEmail("")}
-                        >
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      )}
                     </div>
                   </div>
-                </div>
-                <DialogFooter className="mt-4">
-                  <button
-                    onClick={handleInviteByEmail}
-                    disabled={!inviteEmail}
-                    style={{
-                      background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
-                      color: 'white',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      cursor: !inviteEmail ? 'not-allowed' : 'pointer',
-                      border: 'none',
-                      opacity: !inviteEmail ? '0.5' : '1'
-                    }}
-                  >
-                    Send Invitation
-                  </button>
-                </DialogFooter>
-              </TabsContent>
-              <TabsContent value="username" className="pt-4">
-                <div className="grid gap-4 py-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="username">Username</Label>
-                    <div className="relative">
-                      <User className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="username"
-                        placeholder="mentor_username"
-                        className="pl-8"
-                        value={inviteUsername}
-                        onChange={(e) => setInviteUsername(e.target.value)}
-                      />
-                      {inviteUsername && (
-                        <button
-                          className="absolute right-2 top-2.5"
-                          onClick={() => setInviteUsername("")}
-                        >
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      )}
-                    </div>
+
+                  <div className="max-h-60 overflow-y-auto border rounded-md">
+                    {isLoading ? (
+                      <div className="flex justify-center items-center h-40">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : searchQuery.trim() === '' ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>Utilisez la barre de recherche ci-dessus pour trouver des mentors à inviter.</p>
+                      </div>
+                    ) : filteredMentors.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>Aucun mentor ne correspond à votre recherche.</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nom</TableHead>
+                            <TableHead>Prénom</TableHead>
+                            <TableHead>Profession</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredMentors.map((mentor) => (
+                            <TableRow key={mentor.id}>
+                              <TableCell>{mentor.nom}</TableCell>
+                              <TableCell>{mentor.prenom}</TableCell>
+                              <TableCell>{mentor.profession}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAddMentor(mentor.id)}
+                                  disabled={isAddingMentor}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                                    color: 'white',
+                                    border: 'none'
+                                  }}
+                                >
+                                  <UserPlus className="h-4 w-4 mr-1" />
+                                  Ajouter
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
                   </div>
                 </div>
-                <DialogFooter className="mt-4">
-                  <button
-                    onClick={handleInviteByUsername}
-                    disabled={!inviteUsername}
-                    style={{
-                      background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
-                      color: 'white',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      cursor: !inviteUsername ? 'not-allowed' : 'pointer',
-                      border: 'none',
-                      opacity: !inviteUsername ? '0.5' : '1'
-                    }}
-                  >
-                    Send Invitation
-                  </button>
-                </DialogFooter>
               </TabsContent>
             </Tabs>
           </DialogContent>

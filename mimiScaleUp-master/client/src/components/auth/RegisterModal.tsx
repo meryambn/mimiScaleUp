@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 interface RegisterModalProps {
   show: boolean;
@@ -35,6 +36,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ show, onClose, switchToLo
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { setUser } = useAuth();
 
   const validateForm = () => {
     // Email validation
@@ -112,10 +114,10 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ show, onClose, switchToLo
     // Role-specific fields
     if (selectedUserType === 'startup') {
       jsonData.infosRole = {
-        startupName: formData.startupName || '',
-        website: formData.website || '',
-        creationYear: formData.creationYear || '',
-        employees: formData.employees || ''
+        nom_entreprise: formData.startupName || '',
+        site_web: formData.website || '',
+        annee_creation: formData.creationYear || '',
+        nombre_employes: formData.employees || ''
       };
     } else if (selectedUserType === 'mentor' || selectedUserType === 'particulier') {
       jsonData.infosRole = {
@@ -155,7 +157,145 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ show, onClose, switchToLo
         description: "Votre compte a été créé avec succès",
       });
 
-      // Reset form and close modal
+      // Automatically log in the user after successful registration
+      try {
+        console.log('Attempting automatic login after registration');
+        console.log('Login credentials:', {
+          email: formData.email.trim(),
+          password: '********' // Don't log the actual password
+        });
+
+        // Add a small delay to ensure the backend has processed the registration
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Make login request with the same credentials
+        const loginResponse = await fetch('http://localhost:8083/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            email: formData.email.trim(),
+            motDePasse: formData.password,
+          }),
+        });
+
+        console.log('Login response status:', loginResponse.status);
+        const loginData = await loginResponse.json();
+        console.log('Login response data:', loginData);
+
+        if (!loginResponse.ok) {
+          console.error('Auto-login failed:', loginData.error);
+          // If auto-login fails, fall back to manual login
+          onClose();
+          switchToLogin();
+          return;
+        }
+
+        console.log('Auto-login successful:', loginData);
+
+        // Store user data in localStorage
+        localStorage.setItem('user', JSON.stringify(loginData.utilisateur));
+        localStorage.setItem('role', loginData.utilisateur.role);
+        localStorage.setItem('token', loginData.token || '');
+
+        // Update the auth context with user data
+        setUser({
+          id: loginData.utilisateur.id,
+          name: loginData.utilisateur.email, // Use email as name if not provided
+          email: loginData.utilisateur.email,
+          role: loginData.utilisateur.role,
+          profileImage: '', // Default empty string for profileImage
+          token: loginData.token || ''
+        });
+
+        // For startup users, verify that the startup profile exists
+        if (loginData.utilisateur.role === 'startup') {
+          try {
+            // Check if startup profile exists
+            const profileCheckResponse = await fetch(`http://localhost:8083/api/profile/startup/${loginData.utilisateur.id}`);
+
+            if (!profileCheckResponse.ok) {
+              console.log('Startup profile not found, attempting to create it');
+
+              // Create a default startup profile
+              try {
+                // This is a simplified approach - in a real application, you would use the actual data from registration
+                const defaultProfile = {
+                  nom_entreprise: formData.startupName || 'New Startup',
+                  site_web: formData.website || 'https://example.com',
+                  annee_creation: formData.creationYear || new Date().getFullYear().toString(),
+                  nombre_employes: formData.employees || '1',
+                  biographie: 'Nouvelle startup'
+                };
+
+                // This is a placeholder - you would need to implement the actual API endpoint
+                console.log('Would create startup profile with data:', defaultProfile);
+
+                // Note: This is just for debugging - the actual implementation would depend on your backend API
+                console.log('Startup profile creation would be handled by the backend during registration');
+              } catch (createError) {
+                console.error('Error creating startup profile:', createError);
+              }
+            } else {
+              console.log('Startup profile exists');
+            }
+          } catch (profileError) {
+            console.error('Error checking startup profile:', profileError);
+          }
+        }
+
+        // Close modal
+        onClose();
+
+        // Redirect to appropriate dashboard based on user role
+        setTimeout(() => {
+          try {
+            // Determine the correct path based on user role
+            let dashboardPath = '/home';
+            if (loginData.utilisateur.role === 'particulier') {
+              dashboardPath = '/particulier/profile';
+            } else if (loginData.utilisateur.role === 'startup') {
+              dashboardPath = '/startup/profile';
+            } else if (loginData.utilisateur.role === 'mentor') {
+              dashboardPath = '/mentors/dashboard';
+            }
+
+            // Use window.location for navigation
+            window.location.href = dashboardPath;
+          } catch (error) {
+            console.error('Error during redirection:', error);
+            // Fallback to home page if there's an error
+            window.location.href = '/home';
+          }
+        }, 100);
+      } catch (loginErr) {
+        console.error('Error during auto-login:', loginErr);
+        console.error('Auto-login error details:', {
+          name: loginErr.name,
+          message: loginErr.message,
+          stack: loginErr.stack
+        });
+
+        // Try to determine the specific error
+        if (loginErr.message && loginErr.message.includes('fetch')) {
+          console.error('Network error during auto-login. Backend might be unavailable.');
+        } else if (loginErr.message && loginErr.message.includes('JSON')) {
+          console.error('Invalid JSON response from server during auto-login.');
+        }
+
+        // If auto-login fails, fall back to manual login
+        toast({
+          title: "Inscription réussie, mais connexion automatique échouée",
+          description: "Veuillez vous connecter manuellement.",
+        });
+
+        onClose();
+        switchToLogin();
+      }
+
+      // Reset form
       setFormData({
         email: '',
         password: '',
@@ -163,8 +303,6 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ show, onClose, switchToLo
         phone: '',
       });
       setSelectedUserType(null);
-      onClose();
-      switchToLogin();
     } catch (err) {
       console.error('Erreur lors de la soumission:', err);
       console.error('Error details:', {

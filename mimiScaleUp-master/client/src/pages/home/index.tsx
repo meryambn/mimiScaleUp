@@ -16,16 +16,16 @@ const HomePage: React.FC = () => {
     if (isAuthenticated && user) {
       // Use a safer approach for redirection
       try {
-        // Determine the correct dashboard path based on user role
+        // Determine the correct path based on user role
         let dashboardPath = '/dashboard';
         if (user.role === 'admin') {
           dashboardPath = '/admin/dashboard';
         } else if (user.role === 'mentor') {
           dashboardPath = '/mentors/dashboard';
         } else if (user.role === 'startup') {
-          dashboardPath = '/startup/dashboard';
+          dashboardPath = '/startup/profile';
         } else if (user.role === 'particulier') {
-          dashboardPath = '/particulier/dashboard';
+          dashboardPath = '/particulier/profile';
         }
 
         // Use a timeout to avoid too many history API calls
@@ -78,7 +78,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="home-page">
-      <style jsx>{`
+      <style>{`
         .home-page {
           min-height: 100vh;
           display: flex;
