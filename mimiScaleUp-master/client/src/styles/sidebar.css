@@ -46,6 +46,16 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
+/* Hide sidebar on profile pages */
+body.on-profile-page .sidebar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
 .sidebar::after {
   content: '';
   top: 0;
@@ -189,6 +199,11 @@
   transition: all 0.3s ease;
 }
 
+/* Hide hamburger menu on profile pages */
+body.on-profile-page .hamburger-menu {
+  display: none !important;
+}
+
 .hamburger-menu:hover {
   background: #c53629;
 }
@@ -203,6 +218,11 @@
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 90;
   display: none; /* Hidden by default */
+}
+
+/* Hide sidebar overlay on profile pages */
+body.on-profile-page .sidebar-overlay {
+  display: none !important;
 }
 
 /* Responsive Design */
@@ -221,11 +241,11 @@
     margin-left: 0;
     padding-top: 70px;
   }
-  
+
   .hamburger-menu {
     display: flex;
   }
-  
+
   .sidebar-overlay {
     display: block;
   }

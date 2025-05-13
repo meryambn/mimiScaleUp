@@ -64,7 +64,7 @@ const TasksContext = createContext<TasksContextType | undefined>(undefined);
 
 // Provider component
 export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { selectedProgramId, selectedProgram } = useProgramContext();
+  const { selectedProgramId, selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<TaskStatus[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
@@ -74,6 +74,23 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Get today's date for comparison
   const today = new Date().toISOString().split('T')[0];
+
+  // Sync selectedPhase with selectedPhaseId from ProgramContext
+  useEffect(() => {
+    if (selectedPhaseId) {
+      setSelectedPhase(String(selectedPhaseId));
+    }
+  }, [selectedPhaseId]);
+
+  // Sync selectedPhaseId with selectedPhase from TasksContext
+  useEffect(() => {
+    if (selectedPhase) {
+      setSelectedPhaseId(selectedPhase);
+    } else if (selectedPhaseId) {
+      // If selectedPhase is cleared but selectedPhaseId exists, clear it too
+      setSelectedPhaseId(null);
+    }
+  }, [selectedPhase, setSelectedPhaseId]);
 
   // Update phases when selected program changes
   useEffect(() => {

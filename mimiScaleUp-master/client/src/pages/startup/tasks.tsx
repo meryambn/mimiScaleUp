@@ -1,89 +1,156 @@
 import React, { useState } from 'react';
-import { 
-  FaCheckCircle, 
-  FaRegCircle, 
-  FaTrash, 
-  FaPlus, 
+import {
+  FaCheckCircle,
+  FaRegCircle,
+  FaTrash,
   FaEllipsisV,
   FaExclamationTriangle,
-  FaArrowUp,
-  FaArrowDown
+  FaSearch,
+  FaFilter
 } from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
+import TaskKanbanBoard from '@/components/tasks/TaskKanbanBoard';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Define types
+interface Task {
+  id: number | string;
+  title: string;
+  completed: boolean;
+  priority: string;
+  dueDate: string;
+  status?: 'todo' | 'in_progress' | 'completed';
+  isOverdue?: boolean;
+}
 
 const StartupTasksPage = () => {
   const [activePhase, setActivePhase] = useState(1);
-  const [tasks, setTasks] = useState({
+  const [activeView, setActiveView] = useState<"list" | "kanban">("kanban");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+
+  // Function to toggle filters visibility
+  const toggleFilters = () => {
+    setShowFilters(prev => !prev);
+  };
+
+
+
+  // Phase data for the filter widget
+  const phases = [
+    { id: 1, name: "Phase 1", color: "#4f46e5", status: "completed" as const },
+    { id: 2, name: "Phase 2", color: "#0ea5e9", status: "in-progress" as const },
+    { id: 3, name: "Phase 3", color: "#10b981", status: "upcoming" as const },
+    { id: 4, name: "Phase 4", color: "#f59e0b", status: "not_started" as const }
+  ];
+
+  const [tasks, setTasks] = useState<Record<number, Task[]>>({
     1: [
-      { id: 1, title: "Finaliser le business plan", completed: false, priority: "high", dueDate: "2025-06-10" },
-      { id: 2, title: "Préparer la présentation pitch", completed: true, priority: "medium", dueDate: "2025-05-28" }
+      { id: 1, title: "Finaliser le business plan", completed: false, priority: "high", dueDate: "2025-06-10", status: "todo" },
+      { id: 2, title: "Préparer la présentation pitch", completed: true, priority: "medium", dueDate: "2025-05-28", status: "completed" }
     ],
     2: [
-      { id: 3, title: "Développer le MVP", completed: false, priority: "high", dueDate: "2025-07-15" },
-      { id: 4, title: "Réaliser des tests utilisateurs", completed: false, priority: "medium", dueDate: "2025-07-20" }
+      { id: 3, title: "Développer le MVP", completed: false, priority: "high", dueDate: "2025-07-15", status: "in_progress" },
+      { id: 4, title: "Réaliser des tests utilisateurs", completed: false, priority: "medium", dueDate: "2025-07-20", status: "todo" }
     ],
     3: [
-      { id: 5, title: "Rencontrer les mentors", completed: false, priority: "medium", dueDate: "2025-09-01" },
-      { id: 6, title: "Affiner la stratégie de scaling", completed: false, priority: "low", dueDate: "" }
+      { id: 5, title: "Rencontrer les mentors", completed: false, priority: "medium", dueDate: "2025-09-01", status: "todo" },
+      { id: 6, title: "Affiner la stratégie de scaling", completed: false, priority: "low", dueDate: "", status: "todo" }
     ],
     4: [
-      { id: 7, title: "Préparer le rapport final", completed: false, priority: "high", dueDate: "2025-11-15" },
-      { id: 8, title: "Présenter les résultats", completed: false, priority: "high", dueDate: "2025-11-30" }
+      { id: 7, title: "Préparer le rapport final", completed: false, priority: "high", dueDate: "2025-11-15", status: "todo" },
+      { id: 8, title: "Présenter les résultats", completed: false, priority: "high", dueDate: "2025-11-30", status: "todo" }
     ]
   });
-  
-  const [newTask, setNewTask] = useState("");
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [selectedPriority, setSelectedPriority] = useState("medium");
-  const [selectedDueDate, setSelectedDueDate] = useState("");
 
-  const currentTasks = tasks[activePhase];
 
-  const toggleTask = (id) => {
+
+  const currentTasks = tasks[activePhase] || [];
+
+  // Filter tasks based on search query and filters
+  const filteredTasks = currentTasks.filter((task: Task) => {
+    // Filter by search query
+    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+
+    // Filter by status
+    if (selectedStatuses.length > 0) {
+      const taskStatus = task.status || (task.completed ? 'completed' : 'todo');
+      if (!selectedStatuses.includes(taskStatus)) {
+        return false;
+      }
+    }
+
+    // Filter by priority
+    if (selectedPriorities.length > 0 && !selectedPriorities.includes(task.priority)) {
+      return false;
+    }
+
+    // Filter by tab
+    if (activeTab === "my-tasks") {
+      // For now, we don't have assigned tasks, so return empty
+      return false;
+    } else if (activeTab === "overdue") {
+      return !task.completed && task.dueDate && new Date(task.dueDate) < new Date();
+    }
+
+    return true;
+  });
+
+  const toggleTask = (id: number | string): void => {
     setTasks(prevTasks => ({
       ...prevTasks,
-      [activePhase]: prevTasks[activePhase].map(task => 
-        task.id === id ? { ...task, completed: !task.completed } : task
+      [activePhase]: prevTasks[activePhase].map((task: Task) =>
+        task.id === id ? {
+          ...task,
+          completed: !task.completed,
+          status: !task.completed ? 'completed' as const : 'todo' as const
+        } : task
       )
     }));
   };
 
-  const deleteTask = (id) => {
+  const handleStatusChange = (taskId: number | string, newStatus: 'todo' | 'in_progress' | 'completed'): void => {
     setTasks(prevTasks => ({
       ...prevTasks,
-      [activePhase]: prevTasks[activePhase].filter(task => task.id !== id)
+      [activePhase]: prevTasks[activePhase].map((task: Task) =>
+        task.id === taskId ? {
+          ...task,
+          status: newStatus,
+          completed: newStatus === 'completed'
+        } : task
+      )
     }));
   };
 
-  const addTask = (e) => {
-    e.preventDefault();
-    if (newTask.trim()) {
-      const newTaskObj = {
-        id: Date.now(),
-        title: newTask,
-        completed: false,
-        priority: selectedPriority,
-        dueDate: selectedDueDate
-      };
-      
-      setTasks(prevTasks => ({
-        ...prevTasks,
-        [activePhase]: [...prevTasks[activePhase], newTaskObj]
-      }));
-      
-      setNewTask("");
-      setSelectedPriority("medium");
-      setSelectedDueDate("");
-      setShowAddTask(false);
+  const deleteTask = (id: number | string): void => {
+    setTasks(prevTasks => ({
+      ...prevTasks,
+      [activePhase]: prevTasks[activePhase].filter((task: Task) => task.id !== id)
+    }));
+  };
+
+
+
+  const handlePhaseChange = (phaseId: string | number | null): void => {
+    if (typeof phaseId === 'number') {
+      setActivePhase(phaseId);
     }
   };
 
-  const handlePhaseChange = (phase) => {
-    setActivePhase(phase);
-  };
-
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = (priority: string): string => {
     switch(priority) {
       case "high": return "bg-red-100 text-red-800";
       case "medium": return "bg-yellow-100 text-yellow-800";
@@ -92,7 +159,7 @@ const StartupTasksPage = () => {
     }
   };
 
-  const getPriorityLabel = (priority) => {
+  const getPriorityLabel = (priority: string): string => {
     switch(priority) {
       case "high": return "Haute";
       case "medium": return "Moyenne";
@@ -101,14 +168,18 @@ const StartupTasksPage = () => {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     if (!dateString) return "Pas de date";
-    const options = { weekday: 'short', day: 'numeric', month: 'short' };
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'short' as const,
+      day: 'numeric' as const,
+      month: 'short' as const
+    };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
 
   // Tâches recommandées par phase
-  const recommendedTasks = {
+  const recommendedTasks: Record<number, string[]> = {
     1: ["Business Plan", "Présentation Pitch", "Étude de marché"],
     2: ["Développement MVP", "Tests utilisateurs", "Levée de fonds"],
     3: ["Rencontres mentors", "Stratégie scaling", "Optimisation processus"],
@@ -126,215 +197,376 @@ const StartupTasksPage = () => {
               {/* Header */}
               <header className="tasks-header">
                 <div>
-                  <h1>Tâches - Phase {activePhase}</h1>
+                  <h1>Tâches du programme</h1>
                   <p className="subtitle">Gérez vos actions et priorités</p>
                 </div>
-                <motion.button
-                  className="primary-btn"
-                  onClick={() => setShowAddTask(true)}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  <FaPlus /> Nouvelle tâche
-                </motion.button>
               </header>
 
-              {/* Phases Navigation */}
-              <section className="phases-section">
-                <div className="phases-tabs">
-                  {[1, 2, 3, 4].map((phase) => (
-                    <motion.button
-                      key={phase}
-                      className={`phase-tab ${activePhase === phase ? 'active' : ''}`}
-                      onClick={() => handlePhaseChange(phase)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      Phase {phase}
-                    </motion.button>
-                  ))}
+              {/* View toggle and filters */}
+              <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveView("kanban")}
+                    className="flex-1 md:flex-none"
+                    style={{
+                      backgroundColor: activeView === "kanban" ? '#0c4c80' : 'white',
+                      color: activeView === "kanban" ? 'white' : '#0c4c80',
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Tableau Kanban
+                  </button>
+                  <button
+                    onClick={() => setActiveView("list")}
+                    className="flex-1 md:flex-none"
+                    style={{
+                      backgroundColor: activeView === "list" ? '#0c4c80' : 'white',
+                      color: activeView === "list" ? 'white' : '#0c4c80',
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Vue Liste
+                  </button>
                 </div>
-              </section>
+                <div className="flex gap-2 flex-1 md:w-1/2">
+                  <div className="relative flex-1">
+                    <FaSearch className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                    <input
+                      placeholder="Rechercher des tâches..."
+                      className="pl-8 w-full h-10 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={toggleFilters}
+                    className={showFilters ? "bg-gray-100" : ""}
+                    style={{
+                      backgroundColor: showFilters ? '#f3f4f6' : 'white',
+                      color: '#0c4c80',
+                      border: '1px solid #e5e7eb',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <FaFilter className="h-4 w-4 mr-2" />
+                    Filtres
+                  </button>
+                </div>
+              </div>
+
+              {/* Phase selection */}
+              <Card className="mb-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Chronologie des phases du programme</CardTitle>
+                  <CardDescription>Cliquez sur une phase pour filtrer les tâches</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col space-y-2">
+                    {/* Phase Timeline Bar */}
+                    <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
+                      {phases.map((phase) => {
+                        // Calculate width based on phase duration (for actual implementation, use date calculation)
+                        const width = `${100 / phases.length}%`;
+
+                        return (
+                          <div
+                            key={phase.id}
+                            className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
+                              ${activePhase === phase.id ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
+                            `}
+                            style={{
+                              width,
+                              backgroundColor: phase.color,
+                              opacity: phase.status === 'not_started' ? 0.5 : 1
+                            }}
+                            onClick={() => handlePhaseChange(phase.id)}
+                          >
+                            <span className="text-white font-medium text-sm">
+                              {phase.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Filters */}
+              {showFilters ? (
+                <Card className="mb-6 border-2 border-blue-200 shadow-md">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Filtres</CardTitle>
+                    <CardDescription>Sélectionnez les filtres pour affiner les tâches</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="font-medium mb-3">Statut de la tâche</h3>
+                        <div className="space-y-2">
+                          {(['todo', 'in_progress', 'completed'] as const).map(status => (
+                            <div key={status} className="flex items-center">
+                              <Checkbox
+                                id={`status-${status}`}
+                                checked={selectedStatuses.includes(status)}
+                                onCheckedChange={(checked) => {
+                                  const newStatuses = checked
+                                    ? [...selectedStatuses, status]
+                                    : selectedStatuses.filter(s => s !== status);
+                                  setSelectedStatuses(newStatuses);
+                                }}
+                              />
+                              <label htmlFor={`status-${status}`} className="ml-2 capitalize">
+                                {status === 'todo' ? 'À faire' :
+                                 status === 'in_progress' ? 'En cours' :
+                                 'Terminé'}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-3">Priorité</h3>
+                        <div className="space-y-2">
+                          {(['high', 'medium', 'low'] as const).map(priority => (
+                            <div key={priority} className="flex items-center">
+                              <Checkbox
+                                id={`priority-${priority}`}
+                                checked={selectedPriorities.includes(priority)}
+                                onCheckedChange={(checked) => {
+                                  const newPriorities = checked
+                                    ? [...selectedPriorities, priority]
+                                    : selectedPriorities.filter(p => p !== priority);
+                                  setSelectedPriorities(newPriorities);
+                                }}
+                              />
+                              <label htmlFor={`priority-${priority}`} className="ml-2">
+                                {getPriorityLabel(priority)}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
 
               {/* Recommended Tasks */}
               <section className="recommended-tasks">
                 <div className="recommended-card">
                   <h2>Tâches recommandées pour la Phase {activePhase}:</h2>
                   <ul>
-                    {recommendedTasks[activePhase].map((task, index) => (
+                    {recommendedTasks[activePhase].map((task: string, index: number) => (
                       <li key={index}>{task}</li>
                     ))}
                   </ul>
                 </div>
               </section>
 
-              {/* Stats */}
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <h3>Total</h3>
-                  <div className="stat-value">{currentTasks.length}</div>
-                </div>
-                <div className="stat-card">
-                  <h3>Terminées</h3>
-                  <div className="stat-value">{currentTasks.filter(t => t.completed).length}</div>
-                </div>
-                <div className="stat-card">
-                  <h3>En retard</h3>
-                  <div className="stat-value">
-                    {currentTasks.filter(t => !t.completed && t.dueDate && new Date(t.dueDate) < new Date()).length}
-                  </div>
-                </div>
-              </div>
+              {/* Task content */}
+              <Tabs defaultValue="all" onValueChange={setActiveTab}>
+                <TabsList className="mb-6">
+                  <TabsTrigger value="all">Toutes les tâches</TabsTrigger>
+                  <TabsTrigger value="my-tasks">Mes tâches</TabsTrigger>
+                  <TabsTrigger value="overdue">En retard</TabsTrigger>
+                </TabsList>
 
-              {/* Tasks List */}
-              <section className="tasks-list">
-                <AnimatePresence>
-                  {currentTasks.map(task => (
-                    <motion.div
-                      key={task.id}
-                      className={`task-card ${task.completed ? 'completed' : ''}`}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="task-main">
-                        <button 
-                          className="task-checkbox"
-                          onClick={() => toggleTask(task.id)}
-                        >
-                          {task.completed ? (
-                            <FaCheckCircle className="checked" />
-                          ) : (
-                            <FaRegCircle />
-                          )}
-                        </button>
-                        
-                        <div className="task-content">
-                          <h3 className={task.completed ? 'line-through' : ''}>
-                            {task.title}
-                          </h3>
-                          <div className="task-meta">
-                            <span className={`priority-badge ${getPriorityColor(task.priority)}`}>
-                              {getPriorityLabel(task.priority)}
-                            </span>
-                            {task.dueDate && (
-                              <span className={`due-date ${!task.completed && new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
-                                {formatDate(task.dueDate)}
-                                {!task.completed && new Date(task.dueDate) < new Date() && (
-                                  <FaExclamationTriangle className="ml-1" />
-                                )}
-                              </span>
-                            )}
+                <TabsContent value="all">
+                  {filteredTasks.length === 0 ? (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <FaExclamationTriangle className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-lg font-medium text-gray-900">Aucune tâche trouvée</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Essayez d'ajuster votre recherche ou vos filtres pour trouver ce que vous cherchez.
+                      </p>
+                    </div>
+                  ) : activeView === "kanban" ? (
+                    // Kanban Board View
+                    <section className="kanban-board-container">
+                      <TaskKanbanBoard
+                        tasks={filteredTasks}
+                        onStatusChange={handleStatusChange}
+                        onDelete={deleteTask}
+                      />
+                    </section>
+                  ) : (
+                    // List View
+                    <div>
+                      {/* Tasks by Status */}
+                      {(['todo', 'in_progress', 'completed'] as const).map(status => {
+                        const statusTasks = filteredTasks.filter(task => task.status === status ||
+                          (status === 'todo' && !task.status && !task.completed) ||
+                          (status === 'completed' && task.completed));
+
+                        if (statusTasks.length === 0) return null;
+
+                        return (
+                          <div key={status} className="mb-8">
+                            <div className="flex items-center mb-4">
+                              {status === 'todo' ? (
+                                <FaRegCircle className="h-4 w-4 text-gray-500 mr-2" />
+                              ) : status === 'in_progress' ? (
+                                <FaRegCircle className="h-4 w-4 text-blue-500 mr-2" />
+                              ) : (
+                                <FaCheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                              )}
+                              <h2 className="text-lg font-medium ml-2">
+                                {status === 'todo' ? 'À faire' :
+                                 status === 'in_progress' ? 'En cours' :
+                                 'Terminé'}
+                              </h2>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4">
+                              {statusTasks.map(task => (
+                                <motion.div
+                                  key={task.id}
+                                  className={`task-card ${task.completed ? 'completed' : ''}`}
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0 }}
+                                  transition={{ duration: 0.3 }}
+                                >
+                                  <div className="task-main">
+                                    <button
+                                      className="task-checkbox"
+                                      onClick={() => toggleTask(task.id)}
+                                    >
+                                      {task.completed ? (
+                                        <FaCheckCircle className="checked" />
+                                      ) : (
+                                        <FaRegCircle />
+                                      )}
+                                    </button>
+
+                                    <div className="task-content">
+                                      <h3 className={task.completed ? 'line-through' : ''}>
+                                        {task.title}
+                                      </h3>
+                                      <div className="task-meta">
+                                        <span className={`priority-badge ${getPriorityColor(task.priority)}`}>
+                                          {getPriorityLabel(task.priority)}
+                                        </span>
+                                        {task.dueDate && (
+                                          <span className={`due-date ${!task.completed && new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
+                                            {formatDate(task.dueDate)}
+                                            {!task.completed && new Date(task.dueDate) < new Date() && (
+                                              <FaExclamationTriangle className="ml-1" />
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="task-actions">
+                                    <button
+                                      className="action-btn delete"
+                                      onClick={() => deleteTask(task.id)}
+                                    >
+                                      <FaTrash />
+                                    </button>
+                                    <button className="action-btn more">
+                                      <FaEllipsisV />
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      
-                      <div className="task-actions">
-                        <button 
-                          className="action-btn delete"
-                          onClick={() => deleteTask(task.id)}
-                        >
-                          <FaTrash />
-                        </button>
-                        <button className="action-btn more">
-                          <FaEllipsisV />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </section>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="my-tasks">
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <FaRegCircle className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-lg font-medium text-gray-900">Mes tâches</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      L'attribution de tâches personnelles sera bientôt disponible.
+                    </p>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="overdue">
+                  {filteredTasks.filter(task => !task.completed && task.dueDate && new Date(task.dueDate) < new Date()).length === 0 ? (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <FaCheckCircle className="mx-auto h-12 w-12 text-green-500" />
+                      <h3 className="mt-2 text-lg font-medium text-gray-900">Aucune tâche en retard</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Toutes les tâches sont à jour. Excellent travail !
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {filteredTasks
+                        .filter(task => !task.completed && task.dueDate && new Date(task.dueDate) < new Date())
+                        .map(task => (
+                          <motion.div
+                            key={task.id}
+                            className="task-card"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <div className="task-main">
+                              <button
+                                className="task-checkbox"
+                                onClick={() => toggleTask(task.id)}
+                              >
+                                <FaRegCircle />
+                              </button>
+
+                              <div className="task-content">
+                                <h3>{task.title}</h3>
+                                <div className="task-meta">
+                                  <span className={`priority-badge ${getPriorityColor(task.priority)}`}>
+                                    {getPriorityLabel(task.priority)}
+                                  </span>
+                                  <span className="due-date overdue">
+                                    {formatDate(task.dueDate)}
+                                    <FaExclamationTriangle className="ml-1" />
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="task-actions">
+                              <button
+                                className="action-btn delete"
+                                onClick={() => deleteTask(task.id)}
+                              >
+                                <FaTrash />
+                              </button>
+                              <button className="action-btn more">
+                                <FaEllipsisV />
+                              </button>
+                            </div>
+                          </motion.div>
+                        ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </main>
 
-            {/* Add Task Modal */}
-            <AnimatePresence>
-              {showAddTask && (
-                <motion.div 
-                  className="modal-overlay"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setShowAddTask(false)}
-                >
-                  <motion.div 
-                    className="modal-content"
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 50, opacity: 0 }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button 
-                      className="close-btn"
-                      onClick={() => setShowAddTask(false)}
-                    >
-                      &times;
-                    </button>
-                    
-                    <h2>Ajouter une nouvelle tâche (Phase {activePhase})</h2>
-                    
-                    <form onSubmit={addTask}>
-                      <div className="form-group">
-                        <label>Titre de la tâche</label>
-                        <input
-                          type="text"
-                          value={newTask}
-                          onChange={(e) => setNewTask(e.target.value)}
-                          required
-                          autoFocus
-                        />
-                      </div>
-                      
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label>Priorité</label>
-                          <select
-                            value={selectedPriority}
-                            onChange={(e) => setSelectedPriority(e.target.value)}
-                          >
-                            <option value="high">Haute</option>
-                            <option value="medium">Moyenne</option>
-                            <option value="low">Basse</option>
-                          </select>
-                        </div>
-                        
-                        <div className="form-group">
-                          <label>Date d'échéance</label>
-                          <input
-                            type="date"
-                            value={selectedDueDate}
-                            onChange={(e) => setSelectedDueDate(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="form-actions">
-                        <motion.button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => setShowAddTask(false)}
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                        >
-                          Annuler
-                        </motion.button>
-                        <motion.button
-                          type="submit"
-                          className="primary-btn"
-                          whileHover={{ scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" }}
-                          whileTap={{ scale: 0.97 }}
-                        >
-                          Ajouter
-                        </motion.button>
-                      </div>
-                    </form>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
 
             {/* CSS Styles */}
-            <style jsx>{`
+            <style>{`
               .tasks-container {
                 display: flex;
                 min-height: 100vh;
@@ -345,6 +577,7 @@ const StartupTasksPage = () => {
               .main-content {
                 flex: 1;
                 padding: 2rem;
+                padding-top: 100px; /* Add padding to account for the navbar height */
                 position: relative;
                 min-height: 100vh;
               }
@@ -371,7 +604,7 @@ const StartupTasksPage = () => {
               }
 
               .primary-btn {
-                background: #e43e32;
+                background: var(--gradient);
                 color: white;
                 border: none;
                 padding: 0.75rem 1.5rem;
@@ -385,35 +618,51 @@ const StartupTasksPage = () => {
               }
 
               .primary-btn:hover {
-                background: #c2332a;
+                background: var(--gradient);
+                opacity: 0.9;
+              }
+
+              /* View Toggle */
+              .view-toggle {
+                display: flex;
+                background: #f3f4f6;
+                border-radius: 8px;
+                padding: 2px;
+              }
+
+              .view-btn {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                font-size: 0.875rem;
+                font-weight: 500;
+                color: #6b7280;
+                border: none;
+                background: transparent;
+                cursor: pointer;
+                transition: all 0.2s;
+              }
+
+              .view-btn.active {
+                background: white;
+                color: #111827;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+              }
+
+              .view-btn:hover:not(.active) {
+                background: rgba(255, 255, 255, 0.5);
+              }
+
+              /* Kanban Board Container */
+              .kanban-board-container {
+                margin-top: 1.5rem;
               }
 
               /* Phases Navigation */
               .phases-section {
                 margin-bottom: 1.5rem;
-              }
-
-              .phases-tabs {
-                display: flex;
-                gap: 0.5rem;
-                overflow-x: auto;
-                padding-bottom: 0.5rem;
-              }
-
-              .phase-tab {
-                padding: 0.75rem 1.5rem;
-                background: #f3f4f6;
-                border: none;
-                border-radius: 6px;
-                font-weight: 500;
-                cursor: pointer;
-                white-space: nowrap;
-                transition: all 0.3s;
-              }
-
-              .phase-tab.active {
-                background: #e43e32;
-                color: white;
               }
 
               /* Recommended Tasks */
@@ -691,18 +940,19 @@ const StartupTasksPage = () => {
               @media (max-width: 768px) {
                 .main-content {
                   padding: 1rem;
+                  padding-top: 100px; /* Maintain padding for navbar on mobile */
                 }
-                
+
                 .tasks-header {
                   flex-direction: column;
                   align-items: flex-start;
                   gap: 1rem;
                 }
-                
+
                 .form-actions {
                   flex-direction: column;
                 }
-                
+
                 .primary-btn, .secondary-btn {
                   width: 100%;
                 }
@@ -715,4 +965,4 @@ const StartupTasksPage = () => {
   );
 };
 
-export default StartupTasksPage; 
+export default StartupTasksPage;

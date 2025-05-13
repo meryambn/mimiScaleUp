@@ -1,14 +1,13 @@
 import React from 'react';
-import Sidebar from '@/components/sidebar';
 import Dashboard from '@/components/Dashboard';
+import StartupLayout from '../../components/layout/StartupLayout';
 
 const StartupDashboardPage: React.FC = () => {
   return (
-    <div className="app-container">
-      <Sidebar />
+    <StartupLayout>
       <Dashboard />
-    </div>
+    </StartupLayout>
   );
 };
 
-export default StartupDashboardPage; 
+export default StartupDashboardPage;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route, Switch, useLocation } from 'wouter';
+import { Route, Switch, useLocation, useParams } from 'wouter';
 import Dashboard from './pages/dashboard';
 import TeamsPage from './pages/teams';
 import StartupDetailPage from './pages/teams/[id]';
@@ -30,6 +30,8 @@ import { TasksProvider } from "@/context/TasksContext";
 import { ResourcesProvider } from "@/context/ResourcesContext";
 import { DeliverablesProvider } from "@/context/DeliverablesContext";
 import Layout from "@/components/layout/Layout";
+import StartupLayout from "./components/layout/StartupLayout";
+import ParticulierLayout from "./components/layout/ParticulierLayout";
 import Profile from './components/Profile';
 import ParticulierProfilePage from './pages/particulier/profile';
 import StartupDashboardPage from './pages/startup/dashboard';
@@ -86,6 +88,25 @@ const TeamsRedirect = () => {
       setLocation('/home');
     }
   }, [user, setLocation]);
+
+  return null;
+};
+
+// Redirect for team detail pages
+const TeamDetailRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { id } = useParams();
+
+  React.useEffect(() => {
+    if (user?.role === 'admin') {
+      setLocation(`/admin/teams/${id}`);
+    } else if (user?.role === 'mentor') {
+      setLocation(`/mentors/teams/${id}`);
+    } else {
+      setLocation('/home');
+    }
+  }, [user, setLocation, id]);
 
   return null;
 };
@@ -334,7 +355,11 @@ const App = () => {
                     </Route>
 
                     <Route path="/particulier/meetings">
-                      {() => <ParticulierMeetingsPage />}
+                      {() => (
+                        <ParticulierLayout>
+                          <ParticulierMeetingsPage />
+                        </ParticulierLayout>
+                      )}
                     </Route>
 
                     <Route path="/startup/profile">
@@ -346,19 +371,35 @@ const App = () => {
                     </Route>
 
                     <Route path="/startup/livrable">
-                      {() => <StartupDeliverablesPage />}
+                      {() => (
+                        <StartupLayout>
+                          <StartupDeliverablesPage />
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     <Route path="/particulier/livrable">
-                      {() => <ParticulierDeliverablesPage />}
+                      {() => (
+                        <ParticulierLayout>
+                          <ParticulierDeliverablesPage />
+                        </ParticulierLayout>
+                      )}
                     </Route>
 
                     <Route path="/startup/ressource">
-                      {() => <StartupResourcePage />}
+                      {() => (
+                        <StartupLayout>
+                          <StartupResourcePage />
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     <Route path="/particulier/ressource">
-                      {() => <ParticulierResourcePage />}
+                      {() => (
+                        <ParticulierLayout>
+                          <ParticulierResourcePage />
+                        </ParticulierLayout>
+                      )}
                     </Route>
 
                     {/* Admin Routes */}
@@ -529,6 +570,14 @@ const App = () => {
                       {() => <TeamsRedirect />}
                     </Route>
 
+                    <Route path="/teams/:id">
+                      {({ id }) => (
+                        <Layout>
+                          <StartupDetailPage />
+                        </Layout>
+                      )}
+                    </Route>
+
                     <Route path="/programs">
                       {() => <ProgramsRedirect />}
                     </Route>
@@ -579,19 +628,35 @@ const App = () => {
                     </Route>
 
                     <Route path="/startup/meetings">
-                      {() => <StartupMeetingsPage />}
+                      {() => (
+                        <StartupLayout>
+                          <StartupMeetingsPage />
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     <Route path="/startup/tasks">
-                      {() => <StartupTasksPage />}
+                      {() => (
+                        <StartupLayout>
+                          <StartupTasksPage />
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     <Route path="/startup/analytics">
-                      {() => <StartupAnalytics />}
+                      {() => (
+                        <StartupLayout>
+                          <StartupAnalytics />
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     <Route path="/particulier/tasks">
-                      {() => <ParticulierTasksPage />}
+                      {() => (
+                        <ParticulierLayout>
+                          <ParticulierTasksPage />
+                        </ParticulierLayout>
+                      )}
                     </Route>
 
                     {/* Handle singular mentor path for backward compatibility */}
@@ -624,7 +689,11 @@ const App = () => {
 
                     {/* Route avec ID pour le formulaire */}
                     <Route path="/particulier/apply/:id">
-                      {() => <FormulairePage />}
+                      {() => (
+                        <ParticulierLayout>
+                          <FormulairePage />
+                        </ParticulierLayout>
+                      )}
                     </Route>
 
                     <Route path="/startup/apply">
@@ -632,7 +701,11 @@ const App = () => {
                     </Route>
 
                     <Route path="/startup/apply/:id">
-                      {() => <FormulairePage />}
+                      {() => (
+                        <StartupLayout>
+                          <FormulairePage />
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     {/* Legacy routes for backward compatibility */}

@@ -8,14 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Search, Filter, Trophy } from 'lucide-react';
 // Import useLocation from wouter
 import { useLocation } from 'wouter';
-
-// Fonction pour naviguer sans rechargement de page - will be replaced by useLocation
-const navigateWithoutReload = (path: string): void => {
-  window.history.pushState({}, '', path);
-  // Déclencher un événement de navigation pour que les composants puissent réagir
-  const navEvent = new PopStateEvent('popstate');
-  window.dispatchEvent(navEvent);
-};
 import { useProgramContext } from '@/context/ProgramContext';
 import KanbanView from '@/components/teams/KanbanView';
 import ViewSelector, { ViewType } from '@/components/teams/ViewSelector';
@@ -43,7 +35,7 @@ interface Startup {
 }
 
 const StartupCard: React.FC<{ startup: Startup }> = ({ startup }) => {
-
+  const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -61,7 +53,10 @@ const StartupCard: React.FC<{ startup: Startup }> = ({ startup }) => {
   return (
     <Card
       className="cursor-pointer hover:shadow-lg transition-shadow"
-      onClick={() => navigateWithoutReload(`/teams/${startup.id}`)}
+      onClick={() => {
+        console.log(`Navigating to team detail: /teams/${startup.id}`);
+        setLocation(`/teams/${startup.id}`);
+      }}
     >
       <CardHeader className="flex flex-row items-center space-x-4 pb-2">
         <img
@@ -95,7 +90,7 @@ const StartupCard: React.FC<{ startup: Startup }> = ({ startup }) => {
             <div className="mt-2 pt-2 border-t">
               <div className="text-sm text-muted-foreground mb-1">Membres de l'équipe: {startup.members.length}</div>
               <div className="flex flex-wrap gap-1">
-                {startup.members.slice(0, 3).map((member, index) => (
+                {startup.members.slice(0, 3).map((member) => (
                   <Badge key={member.id} variant="outline" className="text-xs">
                     {member.name}
                   </Badge>

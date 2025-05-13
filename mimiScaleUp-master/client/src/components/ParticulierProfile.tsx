@@ -44,8 +44,8 @@ const ParticulierProfile: React.FC = () => {
    const [biographie, setBiographie] = useState<string>('');
     const [biographieError, setBiographieError] = useState<string | null>(null);
     const [biographieSuccess, setBiographieSuccess] = useState<string | null>(null);
-  
-    
+
+
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -266,7 +266,7 @@ const ParticulierProfile: React.FC = () => {
         if (!user?.id) {
           throw new Error('Utilisateur non authentifié');
         }
-  
+
         const response = await fetch(`http://localhost:8083/api/biographie/${user.id}`, {
           method: 'GET',
           headers: {
@@ -274,12 +274,12 @@ const ParticulierProfile: React.FC = () => {
             'Authorization': `Bearer ${user.token}`
           }
         });
-  
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.message || errorData.error || 'Erreur lors de la récupération de la biographie');
         }
-  
+
         const data = await response.json();
         setBiographie(data.biographie || '');
       } catch (err) {
@@ -287,22 +287,22 @@ const ParticulierProfile: React.FC = () => {
         setBiographieError(err instanceof Error ? err.message : 'Une erreur est survenue');
       }
     };
-  
+
     const handleSubmitBiographie = async () => {
       try {
         if (!newComment.trim()) {
           throw new Error('La biographie ne peut pas être vide');
         }
-  
+
         setIsSubmitting(true);
         setBiographieError(null);
         setBiographieSuccess(null);
-  
+
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         if (!user?.id) {
           throw new Error('Utilisateur non authentifié');
         }
-  
+
         const response = await fetch(`http://localhost:8083/api/biographie/${user.id}`, {
           method: 'PUT',
           headers: {
@@ -311,12 +311,12 @@ const ParticulierProfile: React.FC = () => {
           },
           body: JSON.stringify({ biographie: newComment.trim() })
         });
-  
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.message || errorData.error || 'Erreur lors de l\'enregistrement de la biographie');
         }
-  
+
         setBiographieSuccess('Biographie enregistrée avec succès!');
         setBiographie(newComment.trim());
         setNewComment('');
@@ -328,11 +328,19 @@ const ParticulierProfile: React.FC = () => {
         setIsSubmitting(false);
       }
     };
-  
+
     useEffect(() => {
       fetchBiographie();
+
+      // Add a class to the body to indicate we're on the profile page
+      document.body.classList.add('on-profile-page');
+
+      // Clean up when component unmounts
+      return () => {
+        document.body.classList.remove('on-profile-page');
+      };
     }, []);
-  
+
 
   if (loading) {
     return <div>Chargement...</div>;
@@ -343,9 +351,9 @@ const ParticulierProfile: React.FC = () => {
   }
 
 
- 
+
   return (
-    <div className="profile-page">
+    <div className="profile-page profile-page-container">
       <div className="profile-container">
         {/* Barre de navigation */}
         <nav className="navbar">
@@ -457,7 +465,7 @@ const ParticulierProfile: React.FC = () => {
                               : 'Cliquez pour noter'}
                           </small>
                         </div>
-          
+
                         <h2>Votre Biographie</h2>
                         <div className="comments-list">
                           {biographie ? (
@@ -469,7 +477,7 @@ const ParticulierProfile: React.FC = () => {
                             <p>Aucune biographie disponible</p>
                           )}
                         </div>
-          
+
                         {!biographie && (
                           <form className="comment-form" onSubmit={(e) => { e.preventDefault(); handleSubmitBiographie(); }}>
                             <textarea
@@ -481,8 +489,8 @@ const ParticulierProfile: React.FC = () => {
                             />
                             {biographieError && <div className="error-message">{biographieError}</div>}
                             {biographieSuccess && <div className="success-message">{biographieSuccess}</div>}
-                            <button 
-                              type="submit" 
+                            <button
+                              type="submit"
                               className="btn-primary"
                               disabled={isSubmitting || !newComment.trim()}
                             >
@@ -492,7 +500,7 @@ const ParticulierProfile: React.FC = () => {
               </form>
                  )}
             </div>
-                       
+
           </div>
         </section>
       </div>
@@ -560,7 +568,7 @@ const ParticulierProfile: React.FC = () => {
 
         .nav-links a:hover {
           color: var(--primary);
-        }   
+        }
 
         .profile-section {
           padding: 8rem 5% 3rem;
@@ -705,7 +713,7 @@ const ParticulierProfile: React.FC = () => {
         }
 
         .btn-primary {
-          background: var(--primary);
+          background: linear-gradient(to right, #e43e32, #f37335);
           color: white;
           border: none;
           padding: 0.8rem 1.5rem;
@@ -944,7 +952,7 @@ const ParticulierProfile: React.FC = () => {
             grid-template-columns: 1fr;
           }
 
-         
+
         .notification-badge {
           position: absolute;
           top: -8px;

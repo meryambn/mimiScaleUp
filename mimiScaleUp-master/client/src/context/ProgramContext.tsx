@@ -321,6 +321,8 @@ interface ProgramContextType {
   updateProgram: (updatedProgram: Program) => void;
   deleteProgram: (programId: string) => Promise<boolean>;
   isLoading: boolean;
+  selectedPhaseId: string | number | null;
+  setSelectedPhaseId: (id: string | number | null) => void;
 }
 
 const ProgramContext = createContext<ProgramContextType | undefined>(undefined);
@@ -359,6 +361,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   // isLoading is used to track API request status
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // selectedPhaseId is used to track the selected phase across components
+  const [selectedPhaseId, setSelectedPhaseId] = useState<string | number | null>(null);
 
   // Custom setter for programs that ensures deduplication
   const setDeduplicatedPrograms = (newPrograms: Program[] | ((prev: Program[]) => Program[])) => {
@@ -1429,7 +1433,9 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
         createProgram,
         updateProgram,
         deleteProgram,
-        isLoading
+        isLoading,
+        selectedPhaseId,
+        setSelectedPhaseId
       }}
     >
       {children}

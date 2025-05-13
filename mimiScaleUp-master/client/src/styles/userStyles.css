@@ -1,0 +1,215 @@
+/* Startup and Particulier Interface Styles - Matching Admin Interface */
+
+:root {
+  --primary: #e43e32;
+  --secondary: #0c4c80;
+  --dark: #2d2d34;
+  --light: #f5f5f5;
+  --hover: rgba(228, 62, 50, 0.05);
+  --gray: #6b7280;
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+}
+
+/* Header Styles */
+.admin-header {
+  background: white !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 1rem 2rem !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  height: 70px !important;
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  z-index: 50 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  margin-left: 280px !important;
+  width: calc(100% - 280px) !important;
+}
+
+.admin-header nav {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2rem !important;
+  visibility: visible !important;
+}
+
+.admin-header nav a {
+  text-decoration: none !important;
+  color: #2d2d34 !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+  display: block !important;
+}
+
+.admin-header nav a span {
+  display: block !important;
+}
+
+.admin-header nav a:hover {
+  color: #e43e32 !important;
+}
+
+.admin-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1rem !important;
+}
+
+.admin-header-profile {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  cursor: pointer !important;
+  padding: 0.5rem !important;
+  border-radius: 9999px !important;
+  transition: all 0.2s !important;
+}
+
+.admin-header-profile:hover {
+  background: #f3f4f6 !important;
+}
+
+/* Main Content Styles */
+/* No custom styles needed - using original sidebar.css */
+
+/* Additional Styles for better integration */
+.admin-header nav a span {
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.375rem !important;
+  transition: all 0.2s ease !important;
+  font-size: 1rem !important;
+}
+
+.admin-header nav a span:hover {
+  background-color: rgba(228, 62, 50, 0.05) !important;
+}
+
+/* Profile Page Styles - Make completely independent */
+.profile-page-container {
+  width: 100% !important;
+  margin-left: 0 !important;
+  padding: 2rem !important;
+}
+
+/* Hide layout components ONLY on profile pages */
+body.on-profile-page .sidebar,
+body.on-profile-page .admin-header,
+body.on-profile-page .hamburger-menu,
+body.on-profile-page .sidebar-overlay {
+  display: none !important;
+}
+
+/* Ensure profile page takes full width */
+body:has(.profile-page),
+body:has(.profile-page-container) {
+  overflow-x: hidden;
+}
+
+/* Ensure profile page is truly independent */
+.profile-page {
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1 !important;
+}
+
+/* Style the profile page navbar */
+.profile-page .navbar,
+.profile-page-container .navbar {
+  background: white !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 0 2rem !important;
+  height: 70px !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  z-index: 1000 !important;
+}
+
+.profile-page .navbar .logo,
+.profile-page-container .navbar .logo {
+  height: auto !important;
+  width: 150px !important;
+  transition: transform 0.4s ease !important;
+}
+
+.profile-page .navbar .logo:hover,
+.profile-page-container .navbar .logo:hover {
+  transform: scale(1.05) !important;
+}
+
+.profile-page .navbar .nav-links,
+.profile-page-container .navbar .nav-links {
+  display: flex !important;
+  align-items: center !important;
+  gap: 1.5rem !important;
+}
+
+.profile-page .navbar .nav-links a,
+.profile-page-container .navbar .nav-links a {
+  color: #333 !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  transition: color 0.2s ease !important;
+}
+
+.profile-page .navbar .nav-links a:hover,
+.profile-page .navbar .nav-links a.active,
+.profile-page-container .navbar .nav-links a:hover,
+.profile-page-container .navbar .nav-links a.active {
+  color: #e43e32 !important;
+}
+
+.profile-page .navbar .notification-link,
+.profile-page-container .navbar .notification-link {
+  position: relative !important;
+}
+
+.profile-page .navbar .notification-badge,
+.profile-page-container .navbar .notification-badge {
+  position: absolute !important;
+  top: -5px !important;
+  right: -5px !important;
+  background: #e43e32 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  width: 15px !important;
+  height: 15px !important;
+  font-size: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Additional rules to ensure sidebar is hidden ONLY on profile pages */
+body.on-profile-page .sidebar {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .admin-header {
+    margin-left: 0 !important;
+    width: 100% !important;
+    left: 0 !important;
+  }
+}

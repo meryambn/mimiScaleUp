@@ -379,6 +379,14 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     fetchBiographie();
+
+    // Add a class to the body to indicate we're on the profile page
+    document.body.classList.add('on-profile-page');
+
+    // Clean up when component unmounts
+    return () => {
+      document.body.classList.remove('on-profile-page');
+    };
   }, []);
 
   if (loading) {
@@ -390,7 +398,7 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="profile-page">
+    <div className="profile-page profile-page-container">
     <div className="profile-container">
       {/* Barre de navigation */}
       <nav className="navbar">
@@ -613,8 +621,8 @@ const Profile: React.FC = () => {
                   />
                   {biographieError && <div className="error-message">{biographieError}</div>}
                   {biographieSuccess && <div className="success-message">{biographieSuccess}</div>}
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="btn-primary"
                     disabled={isSubmitting || !newComment.trim()}
                   >
@@ -690,7 +698,7 @@ const Profile: React.FC = () => {
 
         .nav-links a:hover {
           color: var(--primary);
-        }   
+        }
 
         .profile-section {
           padding: 8rem 5% 3rem;
@@ -835,7 +843,7 @@ const Profile: React.FC = () => {
         }
 
         .btn-primary {
-          background: var(--primary);
+          background: linear-gradient(to right, #e43e32, #f37335);
           color: white;
           border: none;
           padding: 0.8rem 1.5rem;
@@ -997,8 +1005,8 @@ const Profile: React.FC = () => {
         }
 
         .add-member-btn1 {
-          background: rgb(245, 232, 232);
-          color: rgb(132, 22, 0);
+          background: var(--gradient);
+          color: white;
           border: none;
           padding: 0.8rem 1.5rem;
           border-radius: 25px;
@@ -1028,7 +1036,8 @@ const Profile: React.FC = () => {
         }
 
         .add-member-btn1:hover {
-          background: rgb(245, 198, 198);
+          background: var(--gradient);
+          opacity: 0.9;
         }
 
         /* Section Stage */
@@ -1074,7 +1083,7 @@ const Profile: React.FC = () => {
             grid-template-columns: 1fr;
           }
 
-         
+
         .notification-badge {
           position: absolute;
           top: -8px;

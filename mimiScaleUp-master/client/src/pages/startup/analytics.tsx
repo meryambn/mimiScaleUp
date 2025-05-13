@@ -80,13 +80,13 @@ const StartupAnalytics = () => {
           <header className="analytics-header">
             <h1><FaChartLine /> Analytics Dashboard</h1>
             <div className="header-actions">
-              <button 
+              <button
                 className="add-funding-btn"
                 onClick={() => setShowPopup(true)}
               >
                 <FaMoneyBillWave /> Ajouter une levée de fonds
               </button>
-              <button 
+              <button
                 className="reset-btn"
                 onClick={resetData}
               >
@@ -103,10 +103,10 @@ const StartupAnalytics = () => {
                 {(fundingData.totalRaised / 1000).toFixed(0)}k DA
               </div>
               <div className="kpi-progress">
-                <div 
-                  className="progress-bar" 
-                  style={{ 
-                    width: `${(fundingData.totalRaised / fundingData.totalTarget) * 100}%` 
+                <div
+                  className="progress-bar"
+                  style={{
+                    width: `${(fundingData.totalRaised / fundingData.totalTarget) * 100}%`
                   }}
                 ></div>
               </div>
@@ -121,8 +121,8 @@ const StartupAnalytics = () => {
                 {((fundingData.totalRaised / fundingData.totalTarget) * 100).toFixed(1)}%
               </div>
               <div className="kpi-description">
-                {fundingData.totalRaised >= fundingData.totalTarget 
-                  ? 'Objectif atteint !' 
+                {fundingData.totalRaised >= fundingData.totalTarget
+                  ? 'Objectif atteint !'
                   : 'En cours de réalisation'}
               </div>
             </div>
@@ -140,8 +140,8 @@ const StartupAnalytics = () => {
                       <span>{semester.raised.toLocaleString()} DA / {semester.target.toLocaleString()} DA</span>
                     </div>
                     <div className="bar-container">
-                      <div 
-                        className="bar" 
+                      <div
+                        className="bar"
                         style={{ width: `${semester.percentage}%` }}
                       ></div>
                     </div>
@@ -163,14 +163,14 @@ const StartupAnalytics = () => {
                     const sPercentage = totalRaised > 0 ? (s.raised / totalRaised) * 100 : 0;
                     return sum + sPercentage;
                   }, 0);
-                  
+
                   return (
-                    <div 
+                    <div
                       key={index}
                       className="pie-segment"
                       style={{
                         background: `conic-gradient(
-                          var(--color-${index}) ${rotation}deg ${rotation + percentage}deg, 
+                          var(--color-${index}) ${rotation}deg ${rotation + percentage}deg,
                           transparent ${rotation + percentage}deg 360deg
                         )`
                       }}
@@ -201,13 +201,13 @@ const StartupAnalytics = () => {
                 <form onSubmit={handleSubmit}>
                   <div className="form-group">
                     <label>Semestre:</label>
-                    <select 
+                    <select
                       value={currentSemester}
                       onChange={(e) => setCurrentSemester(parseInt(e.target.value))}
                     >
                       {fundingData.semesters.map((semester, index) => (
-                        <option 
-                          key={index} 
+                        <option
+                          key={index}
                           value={index}
                           disabled={semester.raised >= semester.target}
                         >
@@ -218,8 +218,8 @@ const StartupAnalytics = () => {
                   </div>
                   <div className="form-group">
                     <label>Montant (DA):</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={fundingAmount}
                       onChange={(e) => setFundingAmount(e.target.value)}
                       placeholder="Entrez le montant levé"
@@ -243,6 +243,7 @@ const StartupAnalytics = () => {
           <style jsx>{`
             .analytics-container {
               padding: 2rem;
+              padding-top: 100px; /* Add padding to account for the navbar height */
               min-height: 100vh;
               background-color: #f8f9fa;
               margin-left: 280px; /* Ajustement pour la barre latérale */
@@ -366,6 +367,7 @@ const StartupAnalytics = () => {
                 margin-left: 0;
                 width: 100%;
                 padding: 1rem;
+                padding-top: 100px; /* Maintain padding for navbar on mobile */
               }
 
               .charts-section {
@@ -582,4 +584,4 @@ const StartupAnalytics = () => {
   );
 };
 
-export default StartupAnalytics; 
+export default StartupAnalytics;

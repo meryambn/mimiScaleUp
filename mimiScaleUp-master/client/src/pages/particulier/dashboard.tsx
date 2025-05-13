@@ -1,18 +1,13 @@
 import React from 'react';
 import Dashboard from '@/components/Dashboard';
-import Sidebar from '@/components/sidebar';
+import ParticulierLayout from '../../components/layout/ParticulierLayout';
 
 const ParticulierDashboardPage: React.FC = () => {
   return (
-    <div className="flex h-screen bg-gray-100">
-      <Sidebar />
-      <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          <Dashboard />
-        </div>
-      </div>
-    </div>
+    <ParticulierLayout>
+      <Dashboard />
+    </ParticulierLayout>
   );
 };
 
-export default ParticulierDashboardPage; 
+export default ParticulierDashboardPage;

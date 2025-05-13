@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  FaUsers, 
-  FaCalendarAlt, 
-  FaTasks, 
-  FaCheckCircle, 
-  FaSpinner, 
+import {
+  FaUsers,
+  FaCalendarAlt,
+  FaTasks,
+  FaCheckCircle,
+  FaSpinner,
   FaTimesCircle,
   FaArrowUp,
   FaArrowDown,
@@ -13,6 +13,8 @@ import {
   FaLightbulb,
   FaComments
 } from 'react-icons/fa';
+import ProgramTimelineWidget from '@/components/widgets/ProgramTimelineWidget';
+import ProgramDetailsWidget from '@/components/widgets/ProgramDetailsWidget';
 
 const Dashboard = () => {
   const [activePhase, setActivePhase] = useState(1);
@@ -91,8 +93,8 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       {/* Mobile Menu Button */}
-      <button 
-        className="mobile-menu-btn" 
+      <button
+        className="mobile-menu-btn"
         onClick={() => setSidebarActive(!sidebarActive)}
       >
         ☰
@@ -112,40 +114,19 @@ const Dashboard = () => {
           </div>
         </header>
 
-        {/* Phases Section */}
-        <section className="phases-section">
+        {/* Program Details Widget */}
+        <section className="program-details-section">
+          <h2>Détails du Programme</h2>
+          <div className="program-details-container">
+            <ProgramDetailsWidget isStartupInterface={true} />
+          </div>
+        </section>
+
+        {/* Program Timeline Widget */}
+        <section className="timeline-section">
           <h2>Progression du Programme</h2>
-          <div className="phases-container">
-            {[1, 2, 3, 4].map((phase) => (
-              <div 
-                key={phase} 
-                className={`phase-card ${activePhase === phase ? 'active' : ''}`}
-                onClick={() => setActivePhase(phase)}
-              >
-                <div className="phase-number">Phase {phase}</div>
-                <div className="phase-name">
-                  {phase === 1 && 'Sélection'}
-                  {phase === 2 && 'Accélération'}
-                  {phase === 3 && 'Mentorat'}
-                  {phase === 4 && 'Résultats'}
-                </div>
-                <div className="phase-progress">
-                  <div 
-                    className="progress-bar" 
-                    style={{ width: `${(4 - phase) * 40}%` }}
-                  ></div>
-                </div>
-                <div className="phase-status">
-                  {phase === 1 ? (
-                    <span className="status-completed">Terminée <FaCheckCircle /></span>
-                  ) : phase < 4 ? (
-                    <span className="status-in-progress">En cours <FaSpinner className="spin" /></span>
-                  ) : (
-                    <span className="status-upcoming">À venir</span>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="timeline-container">
+            <ProgramTimelineWidget onPhaseSelect={(phaseId) => setActivePhase(Number(phaseId))} />
           </div>
         </section>
 
@@ -192,10 +173,10 @@ const Dashboard = () => {
                   <span>{statsData.tasks.pending} en attente</span>
                 </div>
                 <div className="progress-bar-container">
-                  <div 
-                    className="progress-bar" 
-                    style={{ 
-                      width: `${(statsData.tasks.completed / (statsData.tasks.completed + statsData.tasks.pending)) * 100}%` 
+                  <div
+                    className="progress-bar"
+                    style={{
+                      width: `${(statsData.tasks.completed / (statsData.tasks.completed + statsData.tasks.pending)) * 100}%`
                     }}
                   ></div>
                 </div>
@@ -272,8 +253,8 @@ const Dashboard = () => {
                   <span className="criteria-name">{criteria.name}</span>
                   <div className="star-rating">
                     {[...Array(5)].map((_, starIndex) => (
-                      <span 
-                        key={starIndex} 
+                      <span
+                        key={starIndex}
                         className={starIndex < criteria.stars ? 'active' : ''}
                       >
                         &#9733;
@@ -312,6 +293,7 @@ const Dashboard = () => {
         .main-content {
           flex: 1;
           padding: 2rem;
+          padding-top: 100px; /* Add padding to account for the navbar height */
           position: relative;
           margin-left: 280px;
           min-height: 100vh;
@@ -345,15 +327,21 @@ const Dashboard = () => {
         }
 
         /* Phases Section */
-        .phases-section {
+        .phases-section, .timeline-section, .program-details-section {
           margin-bottom: 2rem;
         }
 
-        .phases-section h2 {
+        .phases-section h2, .timeline-section h2, .program-details-section h2 {
           font-size: 1.5rem;
           color: #111827;
           margin-bottom: 1.5rem;
           font-weight: 600;
+        }
+
+        .timeline-container, .program-details-container {
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         }
 
         .phases-container {
@@ -596,7 +584,7 @@ const Dashboard = () => {
         }
 
         .meeting-join {
-          background: #e43e32;
+          background: var(--gradient);
           color: white;
           border: none;
           padding: 0.5rem 1rem;
@@ -607,7 +595,8 @@ const Dashboard = () => {
         }
 
         .meeting-join:hover {
-          background: #c2332a;
+          background: var(--gradient);
+          opacity: 0.9;
         }
 
         /* Evaluation Section */
@@ -785,6 +774,7 @@ const Dashboard = () => {
         @media (max-width: 768px) {
           .main-content {
             padding: 1.5rem;
+            padding-top: 100px; /* Maintain padding for navbar on mobile */
             margin-left: 0;
           }
 

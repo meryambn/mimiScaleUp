@@ -12,7 +12,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+
 import {
   Search,
   CheckCircle2,
@@ -128,7 +128,7 @@ const TasksPage: React.FC = () => {
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Program Tasks</h1>
+          <h1 className="text-2xl font-bold">Tâches du programme</h1>
           <p className="text-gray-500">{selectedProgram.name}</p>
         </div>
 
@@ -149,7 +149,7 @@ const TasksPage: React.FC = () => {
               cursor: 'pointer'
             }}
           >
-            Kanban Board
+            Tableau Kanban
           </button>
           <button
             onClick={() => setActiveView("list")}
@@ -163,14 +163,14 @@ const TasksPage: React.FC = () => {
               cursor: 'pointer'
             }}
           >
-            List View
+            Vue Liste
           </button>
         </div>
         <div className="flex gap-2 flex-1 md:flex-none md:w-1/3">
           <div className="relative flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search tasks..."
+              placeholder="Rechercher des tâches..."
               className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -191,7 +191,7 @@ const TasksPage: React.FC = () => {
             }}
           >
             <Filter className="h-4 w-4 mr-2" />
-            Filters
+            Filtres
           </button>
         </div>
       </div>
@@ -199,8 +199,8 @@ const TasksPage: React.FC = () => {
       {/* Phase selection */}
       <Card className="mb-6">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Program Phase Timeline</CardTitle>
-          <CardDescription>Click on a phase to filter tasks</CardDescription>
+          <CardTitle className="text-lg">Chronologie des phases du programme</CardTitle>
+          <CardDescription>Cliquez sur une phase pour filtrer les tâches</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col space-y-2">
@@ -240,7 +240,7 @@ const TasksPage: React.FC = () => {
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-medium mb-3">Task Status</h3>
+                <h3 className="font-medium mb-3">Statut de la tâche</h3>
                 <div className="space-y-2">
                   {(['todo', 'in_progress', 'completed'] as TaskStatus[]).map(status => (
                     <div key={status} className="flex items-center">
@@ -263,7 +263,7 @@ const TasksPage: React.FC = () => {
               </div>
 
               <div>
-                <h3 className="font-medium mb-3">Priority</h3>
+                <h3 className="font-medium mb-3">Priorité</h3>
                 <div className="space-y-2">
                   {['high', 'medium', 'low'].map(priority => (
                     <div key={priority} className="flex items-center">
@@ -299,7 +299,7 @@ const TasksPage: React.FC = () => {
             style={{ backgroundColor: getPhaseById(selectedPhase)?.color }}
           ></div>
           <p className="text-sm">
-            <span className="font-medium">Filtered by:</span> {getPhaseById(selectedPhase)?.name} phase
+            <span className="font-medium">Filtré par:</span> phase {getPhaseById(selectedPhase)?.name}
           </p>
           <button
             className="ml-auto"
@@ -314,7 +314,7 @@ const TasksPage: React.FC = () => {
               fontSize: '0.875rem'
             }}
           >
-            Clear
+            Effacer
           </button>
         </div>
       )}
@@ -322,20 +322,20 @@ const TasksPage: React.FC = () => {
       {/* Task content */}
       <Tabs defaultValue="all">
         <TabsList className="mb-6">
-          <TabsTrigger value="all">All Tasks</TabsTrigger>
-          <TabsTrigger value="my-tasks">My Tasks</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
+          <TabsTrigger value="all">Toutes les tâches</TabsTrigger>
+          <TabsTrigger value="my-tasks">Mes tâches</TabsTrigger>
+          <TabsTrigger value="overdue">En retard</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all">
           {filteredTasks.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-lg font-medium text-gray-900">No tasks found</h3>
+              <h3 className="mt-2 text-lg font-medium text-gray-900">Aucune tâche trouvée</h3>
               <p className="mt-1 text-sm text-gray-500">
                 {selectedPhase
-                  ? `There are no tasks in the ${getPhaseById(selectedPhase)?.name} phase matching your filters.`
-                  : "Try adjusting your search or filters to find what you're looking for."
+                  ? `Il n'y a pas de tâches dans la phase ${getPhaseById(selectedPhase)?.name} correspondant à vos filtres.`
+                  : "Essayez d'ajuster votre recherche ou vos filtres pour trouver ce que vous cherchez."
                 }
               </p>
             </div>
@@ -347,7 +347,7 @@ const TasksPage: React.FC = () => {
                 <div>
                   <div className="flex items-center mb-4">
                     <Clock className="h-4 w-4 text-gray-500 mr-2" />
-                    <h2 className="font-medium">To Do</h2>
+                    <h2 className="font-medium">À faire</h2>
                   </div>
                   <Droppable droppableId="todo">
                     {(provided) => (
@@ -383,7 +383,7 @@ const TasksPage: React.FC = () => {
                 <div>
                   <div className="flex items-center mb-4">
                     <Clock className="h-4 w-4 text-blue-500 mr-2" />
-                    <h2 className="font-medium">In Progress</h2>
+                    <h2 className="font-medium">En cours</h2>
                   </div>
                   <Droppable droppableId="in_progress">
                     {(provided) => (
@@ -419,7 +419,7 @@ const TasksPage: React.FC = () => {
                 <div>
                   <div className="flex items-center mb-4">
                     <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
-                    <h2 className="font-medium">Completed</h2>
+                    <h2 className="font-medium">Terminé</h2>
                   </div>
                   <Droppable droppableId="completed">
                     {(provided) => (
@@ -465,9 +465,9 @@ const TasksPage: React.FC = () => {
                     <div className="flex items-center mb-4">
                       {statusIcons[status]}
                       <h2 className="text-lg font-medium ml-2">
-                        {status === 'todo' ? 'To Do' :
-                         status === 'in_progress' ? 'In Progress' :
-                         status.charAt(0).toUpperCase() + status.slice(1)}
+                        {status === 'todo' ? 'À faire' :
+                         status === 'in_progress' ? 'En cours' :
+                         'Terminé'}
                       </h2>
                     </div>
                     <div className="grid grid-cols-1 gap-4">
@@ -485,9 +485,9 @@ const TasksPage: React.FC = () => {
         <TabsContent value="my-tasks">
           <div className="text-center py-12 bg-gray-50 rounded-lg">
             <User className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">My Tasks</h3>
+            <h3 className="mt-2 text-lg font-medium text-gray-900">Mes tâches</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Personal task assignment is coming soon.
+              L'attribution de tâches personnelles sera bientôt disponible.
             </p>
           </div>
         </TabsContent>
@@ -496,9 +496,9 @@ const TasksPage: React.FC = () => {
           {filteredTasks.filter(task => task.isOverdue).length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
-              <h3 className="mt-2 text-lg font-medium text-gray-900">No Overdue Tasks</h3>
+              <h3 className="mt-2 text-lg font-medium text-gray-900">Aucune tâche en retard</h3>
               <p className="mt-1 text-sm text-gray-500">
-                All tasks are on track. Great job!
+                Toutes les tâches sont à jour. Excellent travail !
               </p>
             </div>
           ) : (
@@ -544,13 +544,13 @@ const TaskCard = ({
                 </div>
                 <div className="flex items-center">
                   {statusIcons[task.status]}
-                  <span className="ml-2 font-medium">{task.title || task.name || "Untitled Task"}</span>
+                  <span className="ml-2 font-medium">{task.title || task.name || "Tâche sans titre"}</span>
                 </div>
               </div>
             ) : (
               <div className="flex items-center">
                 {statusIcons[task.status]}
-                <span className="ml-2 font-medium">{task.title || task.name || "Untitled Task"}</span>
+                <span className="ml-2 font-medium">{task.title || task.name || "Tâche sans titre"}</span>
               </div>
             )}
 
@@ -565,20 +565,20 @@ const TaskCard = ({
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-1 text-gray-500" />
                 <span className={`${task.isOverdue ? 'text-red-600' : 'text-gray-600'}`}>
-                  {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                  {format(new Date(task.dueDate), 'd MMM yyyy')}
                 </span>
               </div>
             </div>
 
             {diffDays > 0 && (
               <div className="text-xs text-gray-500">
-                {diffDays} {diffDays === 1 ? 'day' : 'days'} remaining
+                {diffDays} {diffDays === 1 ? 'jour' : 'jours'} restant{diffDays > 1 ? 's' : ''}
               </div>
             )}
 
             {task.isOverdue && (
               <div className="text-xs text-red-600 font-medium">
-                Overdue by {Math.abs(diffDays)} {Math.abs(diffDays) === 1 ? 'day' : 'days'}
+                En retard de {Math.abs(diffDays)} {Math.abs(diffDays) === 1 ? 'jour' : 'jours'}
               </div>
             )}
           </div>

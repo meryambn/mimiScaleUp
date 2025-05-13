@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  FaFileUpload, 
-  FaFilePdf, 
-  FaFileWord, 
-  FaFileExcel, 
+import {
+  FaFileUpload,
+  FaFilePdf,
+  FaFileWord,
+  FaFileExcel,
   FaFileImage,
   FaTrash,
   FaCheckCircle,
@@ -13,13 +13,22 @@ import {
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
+import ProgramPhaseTimeline from '@/components/widgets/ProgramPhaseTimeline';
 
 const StartupDeliverablesPage = () => {
   const [activePhase, setActivePhase] = useState(1);
+
+  // Phase data for the filter widget
+  const phases = [
+    { id: 1, name: "Phase 1", color: "#4f46e5", status: "completed" },
+    { id: 2, name: "Phase 2", color: "#0ea5e9", status: "in-progress" },
+    { id: 3, name: "Phase 3", color: "#10b981", status: "upcoming" },
+    { id: 4, name: "Phase 4", color: "#f59e0b", status: "not_started" }
+  ];
   const [activeTab, setActiveTab] = useState('pending');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  
+
   // Livrables par phase pour les startups
   const phaseDeliverables = {
     1: [
@@ -138,13 +147,13 @@ const StartupDeliverablesPage = () => {
         size: selectedFile.size,
         required: false
       };
-      
+
       const updatedDeliverables = [...deliverables, newDeliverable];
       setDeliverables(updatedDeliverables);
-      
+
       // Mettre à jour les livrables pour la phase active
       phaseDeliverables[activePhase] = updatedDeliverables;
-      
+
       setSelectedFile(null);
       setShowUploadModal(false);
     }
@@ -188,7 +197,7 @@ const StartupDeliverablesPage = () => {
   return (
     <div className="deliverables-container">
       <Sidebar />
-      
+
       {/* Main Content */}
       <main className="main-content">
         {/* Header */}
@@ -209,19 +218,13 @@ const StartupDeliverablesPage = () => {
 
         {/* Phases Navigation */}
         <section className="phases-section">
-          <div className="phases-tabs">
-            {[1, 2, 3, 4].map((phase) => (
-              <motion.button
-                key={phase}
-                className={`phase-tab ${activePhase === phase ? 'active' : ''}`}
-                onClick={() => handlePhaseChange(phase)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Phase {phase}
-              </motion.button>
-            ))}
-          </div>
+          <ProgramPhaseTimeline
+            phases={phases}
+            selectedPhase={activePhase}
+            onPhaseChange={handlePhaseChange}
+            title="Chronologie des phases"
+            description="Cliquez sur une phase pour filtrer les livrables"
+          />
         </section>
 
         {/* Required Documents Section */}
@@ -294,13 +297,13 @@ const StartupDeliverablesPage = () => {
                     <div className="file-status">
                       {getStatusIcon(deliverable.status)}
                       <span className={`status-text ${deliverable.status}`}>
-                        {deliverable.status === 'approved' ? 'Validé' : 
-                         deliverable.status === 'pending' ? 'En attente' : 
+                        {deliverable.status === 'approved' ? 'Validé' :
+                         deliverable.status === 'pending' ? 'En attente' :
                          deliverable.status === 'rejected' ? 'Rejeté' : 'Non soumis'}
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="card-actions">
                     {deliverable.date && (
                       <button className="action-btn download">
@@ -327,29 +330,29 @@ const StartupDeliverablesPage = () => {
       {/* Upload Modal */}
       <AnimatePresence>
         {showUploadModal && (
-          <motion.div 
+          <motion.div
             className="modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowUploadModal(false)}
           >
-            <motion.div 
+            <motion.div
               className="modal-content"
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 50, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button 
+              <button
                 className="close-btn"
                 onClick={() => setShowUploadModal(false)}
               >
                 &times;
               </button>
-              
+
               <h2>Soumettre un nouveau livrable (Phase {activePhase})</h2>
-              
+
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label>Nom du document</label>
@@ -360,13 +363,13 @@ const StartupDeliverablesPage = () => {
                     onChange={(e) => setSelectedFile(prev => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
-                
+
                 <div className="file-upload-container">
                   <label className="file-upload-label">
                     <FaFileUpload className="upload-icon" />
                     <span>{selectedFile ? selectedFile.name : 'Choisir un fichier'}</span>
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       className="file-input"
                       onChange={handleFileChange}
                       required
@@ -382,7 +385,7 @@ const StartupDeliverablesPage = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="form-actions">
                   <motion.button
                     type="button"
@@ -420,6 +423,7 @@ const StartupDeliverablesPage = () => {
         .main-content {
           flex: 1;
           padding: 2rem;
+          padding-top: 100px; /* Add padding to account for the navbar height */
           margin-left: 280px;
           min-height: 100vh;
         }
@@ -446,7 +450,7 @@ const StartupDeliverablesPage = () => {
         }
 
         .primary-btn {
-          background: #e43e32;
+          background: var(--gradient);
           color: white;
           border: none;
           padding: 0.75rem 1.5rem;
@@ -460,35 +464,13 @@ const StartupDeliverablesPage = () => {
         }
 
         .primary-btn:hover {
-          background: #c2332a;
+          background: var(--gradient);
+          opacity: 0.9;
         }
 
         /* Phases Navigation */
         .phases-section {
           margin-bottom: 1.5rem;
-        }
-
-        .phases-tabs {
-          display: flex;
-          gap: 0.5rem;
-          overflow-x: auto;
-          padding-bottom: 0.5rem;
-        }
-
-        .phase-tab {
-          padding: 0.75rem 1.5rem;
-          background: #f3f4f6;
-          border: none;
-          border-radius: 6px;
-          font-weight: 500;
-          cursor: pointer;
-          white-space: nowrap;
-          transition: all 0.3s;
-        }
-
-        .phase-tab.active {
-          background: #e43e32;
-          color: white;
         }
 
         /* Required Documents Section */
@@ -860,22 +842,23 @@ const StartupDeliverablesPage = () => {
           .main-content {
             margin-left: 0;
             padding: 1rem;
+            padding-top: 100px; /* Maintain padding for navbar on mobile */
           }
-          
+
           .deliverables-header {
             flex-direction: column;
             align-items: flex-start;
             gap: 1rem;
           }
-          
+
           .card-actions {
             flex-direction: column;
           }
-          
+
           .form-actions {
             flex-direction: column;
           }
-          
+
           .primary-btn, .secondary-btn {
             width: 100%;
           }
@@ -885,4 +868,4 @@ const StartupDeliverablesPage = () => {
   );
 };
 
-export default StartupDeliverablesPage; 
+export default StartupDeliverablesPage;

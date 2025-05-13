@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  FaFileUpload, 
-  FaFilePdf, 
-  FaFileWord, 
-  FaFileExcel, 
+import {
+  FaFileUpload,
+  FaFilePdf,
+  FaFileWord,
+  FaFileExcel,
   FaFileImage,
   FaTrash,
   FaCheckCircle,
@@ -19,7 +19,7 @@ const ParticulierDeliverablesPage = () => {
   const [activeTab, setActiveTab] = useState('pending');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  
+
   // Livrables par phase pour les particuliers
   const phaseDeliverables = {
     1: [
@@ -138,13 +138,13 @@ const ParticulierDeliverablesPage = () => {
         size: selectedFile.size,
         required: false
       };
-      
+
       const updatedDeliverables = [...deliverables, newDeliverable];
       setDeliverables(updatedDeliverables);
-      
+
       // Mettre à jour les livrables pour la phase active
       phaseDeliverables[activePhase] = updatedDeliverables;
-      
+
       setSelectedFile(null);
       setShowUploadModal(false);
     }
@@ -188,7 +188,7 @@ const ParticulierDeliverablesPage = () => {
   return (
     <div className="deliverables-container">
       <Sidebar />
-      
+
       {/* Main Content */}
       <main className="main-content">
         {/* Header */}
@@ -294,13 +294,13 @@ const ParticulierDeliverablesPage = () => {
                     <div className="file-status">
                       {getStatusIcon(deliverable.status)}
                       <span className={`status-text ${deliverable.status}`}>
-                        {deliverable.status === 'approved' ? 'Validé' : 
-                         deliverable.status === 'pending' ? 'En attente' : 
+                        {deliverable.status === 'approved' ? 'Validé' :
+                         deliverable.status === 'pending' ? 'En attente' :
                          deliverable.status === 'rejected' ? 'Rejeté' : 'Non soumis'}
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="card-actions">
                     {deliverable.date && (
                       <button className="action-btn download">
@@ -327,29 +327,29 @@ const ParticulierDeliverablesPage = () => {
       {/* Upload Modal */}
       <AnimatePresence>
         {showUploadModal && (
-          <motion.div 
+          <motion.div
             className="modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowUploadModal(false)}
           >
-            <motion.div 
+            <motion.div
               className="modal-content"
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 50, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button 
+              <button
                 className="close-btn"
                 onClick={() => setShowUploadModal(false)}
               >
                 &times;
               </button>
-              
+
               <h2>Soumettre un nouveau livrable (Phase {activePhase})</h2>
-              
+
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label>Nom du document</label>
@@ -360,13 +360,13 @@ const ParticulierDeliverablesPage = () => {
                     onChange={(e) => setSelectedFile(prev => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
-                
+
                 <div className="file-upload-container">
                   <label className="file-upload-label">
                     <FaFileUpload className="upload-icon" />
                     <span>{selectedFile ? selectedFile.name : 'Choisir un fichier'}</span>
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       className="file-input"
                       onChange={handleFileChange}
                       required
@@ -382,7 +382,7 @@ const ParticulierDeliverablesPage = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="form-actions">
                   <motion.button
                     type="button"
@@ -446,7 +446,7 @@ const ParticulierDeliverablesPage = () => {
         }
 
         .primary-btn {
-          background: #e43e32;
+          background: var(--gradient);
           color: white;
           border: none;
           padding: 0.75rem 1.5rem;
@@ -460,7 +460,8 @@ const ParticulierDeliverablesPage = () => {
         }
 
         .primary-btn:hover {
-          background: #c2332a;
+          background: var(--gradient);
+          opacity: 0.9;
         }
 
         /* Phases Navigation */
@@ -861,21 +862,21 @@ const ParticulierDeliverablesPage = () => {
             margin-left: 0;
             padding: 1rem;
           }
-          
+
           .deliverables-header {
             flex-direction: column;
             align-items: flex-start;
             gap: 1rem;
           }
-          
+
           .card-actions {
             flex-direction: column;
           }
-          
+
           .form-actions {
             flex-direction: column;
           }
-          
+
           .primary-btn, .secondary-btn {
             width: 100%;
           }
@@ -885,4 +886,4 @@ const ParticulierDeliverablesPage = () => {
   );
 };
 
-export default ParticulierDeliverablesPage; 
+export default ParticulierDeliverablesPage;
