@@ -13,8 +13,8 @@ const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
 }) => {
   const { selectedProgram } = useProgramContext();
 
-  // Mock program data for startup interface
-  const mockProgram = {
+  // For startup interface, use the selected program if available, otherwise use a default program
+  const programToDisplay = selectedProgram || {
     name: "Programme ScaleUp 2024",
     description: "Programme d'accélération pour les startups innovantes dans le domaine de la technologie",
     startDate: "2024-01-15",
@@ -26,9 +26,6 @@ const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
       { id: "4", name: "Phase 4", startDate: "2024-09-16", endDate: "2024-12-15" }
     ]
   };
-
-  // For startup interface, always use the mock program
-  const programToDisplay = isStartupInterface ? mockProgram : selectedProgram;
 
   if (!programToDisplay && !isStartupInterface) {
     return (

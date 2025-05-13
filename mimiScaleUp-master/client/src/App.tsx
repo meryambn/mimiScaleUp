@@ -24,6 +24,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import { ProgramProvider, useProgramContext } from "@/context/ProgramContext";
 import { MeetingsProvider } from "@/context/MeetingsContext";
 import { TasksProvider } from "@/context/TasksContext";
@@ -34,6 +35,7 @@ import StartupLayout from "./components/layout/StartupLayout";
 import ParticulierLayout from "./components/layout/ParticulierLayout";
 import Profile from './components/Profile';
 import ParticulierProfilePage from './pages/particulier/profile';
+import MentorProfilePage from './pages/MentorProfile';
 import StartupDashboardPage from './pages/startup/dashboard';
 import ParticulierDashboardPage from './pages/particulier/dashboard';
 import ParticulierMeetingsPage from './pages/particulier/meetings';
@@ -324,11 +326,12 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ProgramProvider>
-          <MeetingsProvider>
-            <TasksProvider>
-              <ResourcesProvider>
-                <DeliverablesProvider>
+        <NotificationProvider>
+          <ProgramProvider>
+            <MeetingsProvider>
+              <TasksProvider>
+                <ResourcesProvider>
+                  <DeliverablesProvider>
                   <Switch>
                     <Route path="/">
                       {() => <RedirectToHome />}
@@ -622,6 +625,8 @@ const App = () => {
                       )}
                     </Route>
 
+
+
                     {/* Legacy route for backward compatibility */}
                     <Route path="/test/create-team">
                       {() => <TestCreateTeamRedirect />}
@@ -662,6 +667,14 @@ const App = () => {
                     {/* Handle singular mentor path for backward compatibility */}
                     <Route path="/mentor/dashboard">
                       {() => <MentorDashboardRedirect />}
+                    </Route>
+
+                    {/* Mentor profile routes */}
+                    <Route path="/mentor/profile">
+                      {() => <MentorProfilePage />}
+                    </Route>
+                    <Route path="/mentors/profile">
+                      {() => <MentorProfilePage />}
                     </Route>
 
                     {/* Route de base pour les notifications */}
@@ -734,11 +747,12 @@ const App = () => {
                     </Route>
                   </Switch>
                   <Toaster />
-                </DeliverablesProvider>
-              </ResourcesProvider>
-            </TasksProvider>
-          </MeetingsProvider>
-        </ProgramProvider>
+                  </DeliverablesProvider>
+                </ResourcesProvider>
+              </TasksProvider>
+            </MeetingsProvider>
+          </ProgramProvider>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

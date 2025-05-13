@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useMeetings } from '@/context/MeetingsContext';
+import { useProgramContext } from '@/context/ProgramContext';
 
 const UpcomingMeetingsWidget: React.FC = () => {
   const {
@@ -11,21 +12,34 @@ const UpcomingMeetingsWidget: React.FC = () => {
     formatDate,
     formatTime
   } = useMeetings();
+  const { selectedPhaseId } = useProgramContext();
+
+  // Filter meetings by selected phase if applicable
+  const phaseFilteredMeetings = selectedPhaseId
+    ? upcomingMeetings.filter(meeting => {
+        // If meeting has phaseId property, filter by it
+        if (meeting.phaseId) {
+          return meeting.phaseId === selectedPhaseId;
+        }
+        // Otherwise, include all meetings
+        return true;
+      })
+    : upcomingMeetings;
 
   // Get only the first 4 upcoming meetings
-  const displayMeetings = upcomingMeetings.slice(0, 4);
+  const displayMeetings = phaseFilteredMeetings.slice(0, 4);
 
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold">Upcoming Meetings</h3>
+        <h3 className="text-lg font-semibold">Réunions à venir</h3>
         <Calendar className="h-5 w-5 text-orange-500" />
       </div>
 
       {displayMeetings.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-          <p>No upcoming meetings scheduled</p>
+          <p>Aucune réunion programmée</p>
         </div>
       ) : (
         <ScrollArea className="h-[300px]">
@@ -41,7 +55,7 @@ const UpcomingMeetingsWidget: React.FC = () => {
 
                   </div>
                   <Button variant="ghost" size="sm">
-                    Join
+                    Rejoindre
                   </Button>
                 </div>
 
@@ -57,7 +71,7 @@ const UpcomingMeetingsWidget: React.FC = () => {
                     {meeting.isOnline ? (
                       <>
                         <Video className="h-4 w-4 text-blue-500" />
-                        <span className="text-blue-600">Online Meeting</span>
+                        <span className="text-blue-600">Réunion en ligne</span>
                       </>
                     ) : (
                       <>

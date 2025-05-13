@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Calendar, BarChart, Users, Target, Check, Trash2 } from "lucide-react";
 import { useProgramContext } from "@/context/ProgramContext";
 import { format, isValid, parseISO } from "date-fns";
+import { fr } from "date-fns/locale";
 import { Program, Phase } from "@/types/program";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -41,7 +42,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
 
   const formatDate = (dateString: string) => {
     const date = parseISO(dateString);
-    return isValid(date) ? format(date, "PPP") : "Invalid date";
+    return isValid(date) ? format(date, "dd MMMM yyyy", { locale: fr }) : "Date invalide";
   };
 
   const handleSelectProgram = () => {
@@ -78,30 +79,26 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
 
   const isSelected = selectedProgramId === id;
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-100 text-green-800 border border-green-300">Actif</Badge>;
+      case 'completed':
+        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Terminé</Badge>;
+      case 'draft':
+        return <Badge className="bg-gray-100 text-gray-800 border border-gray-300">Brouillon</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">Inconnu</Badge>;
+    }
+  };
+
   return (
-    <Card className={cn(
-      "h-full flex flex-col transition-colors",
-      isSelected && "border-primary bg-primary/5"
-    )}>
-      <CardContent className="flex-grow p-6">
-        <div className="flex justify-between items-start mb-4">
+    <Card className="h-full transition-all hover:shadow-md">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-xl">{name}</CardTitle>
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-medium text-gray-900">
-              {name} <span className="text-xs text-gray-500 ml-1">(ID: {id})</span>
-            </h3>
-            {isSelected && <Check className="h-5 w-5 text-primary" />}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className={`
-              px-2.5 py-0.5 rounded-full text-xs font-medium
-              ${status === "draft"
-                ? "bg-gray-100 text-gray-800 border border-gray-300"
-                : status === "active"
-                  ? "bg-green-100 text-green-800 border border-green-300"
-                  : "bg-blue-100 text-blue-800 border border-blue-300"}
-            `}>
-              {status === "draft" ? "Brouillon" : status === "active" ? "Actif" : "Terminé"}
-            </div>
+            {getStatusBadge(status)}
             {onDelete && (
               <button
                 onClick={handleDelete}
@@ -118,45 +115,54 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
             )}
           </div>
         </div>
-        <p className="text-sm text-gray-500 mb-4">{description}</p>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
         <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-500">
-            <Calendar className="mr-2 h-4 w-4" />
-            <span>
-              {startDate && endDate ? (
-                `${formatDate(startDate)} - ${formatDate(endDate)}`
-              ) : (
-                "No dates set"
-              )}
-            </span>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Date de début:</span>
+            <span className="font-medium">{formatDate(startDate)}</span>
           </div>
-          <div className="flex items-center text-sm text-gray-500">
-            <BarChart className="mr-2 h-4 w-4" />
-            <span>{phases.length} Phases</span>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Date de fin:</span>
+            <span className="font-medium">{formatDate(endDate)}</span>
+          </div>
+          <div className="mt-4">
+            <span className="text-gray-500 text-sm">Phases:</span>
+            <div className="mt-2 space-y-2">
+              {phases.map((phase) => (
+                <div key={phase.id} className="flex items-center space-x-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: phase.color || '#818cf8' }}
+                  />
+                  <span className="text-sm font-medium">{phase.name}</span>
+                  <span className="text-xs text-gray-500">
+                    ({format(new Date(phase.startDate), "dd/MM/yyyy")} - {format(new Date(phase.endDate), "dd/MM/yyyy")})
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="p-6 pt-0">
+      <CardFooter className="flex justify-between">
+        <div className="text-xs text-gray-500">ID: {id}</div>
         {status === "draft" ? (
           <button
-            className="w-full"
             onClick={handleEditProgram}
-            style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+            className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
           >
             Modifier
           </button>
         ) : (
           <button
-            className="w-full"
             onClick={handleSelectProgram}
-            style={{
-              backgroundColor: isSelected ? '#0c4c80' : 'white',
-              color: isSelected ? 'white' : '#0c4c80',
-              border: '1px solid #e5e7eb',
-              padding: '8px 16px',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              isSelected
+                ? "bg-blue-700 text-white"
+                : "text-blue-700 bg-blue-50 hover:bg-blue-100"
+            }`}
           >
             {isSelected ? "Sélectionné" : "Sélectionner"}
           </button>
@@ -167,14 +173,20 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
 };
 
 const Programs: React.FC = () => {
-  const { programs, selectedProgramId, setSelectedProgramId, deleteProgram } = useProgramContext();
+  const { programs, selectedProgramId, setSelectedProgramId, deleteProgram, isLoading } = useProgramContext();
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
+
+  // Separate backend programs from example programs
+  const backendPrograms = programs.filter(program => !isNaN(Number(program.id)));
+  const examplePrograms = programs.filter(program => isNaN(Number(program.id)));
 
   // Filter programs by status
   const draftPrograms = programs.filter(program => program.status === "draft");
   const activePrograms = programs.filter(program => program.status === "active");
   const completedPrograms = programs.filter(program => program.status === "completed");
+
+  // For mentors, we only show programs they're assigned to (already filtered in ProgramContext)
 
   // Placeholder for startups count
   const getStartupsCount = (programId: string) => {
@@ -197,115 +209,213 @@ const Programs: React.FC = () => {
   };
 
   return (
-    <div className="py-6">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold text-gray-900">Programmes</h1>
-          {!isMentor && (
-            <Link href="/programs/create">
-              <button
-                style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Nouveau programme
-              </button>
-            </Link>
-          )}
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Programmes</h1>
         </div>
+        {!isMentor && (
+          <Link href="/programs/create">
+            <button
+              style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau programme
+            </button>
+          </Link>
+        )}
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-5">
-        {/* Programmes en brouillon - visible uniquement pour les admins */}
-        {!isMentor && (
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Brouillons</h2>
-            {draftPrograms.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-                <p className="text-gray-500">Aucun programme en brouillon</p>
+      <div>
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+          </div>
+        )}
+
+        {/* Backend Programs Section - without the heading */}
+        {backendPrograms.length > 0 && (
+          <div className="mb-10">
+            {/* Programmes en brouillon - visible uniquement pour les admins */}
+            {!isMentor && backendPrograms.filter(p => p.status === "draft").length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Brouillons</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {backendPrograms
+                    .filter(program => program.status === "draft")
+                    .map((program) => (
+                      <ProgramCard
+                        key={program.id}
+                        id={program.id}
+                        name={program.name}
+                        description={program.description}
+                        startDate={program.startDate}
+                        endDate={program.endDate}
+                        phases={program.phases || []}
+                        status={program.status}
+                        onSelect={() => setSelectedProgramId(program.id)}
+                        onDelete={handleDeleteProgram}
+                        program={program}
+                      />
+                    ))}
+                </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {draftPrograms.map((program) => (
-                  <ProgramCard
-                    key={program.id}
-                    id={program.id}
-                    name={program.name}
-                    description={program.description}
-                    startDate={new Date(program.startDate).toLocaleDateString()}
-                    endDate={new Date(program.endDate).toLocaleDateString()}
-                    phases={program.phases || []}
-                    status={program.status}
-                    onSelect={() => setSelectedProgramId(program.id)}
-                    onDelete={handleDeleteProgram}
-                    program={program}
-                  />
-                ))}
+            )}
+
+            {/* Programmes actifs du backend */}
+            {backendPrograms.filter(p => p.status === "active").length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Programmes actifs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {backendPrograms
+                    .filter(program => program.status === "active")
+                    .map((program) => (
+                      <ProgramCard
+                        key={program.id}
+                        id={program.id}
+                        name={program.name}
+                        description={program.description}
+                        startDate={program.startDate}
+                        endDate={program.endDate}
+                        phases={program.phases || []}
+                        status={program.status}
+                        onSelect={() => setSelectedProgramId(program.id)}
+                        onDelete={handleDeleteProgram}
+                        program={program}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Programmes terminés du backend */}
+            {backendPrograms.filter(p => p.status === "completed").length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Programmes terminés</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {backendPrograms
+                    .filter(program => program.status === "completed")
+                    .map((program) => (
+                      <ProgramCard
+                        key={program.id}
+                        id={program.id}
+                        name={program.name}
+                        description={program.description}
+                        startDate={program.startDate}
+                        endDate={program.endDate}
+                        phases={program.phases || []}
+                        status={program.status}
+                        onSelect={() => setSelectedProgramId(program.id)}
+                        onDelete={handleDeleteProgram}
+                        program={program}
+                      />
+                    ))}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Programmes actifs */}
-        <div className="mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Programmes actifs</h2>
-          {activePrograms.length === 0 ? (
+        {/* Example Programs Section - without the heading */}
+        <div className="mb-10">
+          {/* Programmes en brouillon - visible uniquement pour les admins */}
+          {!isMentor && examplePrograms.filter(p => p.status === "draft").length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Brouillons</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {examplePrograms
+                  .filter(program => program.status === "draft")
+                  .map((program) => (
+                    <ProgramCard
+                      key={program.id}
+                      id={program.id}
+                      name={program.name}
+                      description={program.description}
+                      startDate={program.startDate}
+                      endDate={program.endDate}
+                      phases={program.phases || []}
+                      status={program.status}
+                      onSelect={() => setSelectedProgramId(program.id)}
+                      onDelete={handleDeleteProgram}
+                      program={program}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Programmes actifs d'exemple */}
+          {examplePrograms.filter(p => p.status === "active").length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Programmes actifs</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {examplePrograms
+                  .filter(program => program.status === "active")
+                  .map((program) => (
+                    <ProgramCard
+                      key={program.id}
+                      id={program.id}
+                      name={program.name}
+                      description={program.description}
+                      startDate={program.startDate}
+                      endDate={program.endDate}
+                      phases={program.phases || []}
+                      status={program.status}
+                      onSelect={() => setSelectedProgramId(program.id)}
+                      onDelete={handleDeleteProgram}
+                      program={program}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Programmes terminés d'exemple */}
+          {examplePrograms.filter(p => p.status === "completed").length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Programmes terminés</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {examplePrograms
+                  .filter(program => program.status === "completed")
+                  .map((program) => (
+                    <ProgramCard
+                      key={program.id}
+                      id={program.id}
+                      name={program.name}
+                      description={program.description}
+                      startDate={program.startDate}
+                      endDate={program.endDate}
+                      phases={program.phases || []}
+                      status={program.status}
+                      onSelect={() => setSelectedProgramId(program.id)}
+                      onDelete={handleDeleteProgram}
+                      program={program}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* No programs message */}
+          {examplePrograms.length === 0 && backendPrograms.length === 0 && !isLoading && (
             <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-              <p className="text-gray-500">Aucun programme actif trouvé</p>
-              {draftPrograms.length === 0 && (
+              <p className="text-gray-500">Aucun programme trouvé</p>
+              {!isMentor && (
                 <Link href="/programs/create">
                   <button
-                    className="mt-4"
-                    style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                    className="mt-4 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                   >
                     Créer votre premier programme
                   </button>
                 </Link>
               )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {activePrograms.map((program) => (
-                <ProgramCard
-                  key={program.id}
-                  id={program.id}
-                  name={program.name}
-                  description={program.description}
-                  startDate={new Date(program.startDate).toLocaleDateString()}
-                  endDate={new Date(program.endDate).toLocaleDateString()}
-                  phases={program.phases || []}
-                  status={program.status}
-                  onSelect={() => setSelectedProgramId(program.id)}
-                  onDelete={handleDeleteProgram}
-                  program={program}
-                />
-              ))}
+              {isMentor && (
+                <p className="mt-4 text-gray-500">Vous n'avez pas encore été invité à participer à un programme.</p>
+              )}
             </div>
           )}
         </div>
-
-        {/* Programmes terminés */}
-        {completedPrograms.length > 0 && (
-          <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Programmes terminés</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {completedPrograms.map((program) => (
-                <ProgramCard
-                  key={program.id}
-                  id={program.id}
-                  name={program.name}
-                  description={program.description}
-                  startDate={new Date(program.startDate).toLocaleDateString()}
-                  endDate={new Date(program.endDate).toLocaleDateString()}
-                  phases={program.phases || []}
-                  status={program.status}
-                  onSelect={() => setSelectedProgramId(program.id)}
-                  onDelete={handleDeleteProgram}
-                  program={program}
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

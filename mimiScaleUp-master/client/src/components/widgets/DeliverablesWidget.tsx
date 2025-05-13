@@ -16,7 +16,7 @@ const DeliverablesWidget: React.FC = () => {
     deliverables
   } = useDeliverables();
 
-  const { selectedProgram } = useProgramContext();
+  const { selectedProgram, selectedPhaseId } = useProgramContext();
   const [isLoading, setIsLoading] = useState(true);
 
   // Set loading to false when deliverables are loaded
@@ -28,8 +28,43 @@ const DeliverablesWidget: React.FC = () => {
     return () => clearTimeout(timer);
   }, [deliverables]);
 
+  // Filter deliverables by selected phase if applicable
+  const phaseFilteredDeliverables = React.useMemo(() => {
+    if (!selectedPhaseId) {
+      return upcomingDeliverables;
+    }
+
+    // Filter deliverables by the selected phase
+    return upcomingDeliverables.filter(deliverable => {
+      // If deliverable has phaseId property, filter by it
+      if (deliverable.phaseId) {
+        return deliverable.phaseId === selectedPhaseId ||
+               String(deliverable.phaseId) === String(selectedPhaseId);
+      }
+
+      // If we have the selected program, check if the deliverable is in the selected phase
+      if (selectedProgram && selectedProgram.phases) {
+        const selectedPhase = selectedProgram.phases.find(phase =>
+          phase.id === selectedPhaseId ||
+          String(phase.id) === String(selectedPhaseId)
+        );
+
+        if (selectedPhase && selectedPhase.deliverables) {
+          // Check if this deliverable is in the selected phase's deliverables
+          return selectedPhase.deliverables.some(d =>
+            d.id === deliverable.id ||
+            String(d.id) === String(deliverable.id)
+          );
+        }
+      }
+
+      // If we can't determine the phase, include the deliverable
+      return true;
+    });
+  }, [upcomingDeliverables, selectedPhaseId, selectedProgram]);
+
   // Get only the first 5 deliverables for display
-  const displayDeliverables = upcomingDeliverables.slice(0, 5);
+  const displayDeliverables = phaseFilteredDeliverables.slice(0, 5);
   const today = new Date();
 
   return (

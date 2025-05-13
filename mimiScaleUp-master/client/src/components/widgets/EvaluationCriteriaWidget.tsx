@@ -35,7 +35,7 @@ if (typeof window !== 'undefined' && !window.globalEvaluationCriteria) {
 const EvaluationCriteriaWidget: React.FC = () => {
   const [expandedCriterion, setExpandedCriterion] = useState<string | number | null>(null);
   const [localCriteria, setLocalCriteria] = useState<EvaluationCriterion[]>([]);
-  const { selectedProgram } = useProgramContext();
+  const { selectedProgram, selectedPhaseId } = useProgramContext();
   const queryClient = useQueryClient();
   const selectedProgramId = selectedProgram?.id;
 
@@ -208,19 +208,20 @@ const EvaluationCriteriaWidget: React.FC = () => {
     };
   }, [queryClient, selectedProgram]);
 
-  // Filter criteria for the selected program
+  // Filter criteria for the selected program and phase
   const programCriteria = React.useMemo(() => {
     const allCriteria = getAllCriteriaWithoutStateUpdates();
     console.log('All criteria from all sources:', allCriteria);
     console.log('Current selected program ID:', selectedProgramId);
+    console.log('Current selected phase ID:', selectedPhaseId);
 
     // If no program is selected, show all criteria
     if (!selectedProgramId) {
       return allCriteria;
     }
 
-    // Filter by programId - try multiple comparison strategies
-    const filtered = allCriteria.filter(criterion => {
+    // First filter by programId - try multiple comparison strategies
+    const programFiltered = allCriteria.filter(criterion => {
       if (!criterion) return false;
 
       // Handle case where programId might be missing
@@ -277,9 +278,40 @@ const EvaluationCriteriaWidget: React.FC = () => {
       return matches;
     });
 
-    console.log('Filtered criteria for program', selectedProgramId, ':', filtered);
-    return filtered;
-  }, [selectedProgramId, localCriteria, apiCriteria]);
+    // If no phase is selected, return all criteria for the program
+    if (!selectedPhaseId) {
+      console.log('No phase selected, returning all program criteria:', programFiltered);
+      return programFiltered;
+    }
+
+    // Now filter by phase if a phase is selected
+    // We need to find the criteria that belong to the selected phase
+    if (selectedProgram && selectedProgram.phases) {
+      // Find the selected phase
+      const selectedPhase = selectedProgram.phases.find(phase =>
+        phase.id === selectedPhaseId ||
+        String(phase.id) === String(selectedPhaseId)
+      );
+
+      if (selectedPhase && selectedPhase.evaluationCriteria) {
+        // Get the IDs of criteria in the selected phase
+        const phaseEvaluationCriteriaIds = selectedPhase.evaluationCriteria.map(c =>
+          String(c.id)
+        );
+
+        // Filter the program criteria to only include those in the selected phase
+        const phaseFiltered = programFiltered.filter(criterion =>
+          phaseEvaluationCriteriaIds.includes(String(criterion.id))
+        );
+
+        console.log('Filtered criteria for phase', selectedPhaseId, ':', phaseFiltered);
+        return phaseFiltered;
+      }
+    }
+
+    console.log('Filtered criteria for program', selectedProgramId, ':', programFiltered);
+    return programFiltered;
+  }, [selectedProgramId, selectedPhaseId, localCriteria, apiCriteria, selectedProgram]);
 
 
   // Use the program criteria directly, no hardcoded fallback
@@ -290,15 +322,15 @@ const EvaluationCriteriaWidget: React.FC = () => {
     console.log("Evaluation criteria being displayed:", criteria);
   }, [criteria]);
 
-  // Update criteria when selectedProgramId changes
+  // Update criteria when selectedProgramId or selectedPhaseId changes
   useEffect(() => {
     if (selectedProgramId) {
-      console.log(`Program selection changed to ${selectedProgramId}, refreshing criteria`);
+      console.log(`Program selection changed to ${selectedProgramId} or phase changed to ${selectedPhaseId}, refreshing criteria`);
       // Force a refresh of the criteria from all sources
       const refreshedCriteria = getAllCriteriaWithoutStateUpdates();
       setLocalCriteria(refreshedCriteria);
     }
-  }, [selectedProgramId]);
+  }, [selectedProgramId, selectedPhaseId]);
 
   // Return early if no criteria available
   if (!criteria || criteria.length === 0) {

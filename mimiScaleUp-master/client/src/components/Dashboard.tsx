@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FaUsers,
   FaCalendarAlt,
@@ -15,10 +15,13 @@ import {
 } from 'react-icons/fa';
 import ProgramTimelineWidget from '@/components/widgets/ProgramTimelineWidget';
 import ProgramDetailsWidget from '@/components/widgets/ProgramDetailsWidget';
+import { useProgramContext } from '@/context/ProgramContext';
 
 const Dashboard = () => {
-  const [activePhase, setActivePhase] = useState(1);
+  const [activePhase, setActivePhase] = useState<number | string>(1);
   const [sidebarActive, setSidebarActive] = useState(false);
+  const { selectedProgram } = useProgramContext();
+
   const mentors = [
     {
       id: 1,
@@ -83,11 +86,24 @@ const Dashboard = () => {
     ]
   };
 
-  const phaseDescriptions = {
-    1: "Phase de sélection et validation du projet",
-    2: "Développement accéléré et recherche de financement",
-    3: "Accompagnement par des mentors experts",
-    4: "Présentation des résultats et perspectives"
+  // Get phase descriptions from selected program or use default
+  const getPhaseDescription = (phaseId: number | string) => {
+    if (selectedProgram && selectedProgram.phases) {
+      const phase = selectedProgram.phases.find(p => p.id === phaseId);
+      if (phase) {
+        return phase.description;
+      }
+    }
+
+    // Default descriptions if no program is selected
+    const defaultDescriptions = {
+      1: "Phase de sélection et validation du projet",
+      2: "Développement accéléré et recherche de financement",
+      3: "Accompagnement par des mentors experts",
+      4: "Présentation des résultats et perspectives"
+    };
+
+    return defaultDescriptions[phaseId as keyof typeof defaultDescriptions] || "Description non disponible";
   };
 
   return (
@@ -110,7 +126,7 @@ const Dashboard = () => {
           </div>
           <div className="date-range">
             <span>Phase {activePhase} en cours</span>
-            <span>{phaseDescriptions[activePhase]}</span>
+            <span>{getPhaseDescription(activePhase)}</span>
           </div>
         </header>
 

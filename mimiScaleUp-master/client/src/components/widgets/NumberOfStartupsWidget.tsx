@@ -26,7 +26,7 @@ interface Startup {
 // Calculate overall score from evaluation criteria
 const calculateOverallScore = (criteria: EvaluationCriterion[] | undefined): number => {
   if (!criteria || criteria.length === 0) return 0;
-  
+
   return criteria.reduce((total, criterion) => {
     // Convert score from 0-5 scale to 0-100% scale, then apply weight
     return total + ((criterion.score / 5) * 100 * criterion.weight / 100);
@@ -34,8 +34,8 @@ const calculateOverallScore = (criteria: EvaluationCriterion[] | undefined): num
 };
 
 const NumberOfTeamsWidget: React.FC = () => {
-  const { selectedProgramId } = useProgramContext();
-  
+  const { selectedProgramId, selectedPhaseId } = useProgramContext();
+
   // Mock data - this would come from an API in a real application
   const startups: Startup[] = [
     {
@@ -111,27 +111,42 @@ const NumberOfTeamsWidget: React.FC = () => {
     }
   ];
 
-  // Filter startups based on the selected program
-  const programStartups = selectedProgramId 
+  // Filter startups based on the selected program and phase
+  let programStartups = selectedProgramId
     ? startups.filter(startup => startup.programId === selectedProgramId)
     : startups;
 
+  // Further filter by phase if a phase is selected
+  if (selectedPhaseId) {
+    programStartups = programStartups.filter(startup => {
+      // Extract phase number from the currentPhase string or phase ID
+      const startupPhaseMatch = startup.currentPhase.match(/Phase (\d+)/);
+      const startupPhaseNum = startupPhaseMatch ? startupPhaseMatch[1] : null;
+
+      // Extract phase number from selectedPhaseId
+      const selectedPhaseMatch = String(selectedPhaseId).match(/phase(\d+)/);
+      const selectedPhaseNum = selectedPhaseMatch ? selectedPhaseMatch[1] : String(selectedPhaseId);
+
+      return startupPhaseNum === selectedPhaseNum;
+    });
+  }
+
   // Calculate the number of active and at-risk startups based on evaluation scores
   const teamsWithEvaluation = programStartups.filter(startup => startup.evaluationCriteria && startup.evaluationCriteria.length > 0);
-  
+
   // Count at risk teams (score <= 50%)
   const atRiskCount = teamsWithEvaluation.filter(
     startup => calculateOverallScore(startup.evaluationCriteria) <= 50
   ).length;
-  
+
   // Count active teams (score > 50%)
   const activeCount = teamsWithEvaluation.filter(
     startup => calculateOverallScore(startup.evaluationCriteria) > 50
   ).length;
-  
+
   // Count teams without evaluation
   const withoutEvaluationCount = programStartups.length - teamsWithEvaluation.length;
-  
+
   const total = programStartups.length;
   const activeRatio = total > 0 ? (activeCount / total) * 100 : 0;
 
@@ -153,15 +168,15 @@ const NumberOfTeamsWidget: React.FC = () => {
             <Users className="h-8 w-8 text-blue-500" />
             <div>
               <p className="text-sm font-medium leading-none">Total</p>
-              <h3 className="text-lg font-semibold">Teams</h3>
+              <h3 className="text-lg font-semibold">Équipes</h3>
             </div>
           </div>
           <div className="flex flex-col items-end">
             <div className="text-2xl font-bold">{total}</div>
             <div className="flex items-center text-sm mt-1">
-              <span className="text-green-600 font-medium">{activeCount} Active</span>
+              <span className="text-green-600 font-medium">{activeCount} Actives</span>
               <span className="mx-1 text-gray-400">|</span>
-              <span className="text-red-600 font-medium">{atRiskCount} At Risk</span>
+              <span className="text-red-600 font-medium">{atRiskCount} En risque</span>
             </div>
       </div>
         </div>
@@ -177,7 +192,7 @@ const NumberOfTeamsWidget: React.FC = () => {
 
         {topTeams.length > 0 && (
           <div className="mt-6 pt-3 border-t">
-            <p className="text-sm text-gray-500 mb-3">Top Performers</p>
+            <p className="text-sm text-gray-500 mb-3">Meilleures Performances</p>
             <ScrollArea className="h-[120px]">
               <div className="space-y-2">
                 {topTeams.map((team) => {
@@ -215,4 +230,4 @@ const NumberOfTeamsWidget: React.FC = () => {
   );
 };
 
-export default NumberOfTeamsWidget; 
+export default NumberOfTeamsWidget;

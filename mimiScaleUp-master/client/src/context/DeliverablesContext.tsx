@@ -57,7 +57,7 @@ const DeliverablesContext = createContext<DeliverablesContextType | undefined>(u
 
 // Provider component
 export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { selectedProgramId, selectedProgram } = useProgramContext();
+  const { selectedProgramId, selectedProgram, selectedPhaseId } = useProgramContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -99,6 +99,11 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
       });
 
       setPhases(mappedPhases);
+
+      // If a phase is selected in the ProgramContext, update the local selectedPhase
+      if (selectedPhaseId) {
+        setSelectedPhase(String(selectedPhaseId));
+      }
     } else {
       // Use default phases if no program is selected
       setPhases([
@@ -144,7 +149,7 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
       ]);
     }
-  }, [selectedProgram]);
+  }, [selectedProgram, selectedPhaseId]);
 
   // Add event listener for new program creation
   useEffect(() => {
@@ -427,11 +432,19 @@ export const DeliverablesProvider: React.FC<{ children: ReactNode }> = ({ childr
     // We're now using backend data, no need to load from localStorage
   }, [selectedProgram, selectedProgramId]);
 
-  // Filter deliverables based on selected filters, search query, and program
+  // Filter deliverables based on selected filters, search query, program, and phase from ProgramContext
   const filteredDeliverables = deliverables.filter(deliverable => {
     const matchesSearch = deliverable.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         deliverable.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesPhase = !selectedPhase || deliverable.phaseId === selectedPhase;
+
+    // Check if deliverable matches the selected phase from the context or from ProgramContext
+    const matchesPhase = (!selectedPhase && !selectedPhaseId) ||
+                         (selectedPhase && deliverable.phaseId === selectedPhase) ||
+                         (selectedPhaseId && (
+                           deliverable.phaseId === selectedPhaseId ||
+                           String(deliverable.phaseId) === String(selectedPhaseId)
+                         ));
+
     const matchesType = !selectedType || deliverable.submissionType === selectedType;
 
     // Improved program matching with multiple comparison strategies

@@ -3,6 +3,7 @@ import { Clock, CheckCircle, AlertCircle, Milestone } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useProgramContext } from '@/context/ProgramContext';
 
 interface TimelinePhase {
   id: number | string;
@@ -19,8 +20,8 @@ interface ProgramTimelineWidgetProps {
 }
 
 const ProgramTimelineWidget: React.FC<ProgramTimelineWidgetProps> = ({ onPhaseSelect }) => {
-  const [selectedPhaseId, setSelectedPhaseId] = useState<number | string | null>(null);
   const [phases, setPhases] = useState<TimelinePhase[]>([]);
+  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
 
   // Notify parent component when phase is selected
   const handlePhaseSelect = (phaseId: number | string | null) => {
@@ -31,8 +32,46 @@ const ProgramTimelineWidget: React.FC<ProgramTimelineWidgetProps> = ({ onPhaseSe
   };
 
   useEffect(() => {
-    // Use default phases since we're not using ProgramContext
-    setPhases([
+    if (selectedProgram && selectedProgram.phases && selectedProgram.phases.length > 0) {
+      // Convert program phases to timeline phases
+      const timelinePhases = selectedProgram.phases.map(phase => {
+        // Calculate progress based on dates
+        const now = new Date();
+        const startDate = new Date(phase.startDate);
+        const endDate = new Date(phase.endDate);
+        const totalDuration = endDate.getTime() - startDate.getTime();
+        const elapsedDuration = now.getTime() - startDate.getTime();
+        let progress = 0;
+
+        if (now > endDate) {
+          progress = 100;
+        } else if (now >= startDate && now <= endDate) {
+          progress = Math.min(Math.round((elapsedDuration / totalDuration) * 100), 100);
+        }
+
+        // Convert phase status to timeline status
+        let timelineStatus: 'completed' | 'in-progress' | 'upcoming' = 'upcoming';
+        if (phase.status === 'completed') {
+          timelineStatus = 'completed';
+        } else if (phase.status === 'in_progress') {
+          timelineStatus = 'in-progress';
+        }
+
+        return {
+          id: phase.id,
+          name: phase.name,
+          startDate: new Date(phase.startDate).toISOString().split('T')[0],
+          endDate: new Date(phase.endDate).toISOString().split('T')[0],
+          progress: progress,
+          status: timelineStatus,
+          description: phase.description || `Phase ${phase.name}`
+        };
+      });
+
+      setPhases(timelinePhases);
+    } else {
+      // Use default phases if no program is selected
+      setPhases([
         {
           id: 1,
           name: 'Phase 1',
@@ -70,7 +109,8 @@ const ProgramTimelineWidget: React.FC<ProgramTimelineWidgetProps> = ({ onPhaseSe
           description: 'Présentation des résultats et perspectives'
         }
       ]);
-  }, []);
+    }
+  }, [selectedProgram]);
 
   const getStatusIcon = (status: TimelinePhase['status']) => {
     switch (status) {

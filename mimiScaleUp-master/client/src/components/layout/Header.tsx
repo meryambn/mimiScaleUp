@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Bell, Menu, MessageSquare, HelpCircle, ChevronDown, LogOut } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -96,8 +97,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           </Button>
           <MessagesDialog open={messagesOpen} onOpenChange={setMessagesOpen} />
           <Button variant="ghost" size="icon" className="rounded-full relative">
-            <Bell className="h-5 w-5 text-gray-500" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">3</span>
+            <NotificationBell />
           </Button>
 
           <DropdownMenu>
@@ -107,12 +107,18 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                   <AvatarImage src="" />
                   <AvatarFallback className="bg-primary-100 text-primary-800">AU</AvatarFallback>
                 </Avatar>
-                <span className="font-medium hidden md:inline-block">{user?.name || 'Utilisateur'}</span>
+                <span className="font-medium hidden md:inline-block">
+                  {user?.role === 'mentor'
+                    ? user?.email || 'Mentor'
+                    : user?.name || 'Utilisateur'}
+                </span>
                 <ChevronDown className="h-4 w-4 text-gray-500" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem className="cursor-pointer">Profil</DropdownMenuItem>
+              <Link href={user?.role === 'mentor' ? '/mentors/profile' : (user?.role === 'admin' ? '/admin/profile' : '/')}>
+                <DropdownMenuItem className="cursor-pointer">Profil</DropdownMenuItem>
+              </Link>
               <DropdownMenuItem className="cursor-pointer">Paramètres du compte</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer text-red-600" onClick={logout}>

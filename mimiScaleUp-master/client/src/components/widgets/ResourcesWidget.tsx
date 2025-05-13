@@ -28,7 +28,7 @@ const ResourcesWidget: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [widgetResources, setWidgetResources] = useState<WidgetResource[]>([]);
 
-  // Fetch resources directly from the API for the widget
+  // Get resources from the selected program or fetch from API
   useEffect(() => {
     const fetchResources = async () => {
       if (!selectedProgram?.id) {
@@ -38,7 +38,29 @@ const ResourcesWidget: React.FC = () => {
 
       setIsLoading(true);
       try {
-        // Call the API to get resources for the selected program
+        // First check if the selected program already has resources in its object
+        if (selectedProgram.resources && selectedProgram.resources.length > 0) {
+          console.log("ResourcesWidget: Using resources from selected program:", selectedProgram.resources);
+
+          // Convert program resources to widget resources
+          const formattedResources: WidgetResource[] = selectedProgram.resources.map((r: any) => ({
+            id: String(r.id),
+            title: r.title,
+            description: r.description || '',
+            type: typeof r.type === 'string' ? r.type.toLowerCase() : 'document',
+            url: r.url || `/api/resources/download/${r.id}`,
+            createdAt: r.created_at || new Date().toISOString(),
+            category: r.category || '',
+            is_external: r.is_external || false
+          }));
+
+          setWidgetResources(formattedResources);
+          setIsLoading(false);
+          return;
+        }
+
+        // If no resources in the program object, call the API
+        console.log("ResourcesWidget: Fetching resources from API for program:", selectedProgram.id);
         const result = await getProgramResources(selectedProgram.id);
 
         // Convert API resources to widget resources

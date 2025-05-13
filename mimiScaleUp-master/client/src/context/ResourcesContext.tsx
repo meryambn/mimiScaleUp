@@ -134,7 +134,41 @@ export const ResourcesProvider: React.FC<{ children: ReactNode }> = ({ children 
       setError(null);
 
       try {
-        // Call the API to get resources for the selected program
+        // First check if the selected program already has resources in its object
+        if (selectedProgram.resources && selectedProgram.resources.length > 0) {
+          console.log("Using resources from selected program:", selectedProgram.resources);
+
+          // Convert program resources to context resources
+          const programResources = selectedProgram.resources.map((r: any) => ({
+            id: String(r.id),
+            title: r.title,
+            description: r.description || '',
+            type: typeof r.type === 'string' ? r.type.toLowerCase() : 'document',
+            url: r.url || '',
+            createdAt: r.created_at || new Date().toISOString(),
+            programId: String(r.program_id || selectedProgram.id),
+            category: r.category || '',
+            is_external: r.is_external || false
+          }));
+
+          // Separate into regular and external resources
+          const regularResources = programResources.filter(r => !r.is_external);
+          const externalResources = programResources.filter(r => r.is_external);
+
+          setResources(regularResources);
+          setExternalResources(externalResources.map(r => ({
+            id: r.id,
+            title: r.title,
+            url: r.url,
+            programId: r.programId
+          })));
+
+          setIsLoading(false);
+          return;
+        }
+
+        // If no resources in the program object, call the API
+        console.log("Fetching resources from API for program:", selectedProgram.id);
         const result = await getProgramResources(selectedProgram.id);
 
         // Convert API resources to context resources
@@ -156,7 +190,7 @@ export const ResourcesProvider: React.FC<{ children: ReactNode }> = ({ children 
     };
 
     fetchResources();
-  }, [selectedProgram?.id]);
+  }, [selectedProgram]);
 
   // Filter resources based on selected filters, search query, and program
   const filteredResources = resources.filter(resource => {

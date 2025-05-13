@@ -1,12 +1,12 @@
 import React from 'react';
-import Profile from '../components/Profile';
+import MentorProfile from '../components/MentorProfile';
 
-const MentorProfile: React.FC = () => {
+const MentorProfilePage: React.FC = () => {
   return (
     <div>
-      <Profile />
+      <MentorProfile />
     </div>
   );
 };
 
-export default MentorProfile; 
+export default MentorProfilePage;

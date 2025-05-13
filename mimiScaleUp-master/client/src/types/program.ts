@@ -137,6 +137,18 @@ export interface EligibilityCriteria {
   requiredDocuments: string[];
 }
 
+export interface Resource {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  url: string;
+  is_external?: boolean;
+  created_at: string;
+  program_id: number;
+  category?: string;
+}
+
 export interface Program {
   id: string;
   name: string;
@@ -149,6 +161,7 @@ export interface Program {
   eligibilityCriteria?: EligibilityCriteria;
   dashboardWidgets?: WidgetData[];
   mentors?: any[];
+  resources?: Resource[];
   hasWinner?: boolean;
   createdAt: string;
   updatedAt: string;

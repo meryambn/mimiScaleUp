@@ -14,25 +14,84 @@ import {
   createReunion,
   createLivrable
 } from "@/services/programService";
+import { getMentorPrograms } from "@/services/mentorProgramService";
+import { useAuth } from "./AuthContext";
 
 // Example programs
 const examplePrograms: Program[] = [
   {
     id: "1",
-    name: "Tech Accelerator 2023",
+    name: "Tech Accelerator 2025",
     description: "A comprehensive accelerator program for early-stage technology startups",
-    startDate: "2023-01-15",
-    endDate: "2023-06-15",
+    startDate: "2025-01-15",
+    endDate: "2025-06-15",
     status: "active",
     phases: [
       {
         id: "phase1",
         name: "Idéation",
         description: "Développement et validation de l'idée",
-        startDate: new Date("2023-01-15"),
-        endDate: new Date("2023-02-15"),
+        startDate: new Date("2025-01-15"),
+        endDate: new Date("2025-02-15"),
         tasks: [],
-        meetings: [],
+        meetings: [
+          {
+            id: "m1",
+            title: "Kickoff Meeting",
+            date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+            time: "10:00",
+            duration: 60,
+            type: "group",
+            location: "Salle de conférence A",
+            attendees: ["Équipe Startup", "Mentor", "Program Manager"],
+            description: "Réunion de lancement du programme et présentation des objectifs",
+            isCompleted: false,
+            hasNotes: false,
+            isOnline: false,
+            phaseId: "phase1",
+            programId: "1"
+          },
+          {
+            id: "m2",
+            title: "Atelier d'idéation",
+            date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // 10 days from now
+            time: "14:00",
+            duration: 120,
+            type: "workshop",
+            location: "Zoom",
+            attendees: ["Équipe Startup", "Mentor", "Expert Innovation"],
+            description: "Atelier pour développer et affiner les idées de projet",
+            isCompleted: false,
+            hasNotes: false,
+            isOnline: true,
+            phaseId: "phase1",
+            programId: "1"
+          }
+        ],
+        deliverables: [
+          {
+            id: 'd1',
+            name: 'Présentation de l\'idée',
+            description: 'Présentation détaillée de l\'idée et de son potentiel',
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+            status: 'pending',
+            type: 'document',
+            url: 'https://example.com/deliverable1',
+            submissionType: 'file',
+            required: true
+          },
+          {
+            id: 'd2',
+            name: 'Analyse de marché',
+            description: 'Analyse complète du marché cible',
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+            status: 'pending',
+            type: 'document',
+            url: 'https://example.com/deliverable2',
+            submissionType: 'file',
+            required: true
+          }
+        ],
         evaluationCriteria: [
           { id: '1', name: 'Idée Innovante', description: 'Niveau d\'innovation de l\'idée', weight: 40, accessibleBy: ['mentors'], requiresValidation: false },
           { id: '2', name: 'Analyse de Marché', description: 'Qualité de l\'analyse de marché', weight: 30, accessibleBy: ['mentors'], requiresValidation: false },
@@ -45,10 +104,67 @@ const examplePrograms: Program[] = [
         id: "phase2",
         name: "Prototypage",
         description: "Création d'un prototype fonctionnel",
-        startDate: new Date("2023-02-16"),
-        endDate: new Date("2023-03-31"),
+        startDate: new Date("2025-02-16"),
+        endDate: new Date("2025-03-31"),
         tasks: [],
-        meetings: [],
+        meetings: [
+          {
+            id: "m3",
+            title: "Revue de prototype",
+            date: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), // 25 days from now
+            time: "11:00",
+            duration: 90,
+            type: "group",
+            location: "Salle de conférence B",
+            attendees: ["Équipe Startup", "Mentor", "Expert Technique"],
+            description: "Présentation et évaluation du prototype MVP",
+            isCompleted: false,
+            hasNotes: false,
+            isOnline: false,
+            phaseId: "phase2",
+            programId: "1"
+          },
+          {
+            id: "m4",
+            title: "Session de feedback utilisateurs",
+            date: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000), // 28 days from now
+            time: "15:30",
+            duration: 120,
+            type: "workshop",
+            location: "Zoom",
+            attendees: ["Équipe Startup", "Utilisateurs test", "Mentor"],
+            description: "Session de test et feedback avec des utilisateurs potentiels",
+            isCompleted: false,
+            hasNotes: false,
+            isOnline: true,
+            phaseId: "phase2",
+            programId: "1"
+          }
+        ],
+        deliverables: [
+          {
+            id: 'd3',
+            name: 'Prototype MVP',
+            description: 'Version minimale fonctionnelle du produit',
+            dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21 days from now
+            status: 'pending',
+            type: 'application',
+            url: 'https://example.com/prototype',
+            submissionType: 'file',
+            required: true
+          },
+          {
+            id: 'd4',
+            name: 'Documentation technique',
+            description: 'Documentation détaillée de l\'architecture technique',
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            status: 'pending',
+            type: 'document',
+            url: 'https://example.com/tech-doc',
+            submissionType: 'file',
+            required: true
+          }
+        ],
         evaluationCriteria: [
           { id: '4', name: 'Qualité du Prototype', description: 'Qualité et fonctionnalité du prototype', weight: 35, accessibleBy: ['mentors'], requiresValidation: false },
           { id: '5', name: 'Faisabilité Technique', description: 'Faisabilité technique de la solution', weight: 35, accessibleBy: ['mentors'], requiresValidation: false },
@@ -61,10 +177,34 @@ const examplePrograms: Program[] = [
         id: "phase3",
         name: "Validation",
         description: "Tests et validation du marché",
-        startDate: new Date("2023-04-01"),
-        endDate: new Date("2023-04-30"),
+        startDate: new Date("2025-04-01"),
+        endDate: new Date("2025-04-30"),
         tasks: [],
         meetings: [],
+        deliverables: [
+          {
+            id: 'd5',
+            name: 'Rapport de tests utilisateurs',
+            description: 'Rapport détaillé des tests utilisateurs et des retours obtenus',
+            dueDate: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000), // 40 days from now
+            status: 'pending',
+            type: 'document',
+            url: 'https://example.com/user-tests',
+            submissionType: 'file',
+            required: true
+          },
+          {
+            id: 'd6',
+            name: 'Plan d\'amélioration',
+            description: 'Plan d\'amélioration basé sur les retours utilisateurs',
+            dueDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000), // 45 days from now
+            status: 'pending',
+            type: 'document',
+            url: 'https://example.com/improvement-plan',
+            submissionType: 'file',
+            required: true
+          }
+        ],
         evaluationCriteria: [
           { id: '7', name: 'Résultats des Tests', description: 'Résultats des tests de validation', weight: 40, accessibleBy: ['mentors'], requiresValidation: false },
           { id: '8', name: 'Retour Utilisateurs', description: 'Qualité des retours utilisateurs', weight: 30, accessibleBy: ['mentors'], requiresValidation: false },
@@ -77,8 +217,8 @@ const examplePrograms: Program[] = [
         id: "phase4",
         name: "Lancement",
         description: "Préparation et lancement sur le marché",
-        startDate: new Date("2023-05-01"),
-        endDate: new Date("2023-06-15"),
+        startDate: new Date("2025-05-01"),
+        endDate: new Date("2025-06-15"),
         tasks: [],
         meetings: [],
         evaluationCriteria: [
@@ -104,8 +244,98 @@ const examplePrograms: Program[] = [
     },
     dashboardWidgets: [],
     mentors: [],
-    createdAt: "2022-11-01",
-    updatedAt: "2023-01-15"
+    resources: [
+      {
+        id: "r1",
+        title: "Guide de démarrage pour startups tech",
+        description: "Un guide complet pour les startups technologiques en phase de démarrage",
+        url: "https://example.com/startup-guide",
+        type: "document",
+        is_external: false,
+        created_at: "2025-01-10",
+        program_id: 1,
+        category: "Guide"
+      },
+      {
+        id: "r2",
+        title: "Vidéo: Comment créer un MVP efficace",
+        description: "Tutoriel vidéo sur la création d'un MVP qui répond aux besoins des utilisateurs",
+        url: "https://example.com/mvp-video",
+        type: "video",
+        is_external: false,
+        created_at: "2025-01-15",
+        program_id: 1,
+        category: "Tutoriel"
+      },
+      {
+        id: "r3",
+        title: "Modèles de business plan",
+        description: "Templates de business plan pour différents types de startups",
+        url: "https://example.com/business-templates",
+        type: "document",
+        is_external: false,
+        created_at: "2025-01-20",
+        program_id: 1,
+        category: "Template"
+      },
+      {
+        id: "r4",
+        title: "Stratégies de financement pour startups",
+        description: "Guide sur les différentes options de financement pour les startups en phase de croissance",
+        url: "https://example.com/funding-strategies",
+        type: "document",
+        is_external: false,
+        created_at: "2025-01-25",
+        program_id: 1,
+        category: "Guide"
+      },
+      {
+        id: "r5",
+        title: "Webinaire: Pitch parfait pour investisseurs",
+        description: "Enregistrement d'un webinaire sur comment préparer et présenter un pitch convaincant",
+        url: "https://example.com/pitch-webinar",
+        type: "video",
+        is_external: false,
+        created_at: "2025-02-01",
+        program_id: 1,
+        category: "Webinaire"
+      },
+      {
+        id: "r6",
+        title: "Outils d'analyse de marché",
+        description: "Collection d'outils et de méthodes pour analyser votre marché cible",
+        url: "https://example.com/market-analysis",
+        type: "document",
+        is_external: true,
+        created_at: "2025-02-05",
+        program_id: 1,
+        category: "Outil"
+      },
+      {
+        id: "r7",
+        title: "Template de plan marketing",
+        description: "Template détaillé pour créer un plan marketing efficace",
+        url: "https://example.com/marketing-template",
+        type: "document",
+        is_external: false,
+        created_at: "2025-02-10",
+        program_id: 1,
+        category: "Template"
+      },
+      {
+        id: "r8",
+        title: "Livre blanc: Tendances tech 2025",
+        description: "Analyse des tendances technologiques à surveiller en 2025",
+        url: "https://example.com/tech-trends",
+        type: "document",
+        is_external: false,
+        created_at: "2025-02-15",
+        program_id: 1,
+        category: "Livre blanc"
+      }
+    ],
+    createdAt: "2024-12-01",
+    updatedAt: "2025-01-10"
   },
   {
     id: "2",
@@ -264,7 +494,7 @@ const examplePrograms: Program[] = [
     description: "Un programme en cours de création",
     startDate: "2023-09-01",
     endDate: "2024-03-31",
-    status: "active",
+    status: "draft",
     phases: [
       {
         id: "phase1",
@@ -363,6 +593,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(false);
   // selectedPhaseId is used to track the selected phase across components
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | number | null>(null);
+  // Get user from AuthContext
+  const { user } = useAuth();
 
   // Custom setter for programs that ensures deduplication
   const setDeduplicatedPrograms = (newPrograms: Program[] | ((prev: Program[]) => Program[])) => {
@@ -377,11 +609,105 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
   const loadProgramsFromBackend = async () => {
       try {
         setIsLoading(true);
-        console.log('Loading programs from backend...');
 
-        // Since there's no endpoint to get all programs, we'll try a range of IDs
-        // This is a workaround to fetch all programs without a dedicated endpoint
+        // Check if user is a mentor
+        const isMentor = user?.role === 'mentor';
 
+        // If user is a mentor, fetch only programs they're assigned to
+        if (isMentor && user?.id) {
+          const mentorPrograms = await getMentorPrograms(user.id);
+
+          if (mentorPrograms.length > 0) {
+            // Convert backend format to frontend format
+            const convertedPrograms = await Promise.all(
+              mentorPrograms.map(async (programDetails) => {
+                // Fetch phases for this program
+                let programPhases: Phase[] = [];
+                try {
+                  const phases = await getPhases(programDetails.id);
+
+                  if (phases && phases.length > 0) {
+                    programPhases = phases.map((phase: any) => {
+                      // Determine phase status based on dates
+                      const now = new Date();
+                      const startDate = new Date(phase.date_debut);
+                      const endDate = new Date(phase.date_fin);
+
+                      let phaseStatus: "not_started" | "in_progress" | "completed" = "not_started";
+                      if (now > endDate) {
+                        phaseStatus = "completed";
+                      } else if (now >= startDate && now <= endDate) {
+                        phaseStatus = "in_progress";
+                      }
+
+                      return {
+                        id: String(phase.id),
+                        name: phase.nom,
+                        description: phase.description,
+                        startDate: new Date(phase.date_debut),
+                        endDate: new Date(phase.date_fin),
+                        status: phaseStatus,
+                        color: "#818cf8", // Default color
+                        tasks: [],
+                        meetings: [],
+                        evaluationCriteria: [],
+                        deliverables: []
+                      };
+                    });
+                  }
+                } catch (error) {
+                  console.error(`Error fetching phases for program ${programDetails.id}:`, error);
+                }
+
+                // Map mentors from backend format to frontend format
+                const mappedMentors = (programDetails.mentors || []).map((mentor: any) => ({
+                  id: mentor.utilisateur_id,
+                  name: `${mentor.prenom} ${mentor.nom}`,
+                  expertise: mentor.profession || 'General',
+                  bio: mentor.bio || `${mentor.prenom} ${mentor.nom} - ${mentor.profession || 'Mentor'}`,
+                  email: mentor.email || `mentor${mentor.utilisateur_id}@example.com`,
+                  title: mentor.profession || 'Program Mentor',
+                  rating: 4.5, // Default rating
+                  isTopMentor: true // Default value
+                }));
+
+                return {
+                  id: String(programDetails.id),
+                  name: programDetails.nom,
+                  description: programDetails.description,
+                  startDate: programDetails.date_debut,
+                  endDate: programDetails.date_fin,
+                  status: "active" as "active" | "completed" | "draft",
+                  phases: programPhases,
+                  mentors: mappedMentors,
+                  evaluationCriteria: [],
+                  eligibilityCriteria: {
+                    minTeamSize: 1,
+                    maxTeamSize: 5,
+                    requiredStages: [],
+                    requiredIndustries: [],
+                    minRevenue: 0,
+                    maxRevenue: 1000000,
+                    requiredDocuments: []
+                  },
+                  dashboardWidgets: [],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+              })
+            );
+
+            setPrograms(convertedPrograms);
+            setIsLoading(false);
+            return;
+          } else {
+            setPrograms([]);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // For admin users, continue with the existing approach
         // Create a Set to track program IDs we've already processed
         // This will help prevent duplicates
         const processedProgramIds = new Set<number>();
@@ -584,9 +910,25 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
           const uniquePrograms = Array.from(programsMap.values());
           console.log(`Found ${uniquePrograms.length} unique programs`);
 
-          // Replace the programs state entirely with the unique programs from the backend
-          // This ensures we don't have any duplicates from previous loads
-          setPrograms(uniquePrograms);
+          // Combine backend programs with example programs
+          console.log('Combining backend programs with example programs');
+          const combinedPrograms = [...uniquePrograms, ...examplePrograms];
+
+          // Deduplicate the combined programs by ID
+          const combinedProgramsMap = new Map();
+          combinedPrograms.forEach(program => {
+            // If a program with this ID already exists in the map, prefer the backend version
+            if (!combinedProgramsMap.has(program.id)) {
+              combinedProgramsMap.set(program.id, program);
+            }
+          });
+
+          // Convert map back to array
+          const finalPrograms = Array.from(combinedProgramsMap.values());
+          console.log(`Combined ${uniquePrograms.length} backend programs with ${examplePrograms.length} example programs for a total of ${finalPrograms.length} unique programs`);
+
+          // Set the combined programs
+          setPrograms(finalPrograms);
         } else {
           // Fallback to example programs if no programs found
           console.log('No programs found in backend, using example programs');
@@ -596,16 +938,17 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
       } catch (error) {
         console.error('Error loading programs:', error);
         // Fallback to example programs
+        console.log('Error occurred, using example programs');
         setPrograms(examplePrograms);
       } finally {
         setIsLoading(false);
       }
   };
 
-  // Load programs directly from the backend on mount
+  // Load programs directly from the backend on mount or when user changes
   useEffect(() => {
     loadProgramsFromBackend();
-  }, []);
+  }, [user?.id, user?.role]);
 
   // Get the selected program based on the ID
   const currentProgram = selectedProgramId
