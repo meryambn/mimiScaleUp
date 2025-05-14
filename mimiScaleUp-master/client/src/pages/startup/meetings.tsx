@@ -662,7 +662,7 @@ const StartupMeetingsPage = () => {
         }
 
         .meetings-header h1 {
-          font-size: 1.8rem;
+          font-size: 1.3rem;
           color: #111827;
           margin-bottom: 0.25rem;
         }
@@ -725,7 +725,7 @@ const StartupMeetingsPage = () => {
         .meeting-card {
           background: white;
           border-radius: 8px;
-          padding: 1.5rem;
+          padding: 0.5rem;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           transition: all 0.3s ease;
           border-left: 4px solid #e43e32;
@@ -888,7 +888,7 @@ const StartupMeetingsPage = () => {
           display: block;
           margin-bottom: 0.5rem;
           color: #4b5563;
-          font-weight: 500;
+          font-weight: 100;
         }
 
         .form-group input,

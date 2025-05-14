@@ -85,6 +85,11 @@ const Sidebar = () => {
       return '/startup/analytics';
     };
 
+    const getFeedPath = () => {
+      const role = localStorage.getItem('role');
+      return role === 'startup' ? '/startup/feed' : '/particulier/feed';
+    };
+
     return (
         <>
           {/* Hamburger menu button */}
@@ -161,8 +166,8 @@ const Sidebar = () => {
               )}
 
               <Link
-                className={`nav-item ${isActive('/feed') ? 'active' : ''}`}
-                to="/feed"
+                className={`nav-item ${isActive('/startup/feed') || isActive('/particulier/feed') ? 'active' : ''}`}
+                to={getFeedPath()}
               >
                 <div className="icon"><FaComments /></div>
                 <span>Feeds</span>

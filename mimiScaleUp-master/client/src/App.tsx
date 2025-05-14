@@ -17,6 +17,7 @@ import CreateTestTeamPage from './pages/test/create-team';
 import HomePage from './pages/home';
 import NotificationsPage from './pages/particulier/notifications';
 import StartupNotificationsPage from './pages/startup/notifications';
+import FeedPage from './pages/startup/feed';
 
 import NotFound from '@/pages/not-found';
 import HomeLayout from '@/components/layout/HomeLayout';
@@ -736,6 +737,22 @@ const App = () => {
 
                     <Route path="/startup/formulaire/:id">
                       {() => <StartupFormulaireRedirect />}
+                    </Route>
+
+                    <Route path="/startup/feed">
+                      {() => (
+                        <StartupLayout>
+                          <FeedPage />
+                        </StartupLayout>
+                      )}
+                    </Route>
+
+                    <Route path="/particulier/feed">
+                      {() => (
+                        <ParticulierLayout>
+                          <FeedPage />
+                        </ParticulierLayout>
+                      )}
                     </Route>
 
                     <Route>

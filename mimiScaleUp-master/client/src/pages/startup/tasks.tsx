@@ -592,7 +592,7 @@ const StartupTasksPage = () => {
               }
 
               .tasks-header h1 {
-                font-size: 1.8rem;
+                font-size: 1.5rem;
                 color: #111827;
                 margin-bottom: 0.25rem;
               }
@@ -673,7 +673,7 @@ const StartupTasksPage = () => {
               .recommended-card {
                 background: #f0fdf4;
                 border-radius: 8px;
-                padding: 1.5rem;
+                padding: 1rem;
                 border-left: 4px solid #10b981;
               }
 
@@ -894,7 +894,7 @@ const StartupTasksPage = () => {
                 display: block;
                 margin-bottom: 0.5rem;
                 color: #4b5563;
-                font-weight: 500;
+                font-weight: 300;
               }
 
               .form-group input,

@@ -438,7 +438,7 @@ const StartupDeliverablesPage = () => {
         }
 
         .deliverables-header h1 {
-          font-size: 1.8rem;
+          font-size: 1.5rem;
           color: #111827;
           margin-bottom: 0.25rem;
         }
@@ -455,7 +455,7 @@ const StartupDeliverablesPage = () => {
           border: none;
           padding: 0.75rem 1.5rem;
           border-radius: 6px;
-          font-weight: 500;
+          font-weight: 300;
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -481,7 +481,7 @@ const StartupDeliverablesPage = () => {
         .required-docs-card {
           background: rgb(241, 241, 241);
           border-radius: 8px;
-          padding: 1.5rem;
+          padding: 1rem;
           border-left: 4px solid rgb(255, 8, 8);
         }
 
@@ -547,7 +547,7 @@ const StartupDeliverablesPage = () => {
         .deliverable-card {
           background: white;
           border-radius: 8px;
-          padding: 1.5rem;
+          padding: 1rem;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           transition: all 0.3s ease;
           border-left: 4px solid #e43e32;

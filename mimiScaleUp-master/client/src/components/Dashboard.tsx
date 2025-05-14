@@ -322,7 +322,7 @@ const Dashboard = () => {
         }
 
         .dashboard-header h1 {
-          font-size: 1.5rem;
+          font-size: 1.4rem;
           font-weight: 600;
           color: #111827;
           margin: 0;
@@ -348,7 +348,7 @@ const Dashboard = () => {
         }
 
         .phases-section h2, .timeline-section h2, .program-details-section h2 {
-          font-size: 1.5rem;
+          font-size: 1.3rem;
           color: #111827;
           margin-bottom: 1.5rem;
           font-weight: 600;
@@ -369,7 +369,7 @@ const Dashboard = () => {
         .phase-card {
           background: white;
           border-radius: 12px;
-          padding: 1.5rem;
+          padding: 1rem;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
           cursor: pointer;
           transition: all 0.3s ease;
@@ -509,7 +509,7 @@ const Dashboard = () => {
         .progress-labels {
           display: flex;
           justify-content: space-between;
-          font-size: 0.8rem;
+          font-size: 0.1rem;
           color: #6b7280;
           margin-bottom: 0.5rem;
         }
@@ -724,7 +724,7 @@ const Dashboard = () => {
         .mentor-card {
           background: white;
           border-radius: 12px;
-          padding: 1.5rem;
+          padding: 0.1rem;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
           display: flex;
           flex-direction: column;
