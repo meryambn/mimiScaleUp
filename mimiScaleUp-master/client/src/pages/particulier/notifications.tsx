@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { FaArrowLeft, FaUser } from 'react-icons/fa';
 import Modal from '../../components/Modal';
+import { Card, CardContent } from '@mui/material';
+import { Badge } from '@mui/material';
 
 interface Programme {
   id: string;
@@ -10,7 +12,6 @@ interface Programme {
   date_debut: string;
   date_fin: string;
   statut: string;
-  formulaire_soumis?: boolean;
 }
 
 interface FormQuestion {
@@ -40,31 +41,8 @@ const NotificationsPage: React.FC = () => {
   const [currentForm, setCurrentForm] = useState<Form | null>(null);
   const [isLoadingForm, setIsLoadingForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Vérifier si le formulaire a été soumis
-  useEffect(() => {
-    const checkFormSubmission = async () => {
-      const programId = params?.id;
-      if (!programId) return;
-
-      try {
-        const response = await fetch(`http://localhost:8083/api/soum/check/${programId}`, {
-          credentials: 'include'
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (programme) {
-            setProgramme(prev => prev ? { ...prev, formulaire_soumis: data.soumis } : null);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking form submission:', error);
-      }
-    };
-
-    checkFormSubmission();
-  }, [params?.id, programme]);
+  const [hasSubmitted, setHasSubmitted] = useState<boolean>(false);
+  const [user, setUser] = useState<any>(null);
 
   // Charger le formulaire immédiatement
   useEffect(() => {
@@ -130,6 +108,29 @@ const NotificationsPage: React.FC = () => {
     fetchProgramme();
   }, [params?.id]);
 
+  // Vérifier si l'utilisateur a déjà soumis ce formulaire
+  useEffect(() => {
+    const checkSubmission = async () => {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return;
+      const userObj = JSON.parse(storedUser);
+      setUser(userObj);
+      if (!currentForm?.id || !userObj?.id) return;
+      try {
+        const response = await fetch(`http://localhost:8083/api/soum/check?formulaire_id=${currentForm.id}&utilisateur_id=${userObj.id}`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setHasSubmitted(data.hasSubmitted);
+      } catch (err) {
+        setHasSubmitted(false);
+      }
+    };
+    if (currentForm?.id) {
+      checkSubmission();
+    }
+  }, [currentForm]);
+
   // Fonction pour charger le formulaire
   const loadForm = async (programmeId: string) => {
     try {
@@ -178,7 +179,7 @@ const NotificationsPage: React.FC = () => {
               Notifications
             </h1>
             <p className="text-gray-600 mt-2">
-              Consultez vos notifications et restez informé des dernières mises à jour.
+              Consultez vos notifications et restez informé des dernières mises à jour de vos programmes.
             </p>
           </div>
         </div>
@@ -193,41 +194,32 @@ const NotificationsPage: React.FC = () => {
             </div>
           ) : error ? (
             <div className="text-center py-8 bg-white rounded-xl shadow-sm">
-              <p className="text-red-500">{error}</p>
+              <p className="text-blue-500">{error}</p>
             </div>
           ) : programme ? (
-            <div className={`bg-white rounded-xl shadow-sm overflow-hidden border ${programme.formulaire_soumis ? 'border-green-500' : 'border-gray-200'} hover:shadow-md transition-shadow`}>
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200 hover:shadow-md transition-shadow">
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{programme.nom}</h3>
-                      {programme.formulaire_soumis && (
-                        <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                          Formulaire soumis
-                        </span>
-                      )}
-                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{programme.nom}</h3>
                     <p className="text-gray-600 text-sm mb-4">{programme.description}</p>
                     <div className="flex items-center text-sm text-gray-500">
                       <span className="mr-4">Du {new Date(programme.date_debut).toLocaleDateString()}</span>
                       <span>Au {new Date(programme.date_fin).toLocaleDateString()}</span>
                     </div>
                   </div>
+                  {hasSubmitted && currentForm?.message_confirmation && (
+                    <div className="mt-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded">
+                      {currentForm.message_confirmation}
+                    </div>
+                  )}
                   <div className="flex items-center space-x-3 ml-6">
-                    {!programme.formulaire_soumis ? (
+                    {!hasSubmitted && (
                       <button
                         onClick={() => loadForm(programme.id)}
                         className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-sm hover:shadow-md"
                       >
                         Voir le formulaire
-                      </button>
-                    ) : (
-                      <button
-                        disabled
-                        className="px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
-                      >
-                        Formulaire soumis
                       </button>
                     )}
                   </div>
@@ -240,16 +232,16 @@ const NotificationsPage: React.FC = () => {
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600"></div>
                     </div>
                   </div>
-                ) : currentForm?.url_formulaire && !programme.formulaire_soumis ? (
+                ) : currentForm?.url_formulaire && !hasSubmitted ? (
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <div className="flex flex-col items-center">
-                      <p className="text-gray-600 mb-4">{currentForm.message_confirmation}</p>
+                     
                       <p className="text-gray-700">
                         <button
-                          onClick={() => setLocation(`/particulier/apply/${params?.id}`)}
-                          className="text-red-600 hover:text-red-700 underline transition-colors duration-300 cursor-pointer"
+                          onClick={() => setLocation(`/startup/apply/${params?.id}`)}
+                          className="text-blue-600 hover:text-red-700 underline transition-colors duration-300 cursor-pointer"
                         >
-                          {`${window.location.origin}/particulier/apply/${params?.id}`}
+                          {`${window.location.origin}/startup/apply/${params?.id}`}
                         </button>
                       </p>
                     </div>
@@ -263,6 +255,9 @@ const NotificationsPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Message de confirmation en bas de la page */}
+       
       </main>
 
       {/* Modal du formulaire */}
@@ -273,7 +268,7 @@ const NotificationsPage: React.FC = () => {
       >
         {isLoadingForm ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         ) : currentForm ? (
           <div className="flex flex-col flex-grow justify-center items-center min-h-[350px] w-full">
@@ -285,26 +280,26 @@ const NotificationsPage: React.FC = () => {
                 <div key={question.id} className="bg-gray-50 p-6 rounded-lg w-full max-w-xl flex flex-col items-center shadow-sm">
                   <label className="block text-base font-medium text-gray-700 mb-2 text-center">
                     {question.texte_question}
-                    {question.required && <span className="text-red-500 ml-1">*</span>}
+                    {question.required && <span className="text-blue-500 ml-1">*</span>}
                   </label>
                   <span className="mb-4 text-xs text-gray-500 italic">Type : {question.type}</span>
                   {/* Champ de réponse juste en dessous de la question */}
                   {question.type === 'text' && (
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
                       placeholder="Votre réponse..."
                     />
                   )}
                   {question.type === 'textarea' && (
                     <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-2"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
                       rows={4}
                       placeholder="Votre réponse..."
                     />
                   )}
                   {question.type === 'select' && question.options && (
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-2">
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
                       <option value="">Sélectionnez une option</option>
                       {question.options.map((option, i) => (
                         <option key={i} value={option}>

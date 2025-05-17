@@ -41,6 +41,8 @@ const NotificationsPage: React.FC = () => {
   const [currentForm, setCurrentForm] = useState<Form | null>(null);
   const [isLoadingForm, setIsLoadingForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSubmitted, setHasSubmitted] = useState<boolean>(false);
+  const [user, setUser] = useState<any>(null);
 
   // Charger le formulaire immédiatement
   useEffect(() => {
@@ -105,6 +107,29 @@ const NotificationsPage: React.FC = () => {
 
     fetchProgramme();
   }, [params?.id]);
+
+  // Vérifier si l'utilisateur a déjà soumis ce formulaire
+  useEffect(() => {
+    const checkSubmission = async () => {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return;
+      const userObj = JSON.parse(storedUser);
+      setUser(userObj);
+      if (!currentForm?.id || !userObj?.id) return;
+      try {
+        const response = await fetch(`http://localhost:8083/api/soum/check?formulaire_id=${currentForm.id}&utilisateur_id=${userObj.id}`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setHasSubmitted(data.hasSubmitted);
+      } catch (err) {
+        setHasSubmitted(false);
+      }
+    };
+    if (currentForm?.id) {
+      checkSubmission();
+    }
+  }, [currentForm]);
 
   // Fonction pour charger le formulaire
   const loadForm = async (programmeId: string) => {
@@ -183,13 +208,20 @@ const NotificationsPage: React.FC = () => {
                       <span>Au {new Date(programme.date_fin).toLocaleDateString()}</span>
                     </div>
                   </div>
+                  {hasSubmitted && currentForm?.message_confirmation && (
+                    <div className="mt-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded">
+                      {currentForm.message_confirmation}
+                    </div>
+                  )}
                   <div className="flex items-center space-x-3 ml-6">
-                    <button
-                      onClick={() => loadForm(programme.id)}
-                      className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-sm hover:shadow-md"
-                    >
-                      Voir le formulaire
-                    </button>
+                    {!hasSubmitted && (
+                      <button
+                        onClick={() => loadForm(programme.id)}
+                        className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300 shadow-sm hover:shadow-md"
+                      >
+                        Voir le formulaire
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -200,10 +232,10 @@ const NotificationsPage: React.FC = () => {
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600"></div>
                     </div>
                   </div>
-                ) : currentForm?.url_formulaire && (
+                ) : currentForm?.url_formulaire && !hasSubmitted ? (
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <div className="flex flex-col items-center">
-                      <p className="text-gray-600 mb-4">{currentForm.message_confirmation}</p>
+                     
                       <p className="text-gray-700">
                         <button
                           onClick={() => setLocation(`/startup/apply/${params?.id}`)}
@@ -214,7 +246,7 @@ const NotificationsPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           ) : (
@@ -223,6 +255,9 @@ const NotificationsPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Message de confirmation en bas de la page */}
+       
       </main>
 
       {/* Modal du formulaire */}

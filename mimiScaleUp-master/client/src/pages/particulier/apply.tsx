@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
-import { FaArrowLeft } from 'react-icons/fa';
-import { motion } from 'framer-motion';
+import { FaArrowLeft, FaCheck, FaTimes } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface Question {
   id: number;
@@ -21,11 +20,7 @@ interface Formulaire {
   titre: string;
   description: string;
   questions: Question[];
-}
-
-interface SoumissionResponse {
-  message: string;
-  soumission_id: number;
+  message_confirmation?: string;
 }
 
 interface User {
@@ -40,41 +35,14 @@ const ApplyPage: React.FC = () => {
   const [formData, setFormData] = useState<Formulaire | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string | string[]>>({});
   const [error, setError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFormSubmitted, setIsFormSubmitted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
 
   useEffect(() => {
-    // Vérifier si le formulaire a déjà été soumis
-    const checkFormSubmission = async () => {
-      const programId = params?.id;
-      if (!programId) return;
-
-      try {
-        const response = await fetch(`http://localhost:8083/api/soum/check/${programId}`, {
-          credentials: 'include'
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.soumis) {
-            setIsFormSubmitted(true);
-            setLocation(`/particulier/notifications/${programId}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking form submission:', error);
-      }
-    };
-
-    checkFormSubmission();
-  }, [params?.id, setLocation]);
-
-  useEffect(() => {
-    // Vérifier d'abord le localStorage
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -109,28 +77,17 @@ const ApplyPage: React.FC = () => {
         }
 
         const data = await response.json();
-
-        if (!data.utilisateur) {
-          throw new Error('Format de réponse invalide');
-        }
-
         const userData = {
           id: data.utilisateur.id,
           email: data.utilisateur.email,
           role: data.utilisateur.role
         };
 
-        // Mettre à jour le localStorage
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
       } catch (err) {
         console.error('Erreur détaillée:', err);
-        if (err instanceof Error) {
-          setError(`Erreur lors de la récupération des données utilisateur: ${err.message}`);
-        } else {
-          setError('Une erreur inattendue est survenue');
-        }
-        // En cas d'erreur, supprimer les données du localStorage
+        setError(err instanceof Error ? err.message : 'Une erreur inattendue est survenue');
         localStorage.removeItem('user');
       } finally {
         setIsLoading(false);
@@ -149,43 +106,35 @@ const ApplyPage: React.FC = () => {
           credentials: 'include'
         });
 
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
         const data = await response.json();
         setFormData(data.formulaire);
       } catch (err) {
         console.error('Erreur détaillée:', err);
-        if (err instanceof Error) {
-          setError(`Erreur lors du chargement du formulaire: ${err.message}`);
-        } else {
-          setError('Une erreur inattendue est survenue');
-        }
+        setError(err instanceof Error ? err.message : 'Une erreur inattendue est survenue');
       }
     };
 
-    // Si pas d'utilisateur dans le localStorage, faire la requête
-    if (!storedUser) {
-      fetchUserData();
-    } else {
-      setIsLoading(false);
-    }
+    if (!storedUser) fetchUserData();
+    else setIsLoading(false);
 
     fetchForm();
   }, [setLocation, params?.id]);
 
+  const showConfirmationModal = (message: string) => {
+    setModalMessage(message);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setLocation(`/particulier/notifications/${params?.id}`);
+  };
+
   const handleInputChange = (questionId: number, value: string | string[]) => {
-    setFormValues(prev => ({
-      ...prev,
-      [questionId]: value
-    }));
-    if (typeof value === 'string' && value.trim() || Array.isArray(value) && value.length > 0) {
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[questionId];
-        return newErrors;
-      });
+    setFormValues(prev => ({ ...prev, [questionId]: value }));
+    if ((typeof value === 'string' && value.trim()) || (Array.isArray(value) && value.length > 0)) {
+      setValidationErrors(prev => ({ ...prev, [questionId]: undefined }));
     }
   };
 
@@ -194,7 +143,6 @@ const ApplyPage: React.FC = () => {
     const newValues = currentValues.includes(option)
       ? currentValues.filter(v => v !== option)
       : [...currentValues, option];
-
     handleInputChange(questionId, newValues);
   };
 
@@ -206,13 +154,11 @@ const ApplyPage: React.FC = () => {
 
     formData.questions.forEach(question => {
       const value = formValues[question.id];
-      if (question.obligatoire) {
-        if (!value ||
-            (typeof value === 'string' && !value.trim()) ||
-            (Array.isArray(value) && value.length === 0)) {
-          errors[question.id] = 'Ce champ est obligatoire';
-          isValid = false;
-        }
+      if (question.obligatoire && (!value || 
+          (typeof value === 'string' && !value.trim()) || 
+          (Array.isArray(value) && value.length === 0))) {
+        errors[question.id] = 'Ce champ est obligatoire';
+        isValid = false;
       }
     });
 
@@ -222,29 +168,19 @@ const ApplyPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
-    if (!user) {
-      setError('Vous devez être connecté pour soumettre le formulaire');
-      return;
-    }
+    if (!validateForm() || !user || !formData) return;
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Préparer les réponses pour l'envoi
-      const reponses = formData?.questions.map(question => ({
+      const reponses = formData.questions.map(question => ({
         question_id: question.id,
         valeur: Array.isArray(formValues[question.id])
           ? (formValues[question.id] as string[]).join(',')
           : formValues[question.id] || ''
-      })) || [];
+      }));
 
-      // Envoyer la soumission au backend
       const response = await fetch('http://localhost:8083/api/soum/create', {
         method: 'POST',
         headers: {
@@ -254,30 +190,27 @@ const ApplyPage: React.FC = () => {
         },
         credentials: 'include',
         body: JSON.stringify({
-          formulaire_id: formData?.id,
+          formulaire_id: formData.id,
           utilisateur_id: user.id,
           role: user.role,
           reponses: reponses
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `Erreur HTTP: ${response.status}`);
+        if (response.status === 400 && data.error === 'Vous avez déjà soumis ce formulaire') {
+          throw new Error('Vous avez déjà soumis ce formulaire. Vous ne pouvez pas le soumettre à nouveau.');
+        }
+        throw new Error(data.error || `Erreur HTTP: ${response.status}`);
       }
 
-      const data: SoumissionResponse = await response.json();
-      setSubmitted(true);
-
-      // Rediriger vers la page de notifications après un court délai
+      showConfirmationModal(formData.message_confirmation || 'Votre formulaire a été soumis avec succès !');
 
     } catch (err) {
       console.error('Erreur détaillée:', err);
-      if (err instanceof Error) {
-        setError(`Erreur lors de la soumission du formulaire: ${err.message}`);
-      } else {
-        setError('Une erreur inattendue est survenue lors de la soumission');
-      }
+      setError(err instanceof Error ? err.message : 'Une erreur inattendue est survenue');
     } finally {
       setIsSubmitting(false);
     }
@@ -287,12 +220,14 @@ const ApplyPage: React.FC = () => {
     const value = formValues[question.id] || '';
     const error = validationErrors[question.id];
 
+    const inputClass = `w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`;
+
     switch (question.type) {
       case 'Single-Line':
         return (
           <input
             type="text"
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={inputClass}
             placeholder="Votre réponse..."
             value={value as string}
             onChange={e => handleInputChange(question.id, e.target.value)}
@@ -303,7 +238,7 @@ const ApplyPage: React.FC = () => {
       case 'Multi-Line':
         return (
           <textarea
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={inputClass}
             rows={4}
             placeholder="Votre réponse..."
             value={value as string}
@@ -350,10 +285,11 @@ const ApplyPage: React.FC = () => {
             ))}
           </div>
         );
+
       case 'liste_deroulante':
         return (
           <select
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={inputClass}
             value={value as string}
             onChange={e => handleInputChange(question.id, e.target.value)}
             required={question.obligatoire}
@@ -368,7 +304,8 @@ const ApplyPage: React.FC = () => {
       case 'evaluation':
         return (
           <div className="flex items-center space-x-4">
-            {Array.from({ length: (question.evaluation_max || 5) - (question.evaluation_min || 1) + 1 }, (_, i) => i + (question.evaluation_min || 1)).map((rating) => (
+            {Array.from({ length: (question.evaluation_max || 5) - (question.evaluation_min || 1) + 1 }, 
+              (_, i) => i + (question.evaluation_min || 1)).map((rating) => (
               <label key={rating} className="flex flex-col items-center">
                 <input
                   type="radio"
@@ -377,7 +314,7 @@ const ApplyPage: React.FC = () => {
                   checked={value === rating.toString()}
                   onChange={e => handleInputChange(question.id, e.target.value)}
                   required={question.obligatoire}
-                  className="text-blue-500 focus:ring-blue-400"
+                  className="text-red-500 focus:ring-red-400"
                 />
                 <span className="text-sm mt-1">{rating}</span>
               </label>
@@ -397,16 +334,14 @@ const ApplyPage: React.FC = () => {
                   <p className="mb-2 text-sm text-gray-500">
                     <span className="font-semibold">Cliquez pour télécharger</span> ou glissez-déposez
                   </p>
-                  <p className="text-xs text-gray-500">PDF, DOC, DOCX, PNG, JPG </p>
+                  <p className="text-xs text-gray-500">PDF, DOC, DOCX, PNG, JPG (MAX. 10MB)</p>
                 </div>
                 <input
                   type="file"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      handleInputChange(question.id, file.name);
-                    }
+                    if (file) handleInputChange(question.id, file.name);
                   }}
                   required={question.obligatoire}
                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
@@ -415,13 +350,8 @@ const ApplyPage: React.FC = () => {
             </div>
             {value && (
               <div className="mt-2 p-2 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-600">
-                  Fichier sélectionné : {value}
-                </p>
+                <p className="text-sm text-gray-600">Fichier sélectionné : {value}</p>
               </div>
-            )}
-            {error && (
-              <p className="text-red-500 text-sm mt-1">{error}</p>
             )}
           </div>
         );
@@ -430,7 +360,7 @@ const ApplyPage: React.FC = () => {
         return (
           <input
             type="text"
-            className={`w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-red-400 bg-white mb-2`}
+            className={inputClass}
             placeholder="Votre réponse..."
             value={value as string}
             onChange={e => handleInputChange(question.id, e.target.value)}
@@ -439,28 +369,6 @@ const ApplyPage: React.FC = () => {
         );
     }
   };
-
-  if (isFormSubmitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
-          <div className="text-yellow-500 text-center mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-6a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-center mb-4">Formulaire déjà soumis</h2>
-          <p className="text-gray-600 text-center mb-6">Vous avez déjà soumis ce formulaire.</p>
-          <button
-            onClick={() => setLocation(`/particulier/notifications/${params?.id}`)}
-            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-          >
-            Retour aux notifications
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -529,42 +437,109 @@ const ApplyPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7fa]">
-      <div className="w-full flex items-center" style={{height: '64px'}}>
+    <div className="min-h-screen bg-gray-50 py-8 relative">
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 mx-4"
+            >
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                  <FaCheck className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Confirmation</h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">
+                    {modalMessage}
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      </div>
       <div className="max-w-4xl mx-auto px-6 pt-2">
+        <button 
+          onClick={() => setLocation(-1)}
+          className="flex items-center text-red-600 mb-4 hover:text-red-800 transition-colors"
+        >
+          <FaArrowLeft className="mr-2" />
+          Retour
+        </button>
+        
         <h1 className="text-4xl font-extrabold text-red-600 mb-2 leading-tight">{formData.titre}</h1>
         <p className="text-lg text-gray-500 mb-10">{formData.description}</p>
+        
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
           {formData.questions.map((question) => (
-            <div key={question.id} className="flex flex-col items-start mb-2">
-              <label className="block text-base font-semibold text-gray-800 mb-2">
-                {question.texte_question}
-                {question.obligatoire && <span className="text-red-500 ml-1">*</span>}
-              </label>
-              {question.description && (
-                <p className="mb-2 text-sm text-gray-500">{question.description}</p>
-              )}
-              {renderQuestionInput(question)}
-              {validationErrors[question.id] && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors[question.id]}</p>
-              )}
-            </div>
+            <motion.div 
+              key={question.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col items-start mb-2"
+            >
+              <Card className="w-full">
+                <CardContent className="p-6">
+                  <label className="block text-base font-semibold text-gray-800 mb-2">
+                    {question.texte_question}
+                    {question.obligatoire && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {question.description && (
+                    <p className="mb-4 text-sm text-gray-500">{question.description}</p>
+                  )}
+                  {renderQuestionInput(question)}
+                  {validationErrors[question.id] && (
+                    <p className="text-red-500 text-sm mt-2">{validationErrors[question.id]}</p>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
-          <div className="flex justify-end">
-          <button
-            type="submit"
+          
+          <div className="flex justify-end mt-6">
+            <motion.button
+              type="submit"
               disabled={isSubmitting}
-              className={`px-8 py-3 text-base font-bold text-white bg-red-600 rounded-lg shadow hover:bg-red-700 transition-all duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-              {isSubmitting ? 'Envoi en cours...' : 'Soumettre'}
-          </button>
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`px-8 py-3 text-base font-bold text-white bg-red-600 rounded-lg shadow hover:bg-red-700 transition-all duration-200 ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Envoi en cours...
+                </span>
+              ) : (
+                'Soumettre'
+              )}
+            </motion.button>
           </div>
         </form>
-        {submitted && (
-          <div className="mt-8 text-green-600 font-semibold text-lg">Réponse envoyée !</div>
-        )}
       </div>
     </div>
   );

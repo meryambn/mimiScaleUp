@@ -21,6 +21,7 @@ interface Formulaire {
   titre: string;
   description: string;
   questions: Question[];
+  message_confirmation?: string;
 }
 
 interface SoumissionResponse {
@@ -47,7 +48,6 @@ const ApplyPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Vérifier d'abord le localStorage
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -93,7 +93,6 @@ const ApplyPage: React.FC = () => {
           role: data.utilisateur.role
         };
 
-        // Mettre à jour le localStorage
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
       } catch (err) {
@@ -103,7 +102,6 @@ const ApplyPage: React.FC = () => {
         } else {
           setError('Une erreur inattendue est survenue');
         }
-        // En cas d'erreur, supprimer les données du localStorage
         localStorage.removeItem('user');
       } finally {
         setIsLoading(false);
@@ -138,7 +136,6 @@ const ApplyPage: React.FC = () => {
       }
     };
 
-    // Si pas d'utilisateur dans le localStorage, faire la requête
     if (!storedUser) {
       fetchUserData();
     } else {
@@ -209,7 +206,6 @@ const ApplyPage: React.FC = () => {
     setError(null);
 
     try {
-      // Préparer les réponses pour l'envoi
       const reponses = formData?.questions.map(question => ({
         question_id: question.id,
         valeur: Array.isArray(formValues[question.id])
@@ -217,7 +213,6 @@ const ApplyPage: React.FC = () => {
           : formValues[question.id] || ''
       })) || [];
 
-      // Envoyer la soumission au backend
       const response = await fetch('http://localhost:8083/api/soum/create', {
         method: 'POST',
         headers: {
@@ -234,14 +229,26 @@ const ApplyPage: React.FC = () => {
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `Erreur HTTP: ${response.status}`);
+        if (response.status === 400 && data.error === 'Vous avez déjà soumis ce formulaire') {
+          setError('Vous avez déjà soumis ce formulaire. Vous ne pouvez pas le soumettre à nouveau.');
+          return;
+        }
+        throw new Error(data.error || `Erreur HTTP: ${response.status}`);
       }
 
-      const data: SoumissionResponse = await response.json();
+      // Afficher le message de confirmation dans une alerte
+      if (formData?.message_confirmation) {
+        alert(formData.message_confirmation);
+      } else {
+        alert('Votre formulaire a été soumis avec succès !');
+      }
+
       setSubmitted(true);
       setLocation(`/startup/notifications/${params?.id}`);
+
     } catch (err) {
       console.error('Erreur détaillée:', err);
       if (err instanceof Error) {
@@ -480,37 +487,68 @@ const ApplyPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-6 pt-2">
+        <button 
+          onClick={() => setLocation(-1)}
+          className="flex items-center text-blue-600 mb-4 hover:text-blue-800 transition-colors"
+        >
+          <FaArrowLeft className="mr-2" />
+          Retour
+        </button>
+        
         <h1 className="text-4xl font-extrabold text-blue-600 mb-2 leading-tight">{formData.titre}</h1>
         <p className="text-lg text-gray-500 mb-10">{formData.description}</p>
+        
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
           {formData.questions.map((question) => (
-            <div key={question.id} className="flex flex-col items-start mb-2">
-              <label className="block text-base font-semibold text-gray-800 mb-2">
-                {question.texte_question}
-                {question.obligatoire && <span className="text-red-500 ml-1">*</span>}
-              </label>
-              {question.description && (
-                <p className="mb-2 text-sm text-gray-500">{question.description}</p>
-              )}
-              {renderQuestionInput(question)}
-              {validationErrors[question.id] && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors[question.id]}</p>
-              )}
-            </div>
+            <motion.div 
+              key={question.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col items-start mb-2"
+            >
+              <Card className="w-full">
+                <CardContent className="p-6">
+                  <label className="block text-base font-semibold text-gray-800 mb-2">
+                    {question.texte_question}
+                    {question.obligatoire && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {question.description && (
+                    <p className="mb-4 text-sm text-gray-500">{question.description}</p>
+                  )}
+                  {renderQuestionInput(question)}
+                  {validationErrors[question.id] && (
+                    <p className="text-red-500 text-sm mt-2">{validationErrors[question.id]}</p>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
-          <div className="flex justify-end">
-            <button
+          
+          <div className="flex justify-end mt-6">
+            <motion.button
               type="submit"
               disabled={isSubmitting}
-              className={`px-8 py-3 text-base font-bold text-white bg-blue-600 rounded-lg shadow hover:bg-blue-700 transition-all duration-200 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`px-8 py-3 text-base font-bold text-white bg-blue-600 rounded-lg shadow hover:bg-blue-700 transition-all duration-200 ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              {isSubmitting ? 'Envoi en cours...' : 'Soumettre'}
-            </button>
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Envoi en cours...
+                </span>
+              ) : (
+                'Soumettre'
+              )}
+            </motion.button>
           </div>
         </form>
-        {submitted && (
-          <div className="mt-8 text-green-600 font-semibold text-lg">Réponse envoyée !</div>
-        )}
       </div>
     </div>
   );
