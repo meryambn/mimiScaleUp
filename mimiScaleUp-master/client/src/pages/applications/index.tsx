@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { API_BASE_URL } from "@/lib/constants";
+// Note: teamService is imported dynamically to avoid circular dependencies
 // import { Program } from "@shared/schema";
 // Import directement depuis le chemin relatif pour éviter les problèmes de résolution de module
 // No longer using localStorage utilities
@@ -44,11 +46,11 @@ import { useProgramContext } from "@/context/ProgramContext";
 import ApplicationSubmissionCard, { ApplicationSubmission } from "@/components/application/ApplicationSubmissionCard";
 import ApplicationFormViewer from "@/components/application/ApplicationFormViewer";
 import TeamCreationDialog from "@/components/application/TeamCreationDialog";
-import { getFormWithQuestions, deleteForm } from "@/services/formService";
+import { getFormWithQuestions, deleteForm, getSubmissionsByProgram } from "@/services/formService";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import TeamInvitationNotification from "@/components/application/TeamInvitationNotification";
+
 import {
   Dialog,
   DialogClose,
@@ -104,54 +106,41 @@ const ApplicationsPage = () => {
   const [backendFormData, setBackendFormData] = useState<any>(null);
   const [isLoadingBackendForm, setIsLoadingBackendForm] = useState<boolean>(false);
   const [backendFormError, setBackendFormError] = useState<string | null>(null);
-  const [showInvitationDialog, setShowInvitationDialog] = useState(false);
-  const [invitationDetails, setInvitationDetails] = useState<{
-    teamName: string;
-    teamDescription: string;
-    programName: string;
-  }>({ teamName: '', teamDescription: '', programName: '' });
+
+
 
   // Function to add a team to the program
-  const handleAddTeamToProgram = (submission: ApplicationSubmission) => {
-    // Create a new startup object
-    const newStartup = {
-      id: Date.now(),
-      name: submission.teamName,
-      logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(submission.teamName)}&background=random`,
-      industry: submission.industry,
-      currentPhase: "Application",
-      progress: 0,
-      status: 'active' as const,
-      programId: String(selectedProgramId)
-    };
-
-    // Save the new startup to localStorage
+  const handleAddTeamToProgram = async (submission: ApplicationSubmission) => {
     try {
-      // Get existing startups from localStorage
-      const existingStartups = JSON.parse(localStorage.getItem('startups') || '[]');
+      // Import the team service dynamically to avoid circular dependencies
+      const { addSubmissionAsTeam } = await import('@/services/teamService');
 
-      // Add the new startup
-      existingStartups.push(newStartup);
+      // Call the team service to add the submission as a team
+      if (selectedProgramId) {
+        await addSubmissionAsTeam(submission, selectedProgramId);
+      } else {
+        throw new Error("Aucun programme sélectionné");
+      }
 
-      // Save back to localStorage
-      localStorage.setItem('startups', JSON.stringify(existingStartups));
-
-      // Update the submission status
-      const updatedSubmissions = mockSubmissions.map(s =>
+      // Update the submission status in the UI
+      const updatedSubmissions = submissions.map(s =>
         s.id === submission.id ? { ...s, status: 'approved' as const } : s
       );
-      setMockSubmissions(updatedSubmissions);
+      setSubmissions(updatedSubmissions);
 
       // Show success message
       toast({
-        title: "Team added to program",
-        description: `${submission.teamName} has been successfully added to ${selectedProgram?.name}.`,
+        title: "Équipe ajoutée au programme",
+        description: `${submission.teamName} a été ajouté avec succès à ${selectedProgram?.name}.`,
       });
+
+      // Refresh submissions from backend
+      fetchSubmissionsFromBackend(selectedProgramId);
     } catch (error) {
-      console.error("Error saving startup to localStorage:", error);
+      console.error("Error creating team:", error);
       toast({
-        title: "Error adding team",
-        description: "Failed to add team to program. Please try again.",
+        title: "Erreur lors de l'ajout de l'équipe",
+        description: error instanceof Error ? error.message : "Échec de l'ajout de l'équipe au programme. Veuillez réessayer.",
         variant: "destructive",
       });
     }
@@ -476,64 +465,60 @@ const ApplicationsPage = () => {
     return [];
   }, [programId, backendFormData]);
 
-  // Mock application submissions data
-  const [mockSubmissions, setMockSubmissions] = useState<ApplicationSubmission[]>([
-    {
-      id: 1,
-      programId: selectedProgramId,
-      formId: 1,
-      teamName: "TechInnovators",
-      teamEmail: "contact@techinnovators.com",
-      teamSize: 4,
-      industry: "Technology",
-      status: 'pending',
-      submittedAt: new Date().toISOString(),
-      formData: {
-        "Project Description": "We are building an AI-powered platform that helps small businesses automate their customer service.",
-        "Current Stage": "MVP",
-        "Funding Raised": "$50,000",
-        "Team Experience": "Our team has over 10 years of combined experience in AI and customer service technologies."
-      }
-    },
-    {
-      id: 2,
-      programId: selectedProgramId,
-      formId: 1,
-      teamName: "GreenSolutions",
-      teamEmail: "info@greensolutions.co",
-      teamSize: 3,
-      industry: "Sustainability",
-      status: 'pending',
-      submittedAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      formData: {
-        "Project Description": "Developing sustainable packaging solutions for e-commerce businesses.",
-        "Current Stage": "Seed",
-        "Funding Raised": "$120,000",
-        "Team Experience": "Our founders previously worked at major packaging companies and have patents in biodegradable materials."
-      }
-    },
-    {
-      id: 3,
-      programId: selectedProgramId,
-      formId: 1,
-      teamName: "HealthTech Innovations",
-      teamEmail: "team@healthtechinnovations.com",
-      teamSize: 5,
-      industry: "Healthcare",
-      status: 'approved',
-      submittedAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-      formData: {
-        "Project Description": "Creating a wearable device that monitors vital signs and predicts potential health issues.",
-        "Current Stage": "Growth",
-        "Funding Raised": "$500,000",
-        "Team Experience": "Our team includes medical doctors and engineers with experience in medical device development."
-      }
-    }
-  ]);
+  // Submissions data from backend
+  const [submissions, setSubmissions] = useState<ApplicationSubmission[]>([]);
+  const [isSubmissionsLoading, setIsSubmissionsLoading] = useState<boolean>(false);
 
-  // Use mock data instead of API call
-  const isSubmissionsLoading = false;
-  const applicationSubmissions = mockSubmissions;
+  // Function to fetch submissions from backend
+  const fetchSubmissionsFromBackend = async (programId: string | number | null) => {
+    if (!programId) return;
+
+    setIsSubmissionsLoading(true);
+
+    try {
+      const result = await getSubmissionsByProgram(programId);
+      console.log('Submissions fetched from backend API:', result);
+
+      if (result.error) {
+        toast({
+          title: "Erreur de récupération des soumissions",
+          description: result.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (result.submissions && Array.isArray(result.submissions)) {
+        setSubmissions(result.submissions);
+        toast({
+          title: "Soumissions récupérées",
+          description: `${result.submissions.length} soumissions récupérées avec succès.`,
+        });
+      } else {
+        setSubmissions([]);
+      }
+    } catch (err) {
+      console.error('Error fetching submissions from backend:', err);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la récupération des soumissions.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmissionsLoading(false);
+    }
+  };
+
+  // Fetch submissions when program is selected
+  React.useEffect(() => {
+    if (programId) {
+      console.log('Program selected, fetching submissions from backend API');
+      fetchSubmissionsFromBackend(programId);
+    }
+  }, [programId]);
+
+  // Use real data from backend
+  const applicationSubmissions = submissions;
 
   // Filter submissions for the selected program
   const programApplicationSubmissions = React.useMemo(() => {
@@ -1132,10 +1117,21 @@ const ApplicationsPage = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pb-2">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Users className="h-4 w-4 mr-1" />
-                      <span>0 Submissions</span>
-                    </div>
+                    {(() => {
+                      // Calculate submission count once
+                      const submissionCount = programApplicationSubmissions.filter(submission =>
+                        String(submission.formId) === String(form.id)
+                      ).length;
+
+                      return (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Users className="h-4 w-4 mr-1" />
+                          <span>
+                            {submissionCount} {submissionCount <= 1 ? 'Soumission' : 'Soumissions'}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                   <CardFooter className="flex flex-wrap gap-2 pt-2">
                     <div className="flex flex-wrap gap-2">
@@ -1304,19 +1300,41 @@ const ApplicationsPage = () => {
 
             <DialogFooter className="flex flex-wrap justify-between mt-4 gap-2">
               <div className="flex flex-wrap gap-2">
-
-
                 {backendFormData && backendFormData.formulaire && backendFormData.formulaire.url_formulaire && (
-                  <button
-                    onClick={() => window.open(backendFormData.formulaire.url_formulaire, '_blank')}
-                    style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Link className="h-4 w-4 mr-2" />
-                    Ouvrir le formulaire
-                  </button>
+                  <>
+                    <button
+                      onClick={() => window.open(backendFormData.formulaire.url_formulaire, '_blank')}
+                      style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Link className="h-4 w-4 mr-2" />
+                      Ouvrir le formulaire
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(backendFormData.formulaire.url_formulaire)
+                          .then(() => {
+                            toast({
+                              title: "Lien copié",
+                              description: "Le lien du formulaire a été copié dans le presse-papiers.",
+                            });
+                          })
+                          .catch((error) => {
+                            console.error('Erreur lors de la copie du lien:', error);
+                            toast({
+                              title: "Erreur",
+                              description: "Impossible de copier le lien. Veuillez réessayer.",
+                              variant: "destructive",
+                            });
+                          });
+                      }}
+                      style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Partager
+                    </button>
+                  </>
                 )}
-
-
               </div>
 
               <DialogClose asChild>
@@ -1347,88 +1365,47 @@ const ApplicationsPage = () => {
         open={showTeamCreationDialog}
         onOpenChange={setShowTeamCreationDialog}
         submissions={programApplicationSubmissions}
-        onCreateTeam={(teamData) => {
-          // Create a new startup object
-          const newStartup = {
-            id: Date.now(),
-            name: teamData.name,
-            logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(teamData.name)}&background=random`,
-            industry: teamData.members[0]?.industry || 'Technology',
-            currentPhase: "Application",
-            progress: 0,
-            status: 'active' as const,
-            programId: String(selectedProgramId),
-            description: teamData.description,
-            members: teamData.members.map(m => ({
-              id: m.id,
-              name: m.teamName,
-              email: m.teamEmail
-            }))
-          };
-
-          // Save the new startup to localStorage
+        onCreateTeam={async (teamData) => {
           try {
-            // Get existing startups from localStorage
-            const existingStartups = JSON.parse(localStorage.getItem('startups') || '[]');
+            // Import the team service dynamically to avoid circular dependencies
+            const { createTeam } = await import('@/services/teamService');
 
-            // Add the new startup
-            existingStartups.push(newStartup);
+            // Call the team service to create a team
+            if (selectedProgramId) {
+              await createTeam(teamData, selectedProgramId);
+            } else {
+              throw new Error("Aucun programme sélectionné");
+            }
 
-            // Save back to localStorage
-            localStorage.setItem('startups', JSON.stringify(existingStartups));
-
-            // Update the submission status for all team members
-            const updatedSubmissions = mockSubmissions.map(s =>
+            // Update the submission status in the UI for all team members
+            const updatedSubmissions = submissions.map(s =>
               teamData.members.some(m => m.id === s.id) ? { ...s, status: 'approved' as const } : s
             );
-            setMockSubmissions(updatedSubmissions);
+            setSubmissions(updatedSubmissions);
 
-            // Show invitation dialog (simulating sending invitations)
-            setInvitationDetails({
-              teamName: teamData.name,
-              teamDescription: teamData.description,
-              programName: selectedProgram?.name || 'Program'
-            });
-            setShowInvitationDialog(true);
+            // No need to show invitation dialog in admin interface
+            // Notifications will be sent to team members automatically
 
             // Show success message
             toast({
-              title: "Team created successfully",
-              description: `${teamData.name} has been created with ${teamData.members.length} members.`,
+              title: "Équipe créée avec succès",
+              description: `${teamData.name} a été créée avec ${teamData.members.length} membres.`,
             });
+
+            // Refresh submissions from backend
+            fetchSubmissionsFromBackend(selectedProgramId);
           } catch (error) {
-            console.error("Error saving team to localStorage:", error);
+            console.error("Error creating team:", error);
             toast({
-              title: "Error creating team",
-              description: "Failed to create team. Please try again.",
+              title: "Erreur lors de la création de l'équipe",
+              description: error instanceof Error ? error.message : "Échec de la création de l'équipe. Veuillez réessayer.",
               variant: "destructive",
             });
           }
         }}
       />
 
-      {/* Team Invitation Notification */}
-      <TeamInvitationNotification
-        open={showInvitationDialog}
-        onOpenChange={setShowInvitationDialog}
-        teamName={invitationDetails.teamName}
-        teamDescription={invitationDetails.teamDescription}
-        programName={invitationDetails.programName}
-        onAccept={() => {
-          toast({
-            title: "Invitation accepted",
-            description: "You have joined the team.",
-          });
-          setShowInvitationDialog(false);
-        }}
-        onDecline={() => {
-          toast({
-            title: "Invitation declined",
-            description: "You have declined to join the team.",
-          });
-          setShowInvitationDialog(false);
-        }}
-      />
+      {/* Team Invitation Notification removed - notifications will be shown in user interfaces */}
 
     </div>
   );

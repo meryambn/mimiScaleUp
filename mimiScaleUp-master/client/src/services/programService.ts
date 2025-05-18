@@ -15,6 +15,9 @@ export interface CreateProgramRequest {
   ca_min: number;
   ca_max: number;
   admin_id?: number;
+  status?: string;
+  is_template?: string;
+  backendStatus?: string; // Added for status mapping
 }
 
 export interface CreateProgramResponse {
@@ -89,9 +92,20 @@ export interface CreateLivrableResponse {
   message: string;
 }
 
+export interface UpdateProgramStatusRequest {
+  status: string;
+  is_template?: string;
+}
+
+export interface UpdateProgramStatusResponse {
+  message: string;
+  programme: any;
+}
+
 // Base URL for the API
 // Using relative URL to leverage Vite's proxy
 import { API_BASE_URL } from '@/lib/constants';
+import { mapToBackendStatus, FrontendStatus } from '@/utils/statusMapping';
 
 // Base URL for the API endpoints
 
@@ -275,6 +289,17 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
 
     console.log("Sending program data to API (after translation):", JSON.stringify(translatedData, null, 2));
 
+    // Log the backendStatus for debugging
+    console.log("Backend status from translatedData:", translatedData.backendStatus);
+    console.log("Frontend status from translatedData:", translatedData.status);
+
+    // Check if backendStatus is explicitly set
+    if (translatedData.backendStatus) {
+      console.log("backendStatus is explicitly set to:", translatedData.backendStatus);
+    } else {
+      console.log("backendStatus is not set, will use default 'Brouillon'");
+    }
+
     // Create a clean object with exactly the fields needed by the backend
     // Ensure arrays are properly formatted as single-line arrays
     const cleanData = {
@@ -290,8 +315,17 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
       taille_equipe_max: translatedData.taille_equipe_max,
       ca_min: translatedData.ca_min,
       ca_max: translatedData.ca_max,
-      admin_id: 1 // Explicitly set admin_id to 1
+      admin_id: 1, // Explicitly set admin_id to 1
+      status: translatedData.backendStatus || (translatedData.status ? mapToBackendStatus(translatedData.status as FrontendStatus) : 'Brouillon'), // Use backendStatus if provided, otherwise map from frontend status
+      is_template: translatedData.is_template || 'Non-Modèle' // Default to 'Non-Modèle' if not provided
     };
+
+    console.log("Final program data to send to backend:", {
+      ...cleanData,
+      phases_requises: cleanData.phases_requises.length,
+      industries_requises: cleanData.industries_requises.length,
+      documents_requis: cleanData.documents_requis.length
+    });
 
     // Create a FormData object to send the data
     const formData = new FormData();
@@ -307,6 +341,8 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
     formData.append('ca_min', String(cleanData.ca_min));
     formData.append('ca_max', String(cleanData.ca_max));
     formData.append('admin_id', String(cleanData.admin_id));
+    formData.append('status', cleanData.status);
+    formData.append('is_template', cleanData.is_template);
 
     // Add arrays as JSON strings
     formData.append('phases_requises', JSON.stringify(cleanData.phases_requises));
@@ -369,6 +405,45 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
 }
 
 /**
+ * Get all programs
+ * @returns A promise with all programs data
+ */
+export async function getAllPrograms(): Promise<any[]> {
+  try {
+    console.log("Getting all programs");
+
+    const response = await fetch(`${API_BASE_URL}/programmes/all`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
+    });
+
+    console.log(`Get all programs response status: ${response.status}`);
+
+    if (!response.ok) {
+      let errorMessage = 'Unknown error';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || `HTTP error ${response.status}`;
+      } catch (e) {
+        errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
+      }
+      console.error("Error getting all programs:", errorMessage);
+      return []; // Return empty array instead of throwing
+    }
+
+    const result = await response.json();
+    console.log(`Retrieved ${result.length} programs successfully`);
+    return result;
+  } catch (error) {
+    console.error("Exception during getting all programs:", error);
+    return []; // Return empty array instead of throwing
+  }
+}
+
+/**
  * Get a program by ID
  * @param programId The ID of the program to get
  * @returns A promise with the program data
@@ -385,10 +460,13 @@ export async function getProgram(programId: number | string): Promise<any> {
       credentials: 'include'
     });
 
+    console.log(`Get program response status: ${response.status}`);
+
     if (!response.ok) {
       // For 404 errors, just return null instead of throwing an error
       // This helps with the program search algorithm
       if (response.status === 404) {
+        console.log(`Program with ID ${programId} not found (404)`);
         return null;
       }
 
@@ -405,6 +483,14 @@ export async function getProgram(programId: number | string): Promise<any> {
 
     const result = await response.json();
     console.log("Program retrieved successfully:", result);
+
+    // Log template status
+    if (result && result.is_template) {
+      console.log(`Program ${programId} is a template: ${result.is_template}`);
+    } else {
+      console.log(`Program ${programId} is not a template or template status not set`);
+    }
+
     return result;
   } catch (error) {
     console.error("Exception during getting program:", error);
@@ -1203,6 +1289,75 @@ export async function getLivrables(phaseId: number | string): Promise<any[]> {
   } catch (error) {
     console.error("Exception during getting livrables:", error);
     return [];
+  }
+}
+
+/**
+ * Update a program's status
+ * @param programId The ID of the program
+ * @param status The new status (draft, active, completed)
+ * @param isTemplate Whether the program is a template (true/false)
+ * @returns A promise with the updated program data
+ */
+export async function updateProgramStatus(
+  programId: number | string,
+  status: FrontendStatus,
+  isTemplate?: boolean
+): Promise<UpdateProgramStatusResponse> {
+  try {
+    console.log(`Updating program ${programId} status to ${status}, isTemplate: ${isTemplate}`);
+
+    // Map frontend status to backend status
+    const backendStatus = mapToBackendStatus(status);
+    console.log(`Mapped frontend status "${status}" to backend status "${backendStatus}"`);
+
+    // Prepare request body
+    const requestBody: UpdateProgramStatusRequest = {
+      status: backendStatus
+    };
+
+    // Add is_template if provided
+    if (isTemplate !== undefined) {
+      requestBody.is_template = isTemplate ? 'Modèle' : 'Non-Modèle';
+      console.log(`Setting is_template to "${requestBody.is_template}"`);
+    }
+
+    console.log(`Sending request to ${API_BASE_URL}/programmes/${programId}/status with body:`, JSON.stringify(requestBody, null, 2));
+
+    // Call the backend endpoint
+    const response = await fetch(`${API_BASE_URL}/programmes/${programId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      credentials: 'include'
+    });
+
+    console.log(`Status update response status: ${response.status}`);
+
+    if (!response.ok) {
+      let errorMessage = 'Unknown error';
+      let errorDetails = '';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || `HTTP error ${response.status}`;
+        errorDetails = JSON.stringify(errorData, null, 2);
+      } catch (e) {
+        errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
+      }
+      console.error("Error updating program status:", errorMessage);
+      console.error("Error details:", errorDetails);
+      throw new Error(`Failed to update program status: ${errorMessage}`);
+    }
+
+    const result = await response.json();
+    console.log("Program status updated successfully:", result);
+    return result;
+  } catch (error) {
+    console.error("Exception during program status update:", error);
+    throw error;
   }
 }
 

@@ -2,8 +2,10 @@ import React from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, UserPlus, Clock } from 'lucide-react';
+import { Eye, UserPlus, Clock, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useProgramContext } from '@/context/ProgramContext';
+import AddToProgramButton from './AddToProgramButton';
 
 export interface ApplicationSubmission {
   id: number;
@@ -16,6 +18,7 @@ export interface ApplicationSubmission {
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string;
   formData: Record<string, any>;
+  role?: 'startup' | 'particulier' | 'mentor' | string;
 }
 
 interface ApplicationSubmissionCardProps {
@@ -29,6 +32,7 @@ const ApplicationSubmissionCard: React.FC<ApplicationSubmissionCardProps> = ({
   onViewForm,
   onAddTeam
 }) => {
+  const { selectedProgramId } = useProgramContext();
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -42,12 +46,35 @@ const ApplicationSubmissionCard: React.FC<ApplicationSubmissionCardProps> = ({
     }
   };
 
+  const getRoleBadge = (role?: string) => {
+    switch (role) {
+      case 'startup':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Startup</Badge>;
+      case 'particulier':
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800 hover:bg-purple-200">Particulier</Badge>;
+      case 'mentor':
+        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">Mentor</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  // Display actual name instead of "utilisateur"
+  const displayName = submission.teamName === "utilisateur" || !submission.teamName
+    ? submission.teamEmail.split('@')[0] // Use email username if no name
+    : submission.teamName;
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <CardTitle className="text-lg">{submission.teamName}</CardTitle>
-          {getStatusBadge(submission.status)}
+          <div className="flex flex-col">
+            <CardTitle className="text-lg">{displayName}</CardTitle>
+            <div className="flex mt-1 space-x-2">
+              {getRoleBadge(submission.role)}
+              {getStatusBadge(submission.status)}
+            </div>
+          </div>
         </div>
         <div className="text-sm text-muted-foreground">
           <div className="flex items-center mt-1">
@@ -89,22 +116,15 @@ const ApplicationSubmissionCard: React.FC<ApplicationSubmissionCardProps> = ({
             Consulter
           </Button>
           {submission.status === 'pending' && (
-            <Button
-              size="sm"
-              onClick={() => onAddTeam(submission)}
-              style={{
-                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '0 8px',
-                fontSize: '0.75rem',
-                height: '28px',
-                minWidth: '80px'
-              }}
-            >
-              <UserPlus className="h-3 w-3 mr-1" />
-              Ajouter
-            </Button>
+            <div className="flex gap-1">
+              {/* Bouton pour ajouter directement au programme */}
+              <AddToProgramButton
+                submission={submission}
+                programId={selectedProgramId || ''}
+                variant="default"
+                className="text-xs h-7 px-2 min-w-[80px] flex items-center"
+              />
+            </div>
           )}
         </div>
       </CardFooter>

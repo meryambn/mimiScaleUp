@@ -10,6 +10,8 @@ export interface MentorProgram {
   date_fin: string;
   type: string;
   admin_id: number;
+  status?: string;
+  is_template?: string; // 'Modèle' or 'Non-Modèle'
   mentors: Array<{
     utilisateur_id: number;
     nom: string;

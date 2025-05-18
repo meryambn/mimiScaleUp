@@ -49,6 +49,7 @@ import StartupTasksPage from './pages/startup/tasks';
 import ParticulierTasksPage from './pages/particulier/tasks';
 import StartupAnalytics from './pages/startup/analytics';
 import FormulairePage from './pages/particulier/apply';
+import ApplyRedirect from './components/redirects/ApplyRedirect';
 
 // Redirect components to fix hooks issues
 const DashboardRedirect = () => {
@@ -753,6 +754,11 @@ const App = () => {
                           <FeedPage />
                         </ParticulierLayout>
                       )}
+                    </Route>
+
+                    {/* Unified apply route that redirects based on user role */}
+                    <Route path="/apply/:id">
+                      {() => <ApplyRedirect />}
                     </Route>
 
                     <Route>

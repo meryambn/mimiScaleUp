@@ -96,9 +96,9 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
             )}
           </Button>
           <MessagesDialog open={messagesOpen} onOpenChange={setMessagesOpen} />
-          <Button variant="ghost" size="icon" className="rounded-full relative">
+          <div className="rounded-full relative flex items-center justify-center w-10 h-10">
             <NotificationBell />
-          </Button>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

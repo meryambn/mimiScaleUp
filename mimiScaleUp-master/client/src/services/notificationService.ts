@@ -16,15 +16,12 @@ export interface Notification {
 // Get notifications for a user
 export async function getNotifications(userId: number, userRole: string): Promise<Notification[]> {
   try {
-    console.log(`Requesting notifications for user ${userId} with role ${userRole}`);
     const url = `${API_BASE_URL}/notifications/${userId}/${userRole}`;
-    console.log(`Request URL: ${url}`);
 
     const notifications = await apiRequest<Notification[]>(url, {
       method: 'GET'
     });
 
-    console.log(`Received ${notifications.length} notifications from API:`, notifications);
     return notifications;
   } catch (error) {
     console.error('Error fetching notifications:', error);
@@ -35,15 +32,12 @@ export async function getNotifications(userId: number, userRole: string): Promis
 // Mark a notification as read
 export async function markNotificationAsRead(notificationId: number): Promise<Notification | null> {
   try {
-    console.log(`API call to mark notification ${notificationId} as read`);
     const url = `${API_BASE_URL}/notifications/read/${notificationId}`;
-    console.log(`Request URL: ${url}`);
 
     const result = await apiRequest<Notification>(url, {
       method: 'PUT'
     });
 
-    console.log('API response for mark as read:', result);
     return result;
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -54,15 +48,12 @@ export async function markNotificationAsRead(notificationId: number): Promise<No
 // Mark all notifications as read for a user
 export async function markAllNotificationsAsRead(userId: number, userRole: string): Promise<Notification[]> {
   try {
-    console.log(`API call to mark all notifications as read for user ${userId} with role ${userRole}`);
     const url = `${API_BASE_URL}/notifications/read-all/${userId}/${userRole}`;
-    console.log(`Request URL: ${url}`);
 
     const result = await apiRequest<Notification[]>(url, {
       method: 'PUT'
     });
 
-    console.log(`API response for mark all as read: ${result.length} notifications updated`);
     return result;
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -80,5 +71,35 @@ export async function getUnreadNotificationCount(userId: number, userRole: strin
   } catch (error) {
     console.error('Error fetching unread notification count:', error);
     return 0;
+  }
+}
+
+// Create a notification for form access
+export async function createFormAccessNotification(
+  userId: number,
+  userRole: string,
+  programId: number | string,
+  programName: string
+): Promise<boolean> {
+  try {
+    const url = `${API_BASE_URL}/notifications/form-access`;
+
+    const response = await apiRequest(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId,
+        userRole,
+        programId,
+        programName
+      })
+    });
+
+    return !!response;
+  } catch (error) {
+    console.error('Error creating form access notification:', error);
+    return false;
   }
 }

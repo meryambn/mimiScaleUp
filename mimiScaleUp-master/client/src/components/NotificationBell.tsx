@@ -1,15 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaBell, FaCheck, FaCheckDouble } from 'react-icons/fa';
 import { useNotifications } from '@/context/NotificationContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLocation } from 'wouter';
+import { useAuth } from '@/context/AuthContext';
 
 const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [markingRead, setMarkingRead] = useState<number | null>(null);
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  const { notifications, unreadCount, markAsRead, markAllAsRead, loading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, loading, fetchNotifications } = useNotifications();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+
+  // Debug effect removed for production
+
+  // Force refresh notifications only when bell is first opened
+  useEffect(() => {
+    if (isOpen) {
+      // Use a timeout to prevent multiple refreshes
+      const refreshTimeout = setTimeout(() => {
+        fetchNotifications();
+      }, 100); // Small delay to prevent multiple refreshes
+
+      return () => clearTimeout(refreshTimeout);
+    }
+  }, [isOpen]); // fetchNotifications intentionally not in dependency array
 
   const toggleNotifications = () => {
     setIsOpen(!isOpen);
@@ -47,9 +65,47 @@ const NotificationBell: React.FC = () => {
     }
   };
 
+  // Handle notification clicks for form access and team notifications
+  const handleNotificationClick = (notification: any) => {
+    // Handle form access notifications
+    if (notification.type === 'form_access' && notification.related_id) {
+      // Determine the correct URL based on user role
+      const formUrl = user?.role === 'startup'
+        ? `/startup/apply/${notification.related_id}`
+        : `/particulier/apply/${notification.related_id}`;
+
+      // Navigate to the form
+      setLocation(formUrl);
+
+      // Mark the notification as read
+      markAsRead(notification.id);
+
+      // Close the notification dropdown
+      setIsOpen(false);
+    }
+
+    // Handle team creation or team addition notifications
+    else if (notification.type === 'team_creation' || notification.type === 'team_addition') {
+      // Mark the notification as read
+      markAsRead(notification.id);
+
+      // Close the notification dropdown
+      setIsOpen(false);
+
+      // The TeamNotificationHandler component will automatically show the popup
+      // when it detects an unread team notification
+    }
+  };
+
   return (
     <div className="notification-bell-container">
-      <div className="notification-bell" onClick={toggleNotifications}>
+      <div
+        className="notification-bell"
+        onClick={toggleNotifications}
+        role="button"
+        tabIndex={0}
+        aria-label="Notifications"
+      >
         <FaBell />
         {unreadCount > 0 && (
           <span className="notification-badge">{unreadCount}</span>
@@ -81,7 +137,8 @@ const NotificationBell: React.FC = () => {
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`notification-item ${!notification.is_read ? 'unread' : ''}`}
+                    className={`notification-item ${!notification.is_read ? 'unread' : ''} ${notification.type === 'form_access' || notification.type === 'team_creation' || notification.type === 'team_addition' ? 'clickable' : ''}`}
+                    onClick={() => (notification.type === 'form_access' || notification.type === 'team_creation' || notification.type === 'team_addition') ? handleNotificationClick(notification) : null}
                   >
                     <div className="notification-content">
                       <div className="notification-title">{notification.title}</div>
@@ -110,7 +167,7 @@ const NotificationBell: React.FC = () => {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .notification-bell-container {
           position: relative;
           z-index: 1001; /* Ensure it's above other elements */
@@ -121,6 +178,9 @@ const NotificationBell: React.FC = () => {
           cursor: pointer;
           font-size: 1.2rem;
           color: #333;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .notification-badge {
@@ -140,7 +200,7 @@ const NotificationBell: React.FC = () => {
         .notification-dropdown {
           position: absolute;
           top: 100%;
-          right: 0;
+          right: -20px;
           width: 550px;
           max-height: 600px;
           background: white;
@@ -230,6 +290,14 @@ const NotificationBell: React.FC = () => {
 
         .notification-item.unread {
           background-color: #f0f7ff;
+        }
+
+        .notification-item.clickable {
+          cursor: pointer;
+        }
+
+        .notification-item.clickable:hover {
+          background-color: rgba(0, 0, 0, 0.05);
         }
 
         .notification-content {

@@ -11,14 +11,28 @@ import {
   FaChartLine,
   FaAward,
   FaLightbulb,
-  FaComments
+  FaComments,
+  FaUserPlus
 } from 'react-icons/fa';
-import ProgramTimelineWidget from '@/components/widgets/ProgramTimelineWidget';
+import DynamicProgramTimeline from '@/components/widgets/DynamicProgramTimeline';
 import ProgramDetailsWidget from '@/components/widgets/ProgramDetailsWidget';
 import { useProgramContext } from '@/context/ProgramContext';
 
-const Dashboard = () => {
+interface DashboardProps {
+  onCreateTeamClick?: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
   const [activePhase, setActivePhase] = useState<number | string>(1);
+
+  // Convert activePhase to a number for phaseEvaluationCriteria if it's a string
+  const getPhaseKey = (phase: number | string): number => {
+    if (typeof phase === 'string') {
+      const numPhase = parseInt(phase, 10);
+      return isNaN(numPhase) ? 1 : numPhase;
+    }
+    return phase;
+  };
   const [sidebarActive, setSidebarActive] = useState(false);
   const { selectedProgram } = useProgramContext();
 
@@ -124,9 +138,20 @@ const Dashboard = () => {
             <h1>Programme ScaleUp</h1>
             <p className="subtitle">Tableau de bord de votre startup</p>
           </div>
-          <div className="date-range">
-            <span>Phase {activePhase} en cours</span>
-            <span>{getPhaseDescription(activePhase)}</span>
+          <div className="dashboard-actions">
+            {onCreateTeamClick && (
+              <button
+                onClick={onCreateTeamClick}
+                className="create-team-btn"
+              >
+                <FaUserPlus className="icon" />
+                Créer une équipe
+              </button>
+            )}
+            <div className="date-range">
+              <span>Phase {activePhase} en cours</span>
+              <span>{getPhaseDescription(activePhase)}</span>
+            </div>
           </div>
         </header>
 
@@ -142,7 +167,11 @@ const Dashboard = () => {
         <section className="timeline-section">
           <h2>Progression du Programme</h2>
           <div className="timeline-container">
-            <ProgramTimelineWidget onPhaseSelect={(phaseId) => setActivePhase(Number(phaseId))} />
+            <DynamicProgramTimeline
+              onPhaseSelect={(phaseId) => setActivePhase(Number(phaseId))}
+              viewType="vertical"
+              showCard={false}
+            />
           </div>
         </section>
 
@@ -259,26 +288,32 @@ const Dashboard = () => {
           <div className="evaluation-section">
             <h2>Critères d'évaluation - Phase {activePhase}</h2>
             <div className="criteria-container">
-              {phaseEvaluationCriteria[activePhase].map((criteria, index) => (
-                <div key={index} className={`criteria-item ${criteria.status}`}>
-                  <div className="criteria-status">
-                    {criteria.status === 'fulfilled' && <FaCheckCircle />}
-                    {criteria.status === 'pending' && <FaSpinner className="spin" />}
-                    {criteria.status === 'not-met' && <FaTimesCircle />}
+              {phaseEvaluationCriteria[getPhaseKey(activePhase)] ? (
+                phaseEvaluationCriteria[getPhaseKey(activePhase)].map((criteria, index) => (
+                  <div key={index} className={`criteria-item ${criteria.status}`}>
+                    <div className="criteria-status">
+                      {criteria.status === 'fulfilled' && <FaCheckCircle />}
+                      {criteria.status === 'pending' && <FaSpinner className="spin" />}
+                      {criteria.status === 'not-met' && <FaTimesCircle />}
+                    </div>
+                    <span className="criteria-name">{criteria.name}</span>
+                    <div className="star-rating">
+                      {[...Array(5)].map((_, starIndex) => (
+                        <span
+                          key={starIndex}
+                          className={starIndex < criteria.stars ? 'active' : ''}
+                        >
+                          &#9733;
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <span className="criteria-name">{criteria.name}</span>
-                  <div className="star-rating">
-                    {[...Array(5)].map((_, starIndex) => (
-                      <span
-                        key={starIndex}
-                        className={starIndex < criteria.stars ? 'active' : ''}
-                      >
-                        &#9733;
-                      </span>
-                    ))}
-                  </div>
+                ))
+              ) : (
+                <div className="criteria-item">
+                  <span className="criteria-name">Aucun critère d'évaluation pour cette phase</span>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -332,6 +367,35 @@ const Dashboard = () => {
           color: #6b7280;
           font-size: 1rem;
           margin: 0;
+        }
+
+        .dashboard-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 1rem;
+        }
+
+        .create-team-btn {
+          background: linear-gradient(135deg, #e43e32 0%, #0c4c80 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          border: none;
+          font-weight: 500;
+          transition: opacity 0.2s ease;
+        }
+
+        .create-team-btn:hover {
+          opacity: 0.9;
+        }
+
+        .create-team-btn .icon {
+          margin-right: 8px;
+          font-size: 0.9rem;
         }
 
         .date-range {
@@ -816,6 +880,11 @@ const Dashboard = () => {
             flex-direction: column;
             align-items: flex-start;
             gap: 1rem;
+          }
+
+          .dashboard-actions {
+            width: 100%;
+            align-items: flex-start;
           }
 
           .date-range {

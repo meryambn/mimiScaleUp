@@ -14,6 +14,10 @@ import ViewSelector, { ViewType } from '@/components/teams/ViewSelector';
 import WinnerDialog from "@/components/teams/WinnerDialog";
 import WinnerTeamWidget from "@/components/widgets/WinnerTeamWidget";
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { getProgramTeams, getTeamCurrentPhase, ensureTeamHasPhase, BackendTeam, BackendStartup } from '@/services/teamService';
+import { moveToPhase } from '@/services/phaseService';
+import { getPhases } from '@/services/programService';
 
 interface TeamMember {
   id: number;
@@ -119,55 +123,235 @@ const TeamsPage = () => {
   const [selectedWinner, setSelectedWinner] = useState<Startup | null>(null);
   const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
 
-  // Fonction pour mettre à jour la phase d'une équipe
-  const handlePhaseChange = (teamId: number | string, newPhase: string) => {
-    // Trouver l'équipe dans toutes les équipes (sample + local)
-    const teamToUpdate = allStartups.find(s => String(s.id) === String(teamId));
+  // Fetch teams from backend and ensure they all have phases
+  const { data: backendTeamsData, isLoading: isLoadingTeams } = useQuery({
+    queryKey: ['program-teams', selectedProgramId],
+    queryFn: () => selectedProgramId ? getProgramTeams(selectedProgramId, true) : Promise.resolve({ startups_individuelles: [], equipes: [] }),
+    enabled: !!selectedProgramId,
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: true
+  });
 
-    // Mettre à jour localStorage pour toutes les équipes
-    try {
-      const storedStartups = localStorage.getItem('startups') || '[]';
-      const parsedStartups = JSON.parse(storedStartups);
+  // Convert backend teams to frontend format
+  const backendStartups = React.useMemo(() => {
+    if (!backendTeamsData) return [];
 
-      // Vérifier si l'équipe existe déjà dans localStorage
-      const existingIndex = parsedStartups.findIndex((s: any) => String(s.id) === String(teamId));
+    const startups: Startup[] = [];
 
-      let updatedStartups;
-      if (existingIndex >= 0) {
-        // Mettre à jour l'équipe existante
-        updatedStartups = parsedStartups.map((s: any) =>
-          String(s.id) === String(teamId) ? { ...s, currentPhase: newPhase } : s
-        );
-      } else if (teamToUpdate) {
-        // Ajouter l'équipe au localStorage si elle n'existe pas encore
-        updatedStartups = [...parsedStartups, { ...teamToUpdate, currentPhase: newPhase }];
-      } else {
-        updatedStartups = parsedStartups;
-      }
+    // Add individual startups
+    if (backendTeamsData.startups_individuelles && backendTeamsData.startups_individuelles.length > 0) {
+      backendTeamsData.startups_individuelles.forEach(startup => {
+        // Fetch the current phase for this startup (will be updated asynchronously)
+        getTeamCurrentPhase(startup.id).then(phaseData => {
+          if (phaseData) {
+            // Find the startup in the array and update its phase
+            const startupIndex = startups.findIndex(s => s.id === startup.id);
+            if (startupIndex >= 0) {
+              startups[startupIndex].currentPhase = phaseData.nom || "Non assigné";
+              // Force a re-render by updating localStorage
+              const storedStartups = localStorage.getItem('startups') || '[]';
+              const parsedStartups = JSON.parse(storedStartups);
+              const existingIndex = parsedStartups.findIndex((s: any) => String(s.id) === String(startup.id));
+              if (existingIndex >= 0) {
+                parsedStartups[existingIndex].currentPhase = phaseData.nom || "Non assigné";
+              } else {
+                parsedStartups.push({
+                  id: startup.id,
+                  currentPhase: phaseData.nom || "Non assigné"
+                });
+              }
+              localStorage.setItem('startups', JSON.stringify(parsedStartups));
+              window.dispatchEvent(new Event('storage'));
+            }
+          }
+        }).catch(error => {
+          console.error(`Error fetching phase for startup ${startup.id}:`, error);
+        });
 
-      // Sauvegarder dans localStorage
-      localStorage.setItem('startups', JSON.stringify(updatedStartups));
-
-      // Mettre à jour l'état local immédiatement
-      setLocalStartups(updatedStartups);
-    } catch (error) {
-      console.error("Error updating startups in localStorage:", error);
+        startups.push({
+          id: startup.id,
+          name: startup.nom || `Startup #${startup.id}`,
+          logo: `https://via.placeholder.com/100/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${startup.nom?.substring(0, 2) || 'ST'}`,
+          industry: "Non spécifié",
+          currentPhase: "Chargement...", // Will be updated asynchronously
+          progress: 10,
+          status: 'active',
+          programId: selectedProgramId || ""
+        });
+      });
     }
 
-    // Créer un événement personnalisé pour notifier les autres composants
-    const event = new CustomEvent('team-phase-changed', {
-      detail: { teamId, newPhase }
-    });
-    document.dispatchEvent(event);
+    // Add teams
+    if (backendTeamsData.equipes && backendTeamsData.equipes.length > 0) {
+      backendTeamsData.equipes.forEach(team => {
+        // Fetch the current phase for this team (will be updated asynchronously)
+        getTeamCurrentPhase(team.id).then(phaseData => {
+          if (phaseData) {
+            // Find the team in the array and update its phase
+            const teamIndex = startups.findIndex(s => s.id === team.id);
+            if (teamIndex >= 0) {
+              startups[teamIndex].currentPhase = phaseData.nom || "Non assigné";
+              // Force a re-render by updating localStorage
+              const storedStartups = localStorage.getItem('startups') || '[]';
+              const parsedStartups = JSON.parse(storedStartups);
+              const existingIndex = parsedStartups.findIndex((s: any) => String(s.id) === String(team.id));
+              if (existingIndex >= 0) {
+                parsedStartups[existingIndex].currentPhase = phaseData.nom || "Non assigné";
+              } else {
+                parsedStartups.push({
+                  id: team.id,
+                  currentPhase: phaseData.nom || "Non assigné"
+                });
+              }
+              localStorage.setItem('startups', JSON.stringify(parsedStartups));
+              window.dispatchEvent(new Event('storage'));
+            }
+          }
+        }).catch(error => {
+          console.error(`Error fetching phase for team ${team.id}:`, error);
+        });
 
-    // Forcer un rechargement des données dans toutes les vues
-    window.dispatchEvent(new Event('storage'));
+        startups.push({
+          id: team.id,
+          name: team.nom_equipe || `Équipe #${team.id}`,
+          logo: `https://via.placeholder.com/100/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${team.nom_equipe?.substring(0, 2) || 'EQ'}`,
+          industry: "Équipe",
+          currentPhase: "Chargement...", // Will be updated asynchronously
+          progress: 20,
+          status: 'active',
+          programId: selectedProgramId || "",
+          members: team.membres.map(memberId => ({
+            id: memberId,
+            name: `Membre #${memberId}`,
+            email: ""
+          }))
+        });
+      });
+    }
 
-    // Afficher une notification
-    toast({
-      title: "Phase mise à jour",
-      description: `L'équipe a été déplacée vers ${newPhase}`,
-    });
+    return startups;
+  }, [backendTeamsData, selectedProgramId]);
+
+  // Fonction pour mettre à jour la phase d'une équipe
+  const handlePhaseChange = async (teamId: number | string, newPhase: string) => {
+    if (!selectedProgramId) {
+      toast({
+        title: "Erreur",
+        description: "Aucun programme sélectionné.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Trouver l'équipe dans toutes les équipes (sample + local)
+      const teamToUpdate = allStartups.find(s => String(s.id) === String(teamId));
+
+      // Récupérer les phases du programme
+      const phases = await getPhases(selectedProgramId);
+
+      // Trouver la phase correspondante
+      const phaseObj = phases.find(phase =>
+        phase.nom.toLowerCase() === newPhase.toLowerCase() ||
+        phase.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+        newPhase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      );
+
+      if (!phaseObj) {
+        console.error(`Phase "${newPhase}" not found in program ${selectedProgramId}`);
+        toast({
+          title: "Erreur",
+          description: `Phase "${newPhase}" introuvable dans ce programme.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log(`Moving team ${teamId} to phase ${phaseObj.nom} (ID: ${phaseObj.id})`);
+
+      // Find the team to get its name
+      const teamObj = backendTeamsData?.equipes?.find((t: any) => String(t.id) === String(teamId));
+      const teamName = teamObj?.nom_equipe;
+
+      console.log(`Team name for ID ${teamId}: ${teamName || 'Not found'}`);
+
+      // Appeler l'API pour déplacer l'équipe vers la nouvelle phase
+      const result = await moveToPhase({
+        entiteType: 'equipe',
+        entiteId: teamId,
+        phaseNextId: phaseObj.id,
+        programmeId: selectedProgramId,
+        ...(teamName && {
+          nom_entreprise: teamName,
+          // Also include it in the format the backend is looking for
+          soumission: {
+            nom_entreprise: teamName
+          }
+        })
+      });
+
+      // If we sent a name but the backend still used a default name, use our name
+      const displayName = teamName && result.nom && result.nom.startsWith('Startup ')
+        ? teamName
+        : result.nom || teamName;
+
+      // Mettre à jour localStorage pour toutes les équipes
+      try {
+        const storedStartups = localStorage.getItem('startups') || '[]';
+        const parsedStartups = JSON.parse(storedStartups);
+
+        // Vérifier si l'équipe existe déjà dans localStorage
+        const existingIndex = parsedStartups.findIndex((s: any) => String(s.id) === String(teamId));
+
+        let updatedStartups;
+        if (existingIndex >= 0) {
+          // Mettre à jour l'équipe existante
+          updatedStartups = parsedStartups.map((s: any) =>
+            String(s.id) === String(teamId) ? {
+              ...s,
+              currentPhase: newPhase,
+              // Use our name if the backend used a default name
+              name: displayName || s.name
+            } : s
+          );
+        } else if (teamToUpdate) {
+          // Ajouter l'équipe au localStorage si elle n'existe pas encore
+          updatedStartups = [...parsedStartups, { ...teamToUpdate, currentPhase: newPhase }];
+        } else {
+          updatedStartups = parsedStartups;
+        }
+
+        // Sauvegarder dans localStorage
+        localStorage.setItem('startups', JSON.stringify(updatedStartups));
+
+        // Mettre à jour l'état local immédiatement
+        setLocalStartups(updatedStartups);
+      } catch (error) {
+        console.error("Error updating startups in localStorage:", error);
+      }
+
+      // Créer un événement personnalisé pour notifier les autres composants
+      const event = new CustomEvent('team-phase-changed', {
+        detail: { teamId, newPhase }
+      });
+      document.dispatchEvent(event);
+
+      // Forcer un rechargement des données dans toutes les vues
+      window.dispatchEvent(new Event('storage'));
+
+      // Afficher une notification
+      toast({
+        title: "Phase mise à jour",
+        description: `${displayName || 'L\'équipe'} a été déplacée vers ${newPhase}`,
+      });
+    } catch (error) {
+      console.error('Error moving team to phase:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors du déplacement de l'équipe.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Fonction pour sélectionner un gagnant
@@ -374,7 +558,7 @@ const TeamsPage = () => {
     }
   ];
 
-  // Combine sample startups with those from localStorage, with localStorage taking precedence
+  // Combine sample startups with those from localStorage and backend, with backend taking precedence
   const allStartups = React.useMemo(() => {
     // Create a map of all startups from sample data
     const startupsMap = new Map();
@@ -384,14 +568,19 @@ const TeamsPage = () => {
       startupsMap.set(String(startup.id), startup);
     });
 
-    // Override with localStorage startups (they take precedence)
+    // Override with localStorage startups
     localStartups.forEach(startup => {
+      startupsMap.set(String(startup.id), startup);
+    });
+
+    // Override with backend startups (they take highest precedence)
+    backendStartups.forEach(startup => {
       startupsMap.set(String(startup.id), startup);
     });
 
     // Convert map back to array
     return Array.from(startupsMap.values());
-  }, [sampleStartups, localStartups]);
+  }, [sampleStartups, localStartups, backendStartups]);
 
   // Filter startups based on the selected program
   const programStartups = selectedProgramId
@@ -473,7 +662,11 @@ const TeamsPage = () => {
         </TabsList>
 
         <TabsContent value={currentTab}>
-          {filteredStartups.length === 0 ? (
+          {isLoadingTeams ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">Chargement des équipes...</p>
+            </div>
+          ) : filteredStartups.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <p className="text-gray-500">Aucune équipe trouvée pour ce programme.</p>
             </div>

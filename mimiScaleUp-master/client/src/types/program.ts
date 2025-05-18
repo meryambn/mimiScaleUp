@@ -125,6 +125,7 @@ export interface SavedProgramTemplate {
   programData: Omit<Program, 'id' | 'createdAt' | 'updatedAt'>;
   createdAt: string;
   createdBy?: string;
+  isBackendTemplate?: boolean; // Flag to identify templates from the backend API
 }
 
 export interface EligibilityCriteria {
@@ -165,4 +166,5 @@ export interface Program {
   hasWinner?: boolean;
   createdAt: string;
   updatedAt: string;
+  is_template?: string; // 'Modèle' or 'Non-Modèle'
 }

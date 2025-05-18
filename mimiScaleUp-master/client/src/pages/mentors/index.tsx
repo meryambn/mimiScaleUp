@@ -103,23 +103,23 @@ const MentorsPage: React.FC = () => {
   const handleAddMentor = async (mentorId: number) => {
     setIsAddingMentor(true);
     try {
-      const success = await addMentorToAdminPool(mentorId);
+      console.log(`Attempting to add mentor ${mentorId} to admin pool...`);
+      await addMentorToAdminPool(mentorId);
 
-      if (success) {
-        toast({
-          title: 'Succès',
-          description: 'Mentor ajouté au réseau avec succès.',
-        });
-        // Remove the added mentor from the list
-        setAvailableMentors(prev => prev.filter(mentor => mentor.id !== mentorId));
-        setFilteredMentors(prev => prev.filter(mentor => mentor.id !== mentorId));
-      } else {
-        toast({
-          title: 'Erreur',
-          description: 'Impossible d\'ajouter le mentor au réseau. Veuillez réessayer.',
-          variant: 'destructive'
-        });
-      }
+      console.log(`Successfully added mentor ${mentorId} to admin pool`);
+      toast({
+        title: 'Succès',
+        description: 'Mentor ajouté au réseau avec succès.',
+      });
+
+      // Remove the added mentor from the list
+      setAvailableMentors(prev => prev.filter(mentor => mentor.id !== mentorId));
+      setFilteredMentors(prev => prev.filter(mentor => mentor.id !== mentorId));
+
+      // Force refresh notifications
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error adding mentor to pool:', error);
       toast({

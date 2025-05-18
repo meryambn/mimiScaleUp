@@ -12,9 +12,11 @@ import DeliverablesWidget from "@/components/widgets/DeliverablesWidget";
 import WinnerTeamWidget from "@/components/widgets/WinnerTeamWidget";
 import { useProgramContext } from "@/context/ProgramContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { updateProgramStatus, getProgram } from "@/services/programService";
+import { getStatusDisplayText } from "@/utils/statusMapping";
+import { useEffect, useState } from "react";
 
 const Dashboard: React.FC = () => {
   const { selectedProgram, updateProgram } = useProgramContext();
@@ -22,34 +24,94 @@ const Dashboard: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
+  const [isTemplate, setIsTemplate] = useState(false);
+
+  // Fetch program details to check if it's a template
+  useEffect(() => {
+    const fetchProgramDetails = async () => {
+      if (selectedProgram?.id) {
+        try {
+          const programDetails = await getProgram(selectedProgram.id);
+          if (programDetails && programDetails.is_template === 'Modèle') {
+            setIsTemplate(true);
+          } else {
+            setIsTemplate(false);
+          }
+        } catch (error) {
+          console.error("Error fetching program details:", error);
+        }
+      }
+    };
+
+    fetchProgramDetails();
+  }, [selectedProgram?.id]);
 
   const navigateTo = (path: string) => {
     setLocation(path);
   };
 
-  const handleStatusChange = (newStatus: "active" | "completed" | "draft") => {
-    if (!selectedProgram) return;
+  const handleStatusChange = async (newStatus: "active" | "completed" | "draft") => {
+    if (!selectedProgram) {
+      console.error("No program selected");
+      return;
+    }
 
-    // Mettre à jour le programme sélectionné
-    const updatedProgram = {
-      ...selectedProgram,
-      status: newStatus
-    };
+    console.log(`Changing program ${selectedProgram.id} status from ${selectedProgram.status} to ${newStatus}`);
 
-    // Utiliser la fonction updateProgram du contexte pour mettre à jour le programme
-    updateProgram(updatedProgram);
+    // Check status transition rules
+    if (selectedProgram.status === "completed" && newStatus !== "completed") {
+      console.error("Cannot change status from completed to any other status");
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de changer le statut d'un programme terminé.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Afficher une notification
-    const statusText = newStatus === "active" ? "actif" : newStatus === "completed" ? "terminé" : "brouillon";
-    toast({
-      title: "Statut mis à jour",
-      description: `Le programme est maintenant ${statusText}.`,
-    });
+    if (selectedProgram.status === "active" && newStatus === "draft") {
+      console.error("Cannot change status from active to draft");
+      toast({
+        title: "Action non autorisée",
+        description: "Impossible de changer un programme actif en brouillon.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Forcer un rafraîchissement de la page après un court délai
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
+    try {
+      console.log(`Calling updateProgramStatus with programId=${selectedProgram.id}, status=${newStatus}`);
+
+      // Call the backend API to update the program status
+      const result = await updateProgramStatus(selectedProgram.id, newStatus);
+      console.log("Status update result:", result);
+
+      // Update the program in the local context
+      const updatedProgram = {
+        ...selectedProgram,
+        status: newStatus
+      };
+      updateProgram(updatedProgram);
+
+      // Display a notification
+      const statusText = getStatusDisplayText(newStatus);
+      toast({
+        title: "Statut mis à jour",
+        description: `Le programme est maintenant ${statusText}.`,
+      });
+
+      // Refresh the page after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error("Error updating program status:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la mise à jour du statut.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -62,15 +124,22 @@ const Dashboard: React.FC = () => {
             {selectedProgram && (
               <div className="text-gray-500">
                 Programme actuel: <span className="font-medium">{selectedProgram.name}</span>
-                <div className={`
-                  ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                  ${selectedProgram.status === "draft"
-                    ? "bg-gray-100 text-gray-800 border border-gray-300"
-                    : selectedProgram.status === "active"
-                      ? "bg-green-100 text-green-800 border border-green-300"
-                      : "bg-blue-100 text-blue-800 border border-blue-300"}
-                `}>
-                  {selectedProgram.status === "active" ? "Actif" : selectedProgram.status === "draft" ? "Brouillon" : "Terminé"}
+                <div className="flex items-center space-x-2">
+                  <div className={`
+                    inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    ${selectedProgram.status === "draft"
+                      ? "bg-gray-100 text-gray-800 border border-gray-300"
+                      : selectedProgram.status === "active"
+                        ? "bg-green-100 text-green-800 border border-green-300"
+                        : "bg-blue-100 text-blue-800 border border-blue-300"}
+                  `}>
+                    {selectedProgram.status === "active" ? "Actif" : selectedProgram.status === "draft" ? "Brouillon" : "Terminé"}
+                  </div>
+                  {isTemplate && (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
+                      Modèle
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -109,15 +178,22 @@ const Dashboard: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-500">Statut</p>
                   <div className="flex items-center space-x-2 mt-1">
-                    <div className={`
-                      inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                      ${selectedProgram.status === "draft"
-                        ? "bg-gray-100 text-gray-800 border border-gray-300"
-                        : selectedProgram.status === "active"
-                          ? "bg-green-100 text-green-800 border border-green-300"
-                          : "bg-blue-100 text-blue-800 border border-blue-300"}
-                    `}>
-                      {selectedProgram.status === "active" ? "Actif" : selectedProgram.status === "draft" ? "Brouillon" : "Terminé"}
+                    <div className="flex items-center space-x-2">
+                      <div className={`
+                        inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        ${selectedProgram.status === "draft"
+                          ? "bg-gray-100 text-gray-800 border border-gray-300"
+                          : selectedProgram.status === "active"
+                            ? "bg-green-100 text-green-800 border border-green-300"
+                            : "bg-blue-100 text-blue-800 border border-blue-300"}
+                      `}>
+                        {selectedProgram.status === "active" ? "Actif" : selectedProgram.status === "draft" ? "Brouillon" : "Terminé"}
+                      </div>
+                      {isTemplate && (
+                        <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
+                          Modèle
+                        </div>
+                      )}
                     </div>
                     {!isMentor && (
                       <div className="flex space-x-1">

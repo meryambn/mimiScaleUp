@@ -79,24 +79,43 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = (props) => {
     try {
       setIsSaving(true);
 
+      // Check if programId is valid
+      if (!programId || programId === 0) {
+        toast({
+          title: "Attention",
+          description: "Le formulaire sera enregistré une fois le programme créé. Veuillez terminer la création du programme d'abord.",
+          variant: "default",
+        });
+
+        // Still call the parent component's onSave function to save the form data in memory
+        onSave(questions, settings);
+        return;
+      }
+
       // First, call the parent component's onSave function
       onSave(questions, settings);
 
       // Save to backend
-      if (programId) {
-        await createFormWithQuestions(
-          programId,
-          settings.title,
-          settings.description,
-          questions,
-          settings
-        );
-      }
+      const result = await createFormWithQuestions(
+        programId,
+        settings.title,
+        settings.description,
+        questions,
+        settings
+      );
 
-      toast({
-        title: "Formulaire enregistré",
-        description: "Le formulaire de candidature a été enregistré avec succès.",
-      });
+      if (result.success) {
+        toast({
+          title: "Formulaire enregistré",
+          description: "Le formulaire de candidature a été enregistré avec succès.",
+        });
+      } else {
+        toast({
+          title: "Attention",
+          description: "Le formulaire n'a pas pu être enregistré. Il sera enregistré automatiquement une fois le programme créé.",
+          variant: "default",
+        });
+      }
     } catch (error) {
       console.error("Error saving form:", error);
       toast({
@@ -177,24 +196,32 @@ const ApplicationFormTabs: React.FC<ApplicationFormTabsProps> = (props) => {
               <div className="space-y-3">
                 <Label htmlFor="application-form-link">URL du formulaire de candidature</Label>
                 <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
-                  <Input
-                    id="application-form-link"
-                    value={`${window.location.origin}/apply/${programId}`}
-                    readOnly
-                    className="bg-white"
-                  />
-                  <button
-                    style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/apply/${programId}`);
-                      toast({
-                        title: "Link copied!",
-                        description: "Application form link has been copied to clipboard.",
-                      });
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
+                  {programId && programId !== 0 ? (
+                    <>
+                      <Input
+                        id="application-form-link"
+                        value={`${window.location.origin}/apply/${programId}`}
+                        readOnly
+                        className="bg-white"
+                      />
+                      <button
+                        style={{ backgroundColor: 'white', color: '#0c4c80', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/apply/${programId}`);
+                          toast({
+                            title: "Lien copié!",
+                            description: "L'URL du formulaire a été copiée dans le presse-papiers.",
+                          });
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="w-full p-3 bg-white rounded-lg text-gray-500 text-sm">
+                      L'URL du formulaire sera générée automatiquement après la création du programme
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500">Partagez ce lien avec les équipes pour leur permettre de postuler à votre programme</p>
               </div>

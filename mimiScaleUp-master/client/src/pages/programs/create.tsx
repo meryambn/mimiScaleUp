@@ -14,10 +14,12 @@ import MentorSelection from "@/components/mentor/MentorSelection";
 import ApplicationFormTabs from "@/components/application/ApplicationFormTabs";
 import { useProgramContext } from "@/context/ProgramContext";
 // No longer using localStorage for form storage
-import { saveProgramAsTemplate, getSavedProgramTemplates } from "@/utils/programTemplates";
+import { saveProgramAsTemplate, getSavedProgramTemplates, getLocalProgramTemplates } from "@/utils/programTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { createProgram as apiCreateProgram, createPhase, createTask, createLivrable, createCritere, createReunion, addMentorToProgram } from "@/services/programService";
+import { createProgram as apiCreateProgram, createPhase, createTask, createLivrable, createCritere, createReunion, addMentorToProgram, updateProgramStatus } from "@/services/programService";
+import { API_BASE_URL } from '@/lib/constants';
+import { mapToBackendStatus } from "@/utils/statusMapping";
 import { createFormWithQuestions } from "@/services/formService";
 import { Plus, PlusCircle, BarChart, Calendar, Users, BarChart2, Flag, MessageSquare, Filter } from "lucide-react";
 import { DndProvider } from "react-dnd";
@@ -163,6 +165,16 @@ async function dispatchApplicationFormCreated(programId: string, formData: any, 
     throw error;
   }
 }
+
+// Helper function to format dates for the backend
+const formatDateForBackend = (date: Date | string): string => {
+  if (typeof date === 'string') {
+    // If it's already a string, try to parse it
+    const parsedDate = new Date(date);
+    return parsedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+  }
+  return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+};
 
 // Function to dispatch when an evaluation criterion is created
 function dispatchEvaluationCriterionCreated(programId: string, criterionData: any, queryClient: any) {
@@ -356,7 +368,7 @@ const CreateProgram: React.FC = () => {
       requiredDocuments: ["Pitch Deck", "Business Plan", "Team Bios"]
     },
     mentors: [],
-    status: 'active'
+    status: 'draft' // Default to draft instead of active
   });
   const [programPhases, setProgramPhases] = useState<PhaseDetails[]>([]);
   const [applicationForm, setApplicationForm] = useState<any>({
@@ -462,13 +474,31 @@ const CreateProgram: React.FC = () => {
   const { toast } = useToast();
   const [isDraft, setIsDraft] = useState(false);
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
+  const [isTemplateSaved, setIsTemplateSaved] = useState<boolean>(false);
+  const [savedTemplateId, setSavedTemplateId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { createProgram: contextCreateProgram, setSelectedProgramId } = useProgramContext();
 
   // Charger les modèles enregistrés au chargement de la page
   React.useEffect(() => {
-    const loadedTemplates = getSavedProgramTemplates();
-    setSavedTemplates(loadedTemplates);
+    const loadTemplates = async () => {
+      try {
+        // Start with local templates for immediate display
+        const localTemplates = getLocalProgramTemplates();
+        setSavedTemplates(localTemplates);
+
+        // Then load templates from both localStorage and backend
+        const allTemplates = await getSavedProgramTemplates();
+        setSavedTemplates(allTemplates);
+      } catch (error) {
+        console.error('Error loading templates:', error);
+        // Fallback to local templates if API fails
+        const localTemplates = getLocalProgramTemplates();
+        setSavedTemplates(localTemplates);
+      }
+    };
+
+    loadTemplates();
 
     // Vérifier s'il y a un programme en brouillon à éditer
     const editingProgramJSON = localStorage.getItem('editingProgram');
@@ -698,7 +728,9 @@ const CreateProgram: React.FC = () => {
         taille_equipe_max: programData.eligibilityCriteria?.maxTeamSize || 10,
         ca_min: programData.eligibilityCriteria?.minRevenue || 0,
         ca_max: programData.eligibilityCriteria?.maxRevenue || 1000000,
-        admin_id: 1 // Default admin ID
+        admin_id: 1, // Default admin ID
+        status: programData.backendStatus || mapToBackendStatus(programData.status) || 'Brouillon', // First try backendStatus, then map frontend status, then default to 'Brouillon'
+        is_template: programData.is_template || 'Non-Modèle' // Default to non-template
       };
 
       // Convert to string and back to ensure proper JSON formatting
@@ -1199,15 +1231,53 @@ const CreateProgram: React.FC = () => {
 
   const saveDraft = async () => {
     setIsDraft(true);
+    console.log("Saving program as draft");
+
     // Use the same createProgram function but with draft status
-    await createProgram({
-      ...currentProgram,
-      status: 'draft'
-    });
+    // Use the exact backend status value
+    const backendStatus = 'Brouillon';
+    console.log(`Using backend status "${backendStatus}" for draft program`);
+
+    // Log the current program data for debugging
+    console.log("Current program data for draft:", currentProgram);
+
+    try {
+      // Create a new object with the correct status values
+      const programData = {
+        ...currentProgram,
+        status: 'draft', // Frontend status
+        backendStatus: backendStatus // Backend status - this is the key field
+      };
+
+      // Log the program data being sent
+      console.log("Draft program data being sent:", {
+        ...programData,
+        backendStatus: programData.backendStatus // Highlight the backend status
+      });
+
+      const result = await createProgram(programData);
+
+      console.log("Program saved as draft:", result);
+
+      toast({
+        title: "Brouillon enregistré",
+        description: "Le programme a été enregistré comme brouillon.",
+      });
+
+      // Navigate to programs page
+      setLocation("/programs");
+    } catch (error) {
+      console.error("Error saving program as draft:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'enregistrement du brouillon.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Fonction pour enregistrer le programme comme modèle
-  const saveAsTemplate = () => {
+  const saveAsTemplate = async () => {
     // Ouvrir une boîte de dialogue pour demander le nom et la description du modèle
     const templateName = prompt("Nom du modèle:", currentProgram.name);
     if (!templateName) return; // L'utilisateur a annulé
@@ -1216,35 +1286,129 @@ const CreateProgram: React.FC = () => {
     if (!templateDescription) return; // L'utilisateur a annulé
 
     try {
-      // Enregistrer le programme comme modèle
-      saveProgramAsTemplate(
-        {
-          id: uuidv4(),
-          name: currentProgram.name,
-          description: currentProgram.description,
-          startDate: currentProgram.startDate.toISOString(),
-          endDate: currentProgram.endDate.toISOString(),
-          dashboardWidgets: (currentProgram.dashboardWidgets || []).map(widget => ({
-            ...widget,
-            size: widget.size || 'medium',
-            config: {}
-          })) as any,
-          eligibilityCriteria: currentProgram.eligibilityCriteria,
-          mentors: currentProgram.mentors || [],
-          status: 'draft',
-          phases: programPhases,
-          evaluationCriteria: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        templateName,
-        templateDescription
-      );
+      console.log("Saving program as template with name:", templateName);
 
-      toast({
-        title: "Modèle enregistré",
-        description: `Le modèle "${templateName}" a été enregistré avec succès.`,
+      // Create a program with template flag and a valid status
+      // The backend requires a valid status from the enum type app_schema.programme_status
+      const programData = {
+        ...currentProgram,
+        name: templateName, // Use the template name
+        description: templateDescription, // Use the template description
+        is_template: 'Modèle', // Set template flag directly
+        status: 'draft', // Frontend status
+        backendStatus: 'Brouillon' // Backend status - must be a valid enum value
+      };
+
+      console.log("Creating template program with data:", {
+        name: programData.name,
+        description: programData.description,
+        is_template: programData.is_template,
+        status: programData.status,
+        backendStatus: programData.backendStatus
       });
+
+      // Instead of using createProgram which redirects, we'll make a direct API call
+      // First, create a program with a valid status (Brouillon)
+      const response = await fetch(`${API_BASE_URL}/programmes/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          type: programData.type,
+          nom: programData.name,
+          description: programData.description,
+          date_debut: formatDateForBackend(programData.startDate),
+          date_fin: formatDateForBackend(programData.endDate),
+          phases_requises: programData.eligibilityCriteria?.requiredStages || [],
+          industries_requises: programData.eligibilityCriteria?.requiredIndustries || [],
+          documents_requis: programData.eligibilityCriteria?.requiredDocuments || [],
+          taille_equipe_min: programData.eligibilityCriteria?.minTeamSize || 1,
+          taille_equipe_max: programData.eligibilityCriteria?.maxTeamSize || 10,
+          ca_min: programData.eligibilityCriteria?.minRevenue || 0,
+          ca_max: programData.eligibilityCriteria?.maxRevenue || 1000000,
+          admin_id: 1, // Default admin ID
+          status: 'Brouillon', // Always use Brouillon for templates - this is a valid enum value
+          is_template: 'Modèle' // Always set as template
+        }),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create template: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("Template program creation result:", result);
+
+      if (result && result.id) {
+        console.log("Template program created with ID:", result.id);
+
+        try {
+          // Update the program to ensure it has both the template flag and a valid status
+          console.log("Ensuring program has both template flag and valid status");
+
+          // The backend requires a valid status from the enum type app_schema.programme_status
+          // We'll use 'Brouillon' status and set is_template to 'Modèle'
+          await updateProgramStatus(result.id, 'draft', true);
+          console.log("Updated program to 'Brouillon' status and set template flag to 'Modèle'");
+
+          // The program should now have both a valid status (Brouillon) and be marked as a template (Modèle)
+          console.log("Successfully updated program to template status with valid status value");
+        } catch (updateError) {
+          console.error("Error updating program template status:", updateError);
+          // Continue with the normal flow even if this fails
+        }
+
+        // Also save to localStorage for the frontend
+        saveProgramAsTemplate(
+          {
+            id: result.id,
+            name: templateName,
+            description: templateDescription,
+            startDate: currentProgram.startDate.toISOString(),
+            endDate: currentProgram.endDate.toISOString(),
+            dashboardWidgets: (currentProgram.dashboardWidgets || []).map(widget => ({
+              ...widget,
+              size: widget.size || 'medium',
+              config: {}
+            })) as any,
+            eligibilityCriteria: currentProgram.eligibilityCriteria,
+            mentors: currentProgram.mentors || [],
+            phases: programPhases,
+            evaluationCriteria: [],
+            status: 'draft', // Add the required status property
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          templateName,
+          templateDescription
+        );
+
+        toast({
+          title: "Modèle enregistré",
+          description: `Le modèle "${templateName}" a été enregistré avec succès.`,
+        });
+
+        // Update the current program with the template data
+        // This allows the user to continue editing the program
+        setCurrentProgram(prev => ({
+          ...prev,
+          name: templateName,
+          description: templateDescription,
+          // Keep other properties the same
+        }));
+
+        // Set state to indicate a template was just saved
+        setIsTemplateSaved(true);
+        setSavedTemplateId(result.id);
+
+        // Show success message and stay on the same page
+        // Do NOT navigate away from the page
+      } else {
+        throw new Error("Failed to create program template");
+      }
     } catch (error) {
       console.error("Error saving program template:", error);
       toast({
@@ -1256,6 +1420,68 @@ const CreateProgram: React.FC = () => {
   };
 
 
+
+  // Function to publish the template (set to Actif status)
+  const publishTemplate = async () => {
+    if (!savedTemplateId) return;
+
+    try {
+      console.log("Publishing template with ID:", savedTemplateId);
+
+      // Update the program status to Actif while KEEPING the template flag
+      // This allows a program to be both active and a template simultaneously
+      await updateProgramStatus(savedTemplateId, 'active', true);
+
+      // Log the update for debugging
+      console.log(`Updated program ${savedTemplateId} to status 'active' (Actif) and kept template flag`);
+
+      toast({
+        title: "Programme créé et publié",
+        description: "Le programme modèle a été activé et est maintenant visible dans les programmes actifs.",
+      });
+
+      // Navigate to programs page
+      setLocation("/programs");
+    } catch (error) {
+      console.error("Error publishing template:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'activation du programme modèle.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Function to save the template as a draft
+  const saveTemplateAsDraft = async () => {
+    if (!savedTemplateId) return;
+
+    try {
+      console.log("Saving template as draft with ID:", savedTemplateId);
+
+      // Update the program status to Brouillon while KEEPING the template flag
+      // This allows a program to be both a draft and a template simultaneously
+      await updateProgramStatus(savedTemplateId, 'draft', true);
+
+      // Log the update for debugging
+      console.log(`Updated program ${savedTemplateId} to status 'draft' (Brouillon) and kept template flag`);
+
+      toast({
+        title: "Brouillon créé",
+        description: "Le programme modèle a été enregistré comme brouillon.",
+      });
+
+      // Navigate to programs page
+      setLocation("/programs");
+    } catch (error) {
+      console.error("Error saving template as draft:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'enregistrement du programme modèle comme brouillon.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleUpdatePhase = (updatedPhase: PhaseDetails) => {
     setProgramPhases(phases =>
@@ -1724,7 +1950,7 @@ const CreateProgram: React.FC = () => {
                     requiredDocuments: []
                   },
       mentors: template.mentors || [],
-      status: 'draft'
+      status: 'draft' // Always use draft status for new programs
     };
 
     // Mettre à jour le template sélectionné
@@ -2298,7 +2524,7 @@ const CreateProgram: React.FC = () => {
                 </button>
               )}
               <div className="flex space-x-4">
-                {currentStep === 4 && (
+                {currentStep === 4 && !isTemplateSaved && (
                   <>
                     <button
                       onClick={saveDraft}
@@ -2314,22 +2540,78 @@ const CreateProgram: React.FC = () => {
                     </button>
                   </>
                 )}
-                <button
-                  onClick={async () => {
-                    if (currentStep === 4) {
-                      // Create the program with active status
-                      await createProgram({
-                        ...currentProgram,
-                        status: 'active'
-                      });
-                    } else {
-                      handleNextStep();
-                    }
-                  }}
-                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
-                >
-                  {currentStep === 4 ? 'Créer le programme' : 'Suivant'}
-                </button>
+                {currentStep === 4 && isTemplateSaved && (
+                  <>
+                    <button
+                      onClick={saveTemplateAsDraft}
+                      style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Enregistrer comme brouillon
+                    </button>
+                    <button
+                      onClick={publishTemplate}
+                      style={{ backgroundColor: '#0c4c80', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Activer le modèle
+                    </button>
+                  </>
+                )}
+                {(!isTemplateSaved || currentStep !== 4) && (
+                  <button
+                    onClick={async () => {
+                      if (currentStep === 4) {
+                        console.log("Creating program with active status");
+
+                        // Create the program with active status
+                        // Use the exact backend status value
+                        const backendStatus = 'Actif'; // Use the exact backend status value
+                        console.log(`Using backend status "${backendStatus}" for active program`);
+
+                        // Log the current program data for debugging
+                        console.log("Current program data:", currentProgram);
+
+                        try {
+                          // Create a new object with the correct status values
+                          const programData = {
+                            ...currentProgram,
+                            status: 'active', // Frontend status
+                            backendStatus: backendStatus // Backend status - this is the key field
+                          };
+
+                          // Log the program data being sent
+                          console.log("Program data being sent:", {
+                            ...programData,
+                            backendStatus: programData.backendStatus // Highlight the backend status
+                          });
+
+                          const result = await createProgram(programData);
+
+                          console.log("Program created successfully:", result);
+
+                          toast({
+                            title: "Programme créé",
+                            description: "Le programme a été créé avec succès.",
+                          });
+
+                          // Navigate to programs page
+                          setLocation("/programs");
+                        } catch (error) {
+                          console.error("Error creating program:", error);
+                          toast({
+                            title: "Erreur",
+                            description: "Une erreur est survenue lors de la création du programme.",
+                            variant: "destructive"
+                          });
+                        }
+                      } else {
+                        handleNextStep();
+                      }
+                    }}
+                    style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+                  >
+                    {currentStep === 4 ? 'Créer le programme' : 'Suivant'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

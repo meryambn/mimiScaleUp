@@ -66,11 +66,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(data.error || 'Identifiants invalides');
       }
 
+      // Log the actual role from the backend
+      console.log('User role from backend:', data.utilisateur.role);
+
+      // Normalize the role to ensure it matches our expected values
+      let normalizedRole = data.utilisateur.role.toLowerCase();
+
+      // Make sure the role is one of our valid types
+      if (!['admin', 'mentor', 'team', 'startup', 'particulier'].includes(normalizedRole)) {
+        console.warn(`Unknown role "${data.utilisateur.role}" - defaulting to "admin" for admin users`);
+        // If email contains "admin", assume it's an admin
+        if (data.utilisateur.email.includes('admin')) {
+          normalizedRole = 'admin';
+        }
+      }
+
+      console.log('Normalized role:', normalizedRole);
+
       const userData = {
         id: data.utilisateur.id,
         name: data.utilisateur.name,
         email: data.utilisateur.email,
-        role: data.utilisateur.role as UserRole,
+        role: normalizedRole as UserRole,
         profileImage: data.utilisateur.profileImage,
         token: data.token,
       };

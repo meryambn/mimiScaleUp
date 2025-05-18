@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Program, Phase } from "@/types/program";
+import { Program, Phase, Deliverable, Meeting } from "@/types/program";
 import { v4 as uuidv4 } from 'uuid';
 import * as programService from "@/services/programService";
 import {
@@ -10,15 +10,36 @@ import {
   getReunions,
   getCriteres,
   getLivrables,
-  createCritere,
-  createReunion,
-  createLivrable
+  getAllPrograms
 } from "@/services/programService";
-import { getMentorPrograms } from "@/services/mentorProgramService";
+import { getMentorPrograms, MentorProgram } from "@/services/mentorProgramService";
 import { useAuth } from "./AuthContext";
+import { mapToFrontendStatus } from "@/utils/statusMapping";
+
+// Extended interfaces for example data
+interface ExtendedMeeting extends Meeting {
+  isCompleted?: boolean;
+  hasNotes?: boolean;
+  isOnline?: boolean;
+  phaseId?: string;
+  programId?: string;
+}
+
+interface ExtendedDeliverable extends Deliverable {
+  type?: string;
+  url?: string;
+}
+
+// Define a custom interface for example programs that includes extended properties
+interface ExampleProgram extends Omit<Program, 'phases'> {
+  phases: Array<Omit<Phase, 'meetings' | 'deliverables'> & {
+    meetings: ExtendedMeeting[];
+    deliverables?: ExtendedDeliverable[];
+  }>;
+}
 
 // Example programs
-const examplePrograms: Program[] = [
+const examplePrograms: ExampleProgram[] = [
   {
     id: "1",
     name: "Tech Accelerator 2025",
@@ -570,6 +591,9 @@ interface ProgramProviderProps {
 }
 
 // Utility function to deduplicate programs by ID
+// This function is used in the commented out setDeduplicatedPrograms function
+// and is kept for future use
+/*
 const deduplicatePrograms = (programs: Program[]): Program[] => {
   const programsMap = new Map<string, Program>();
 
@@ -581,13 +605,14 @@ const deduplicatePrograms = (programs: Program[]): Program[] => {
   // Convert map back to array
   return Array.from(programsMap.values());
 };
+*/
 
 export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) => {
   const [location] = useLocation();
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [programs, setPrograms] = useState<Program[]>(examplePrograms);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  // selectedProgram is used in the context value
+  // selectedProgram is used in the context value and returned in the context
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   // isLoading is used to track API request status
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -597,6 +622,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
   const { user } = useAuth();
 
   // Custom setter for programs that ensures deduplication
+  // Commented out as it's not currently used, but may be needed in the future
+  /*
   const setDeduplicatedPrograms = (newPrograms: Program[] | ((prev: Program[]) => Program[])) => {
     if (typeof newPrograms === 'function') {
       setPrograms(prev => deduplicatePrograms(newPrograms(prev)));
@@ -604,6 +631,7 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
       setPrograms(deduplicatePrograms(newPrograms));
     }
   };
+  */
 
   // Define the function to load programs from the backend
   const loadProgramsFromBackend = async () => {
@@ -620,7 +648,7 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
           if (mentorPrograms.length > 0) {
             // Convert backend format to frontend format
             const convertedPrograms = await Promise.all(
-              mentorPrograms.map(async (programDetails) => {
+              mentorPrograms.map(async (programDetails: MentorProgram) => {
                 // Fetch phases for this program
                 let programPhases: Phase[] = [];
                 try {
@@ -671,6 +699,9 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
                   isTopMentor: true // Default value
                 }));
 
+                // Log template status
+                console.log(`Program ${programDetails.id} template status:`, programDetails.is_template);
+
                 return {
                   id: String(programDetails.id),
                   name: programDetails.nom,
@@ -692,7 +723,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
                   },
                   dashboardWidgets: [],
                   createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
+                  updatedAt: new Date().toISOString(),
+                  is_template: programDetails.is_template // Include the template flag
                 };
               })
             );
@@ -707,50 +739,21 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
           }
         }
 
-        // For admin users, continue with the existing approach
-        // Create a Set to track program IDs we've already processed
-        // This will help prevent duplicates
-        const processedProgramIds = new Set<number>();
+        // For admin users, use the new getAllPrograms function
+        console.log("Fetching all programs from backend...");
 
-        // Try to find programs by checking a range of IDs
-        // Start with the most recent IDs (higher numbers) to prioritize newer programs
-        const programIds: number[] = [];
-
-        // Check the most recent 200 IDs
-        for (let i = 200; i >= 1; i--) {
-          programIds.push(i);
-        }
-
-        console.log(`Checking for programs with IDs from 200 down to 1...`);
+        // Fetch all programs at once using the new endpoint
+        const allProgramsData = await getAllPrograms();
+        console.log(`Retrieved ${allProgramsData.length} programs from backend`);
 
         // Try to fetch each program
         const fetchedPrograms: Program[] = [];
 
-        // Keep track of consecutive failures to optimize the process
-        let consecutiveFailures = 0;
-        const MAX_CONSECUTIVE_FAILURES = 10;
-
-        for (const id of programIds) {
-          // Skip IDs we've already processed
-          if (processedProgramIds.has(id)) {
-            console.log(`Skipping already processed program ID: ${id}`);
-            continue;
-          }
-
-          // If we've had too many consecutive failures, assume we've reached the end of valid programs
-          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-            console.log(`Stopping program search after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
-            break;
-          }
-
+        // Process each program from the getAllPrograms response
+        for (const programDetails of allProgramsData) {
           try {
-            const programDetails = await getProgram(id);
             if (programDetails) {
-              // Mark this ID as processed
-              processedProgramIds.add(id);
-
-              consecutiveFailures = 0; // Reset counter on success
-              console.log(`Found program with ID ${id}:`, programDetails.nom);
+              console.log(`Processing program with ID ${programDetails.id}:`, programDetails.nom);
 
               // Map mentors from backend format to frontend format
               const mappedMentors = (programDetails.mentors || []).map((mentor: any) => ({
@@ -816,8 +819,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
               let programPhases: Phase[] = [];
               try {
                 // Fetch phases for this program
-                const phases = await getPhases(id);
-                console.log(`Loaded ${phases.length} phases for program ${id}:`, phases);
+                const phases = await getPhases(programDetails.id);
+                console.log(`Loaded ${phases.length} phases for program ${programDetails.id}:`, phases);
 
                 if (phases && phases.length > 0) {
                   // Map phases to frontend format
@@ -850,8 +853,21 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
                   });
                 }
               } catch (error) {
-                console.error(`Error fetching phases for program ${id}:`, error);
+                console.error(`Error fetching phases for program ${programDetails.id}:`, error);
               }
+
+              // Add debugging for status mapping
+              console.log(`Program ${programDetails.id} backend status:`, programDetails.status);
+
+              // Map the status using our improved mapToFrontendStatus function
+              const mappedStatus = programDetails.status ?
+                mapToFrontendStatus(programDetails.status) :
+                "active" as "active" | "completed" | "draft";
+
+              console.log(`Mapped status for program ${programDetails.id}: ${mappedStatus}`);
+
+              // Log template status
+              console.log(`Program ${programDetails.id} template status:`, programDetails.is_template);
 
               // Convert to frontend format
               const convertedProgram = {
@@ -860,7 +876,7 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
                 description: programDetails.description,
                 startDate: programDetails.date_debut,
                 endDate: programDetails.date_fin,
-                status: "active" as "active" | "completed" | "draft",
+                status: mappedStatus,
                 phases: programPhases,
                 mentors: mappedMentors,
                 evaluationCriteria: [],
@@ -875,7 +891,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
                 },
                 dashboardWidgets: [],
                 createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                is_template: programDetails.is_template // Include the template flag
               };
 
               // Check if this program is already in the fetchedPrograms array
@@ -887,10 +904,9 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
               }
             }
           } catch (error) {
-            // Increment the consecutive failures counter
-            consecutiveFailures++;
-            // Ignore errors for programs that don't exist
-            // Don't log these errors to avoid cluttering the console
+            // Log errors when processing programs
+            console.error(`Error processing program ${programDetails.id}:`, error);
+            // Continue with the next program
           }
         }
 
@@ -966,11 +982,14 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
       const uniqueProgramIds = new Set(programs.map(p => p.id));
       const uniquePrograms = Array.from(uniqueProgramIds).map(id =>
         programs.find(p => p.id === id)
-      ).filter(Boolean);
+      ).filter(Boolean) as Program[];
 
       if (uniquePrograms.length > 0) {
-        console.log('%c Auto-sélection du premier programme:', "background: blue; color: white; padding: 5px; font-size: 14px;", uniquePrograms[0].id);
-        setSelectedProgramId(uniquePrograms[0].id);
+        const firstProgram = uniquePrograms[0];
+        if (firstProgram) {
+          console.log('%c Auto-sélection du premier programme:', "background: blue; color: white; padding: 5px; font-size: 14px;", firstProgram.id);
+          setSelectedProgramId(firstProgram.id);
+        }
       }
     }
   }, [selectedProgramId, programs, location]);
@@ -1126,6 +1145,19 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
 
             // Program details loaded from backend
 
+            // Add debugging for status mapping
+            console.log(`Program ${programDetails.id} backend status:`, programDetails.status);
+
+            // Map the status using our improved mapToFrontendStatus function
+            const mappedStatus = programDetails.status ?
+              mapToFrontendStatus(programDetails.status) :
+              "active" as "active" | "completed" | "draft";
+
+            console.log(`Mapped status for program ${programDetails.id}: ${mappedStatus}`);
+
+            // Log template status
+            console.log(`Program ${programDetails.id} template status:`, programDetails.is_template);
+
             // Convert backend program to frontend format
             const updatedProgram = {
               id: String(programDetails.id),
@@ -1133,7 +1165,8 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
               description: programDetails.description,
               startDate: programDetails.date_debut,
               endDate: programDetails.date_fin,
-              status: "active" as "active" | "completed" | "draft",
+              status: mappedStatus,
+              is_template: programDetails.is_template, // Include the template flag
               phases: phasesWithDetails.map((phase: any) => {
                 // Ensure all arrays are properly initialized
                 const phaseTasks = Array.isArray(phase.tasks) ? phase.tasks : [];

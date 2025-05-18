@@ -127,27 +127,27 @@ const MentorManagement: React.FC<MentorManagementProps> = ({
     }
 
     try {
-      const success = await addMentorToProgram(currentProgramId, mentorId);
+      console.log(`Attempting to add mentor ${mentorId} to program ${currentProgramId}...`);
+      await addMentorToProgram(currentProgramId, mentorId);
 
-      if (success) {
-        // Find the mentor in the admin mentors list
-        const mentor = adminMentors.find(m => m.id === mentorId);
-        if (mentor) {
-          // Add the mentor to the program mentors list
-          setProgramMentors(prev => [...prev, mentor]);
-        }
+      console.log(`Successfully added mentor ${mentorId} to program ${currentProgramId}`);
 
-        toast({
-          title: "Mentor ajouté",
-          description: "Le mentor a été ajouté au programme avec succès.",
-        });
-      } else {
-        toast({
-          title: 'Erreur',
-          description: 'Impossible d\'ajouter le mentor au programme. Veuillez réessayer.',
-          variant: 'destructive'
-        });
+      // Find the mentor in the admin mentors list
+      const mentor = adminMentors.find(m => m.id === mentorId);
+      if (mentor) {
+        // Add the mentor to the program mentors list
+        setProgramMentors(prev => [...prev, mentor]);
       }
+
+      toast({
+        title: "Mentor ajouté",
+        description: "Le mentor a été ajouté au programme avec succès.",
+      });
+
+      // Force refresh notifications
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error adding mentor to program:', error);
       toast({

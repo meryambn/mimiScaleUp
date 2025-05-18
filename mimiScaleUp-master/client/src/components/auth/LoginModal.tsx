@@ -94,15 +94,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ show, onClose, switchToRegister
       if (isAdminLogin) {
         console.log('Admin login detected from response');
 
-        // Create admin user object with all required fields
-        const adminUser = {
-          id: 0, // Default ID for admin
+        // Default admin user with ID 1 (based on your logs)
+        let adminUser = {
+          id: 1, // Default to admin ID 1 based on your logs
           name: data.email,
           email: data.email,
           role: 'admin' as const,
           profileImage: '',
           token: 'admin-token' // Placeholder token for admin
         };
+
+        // Log the admin user we're using
+        console.log('Using admin user with ID:', adminUser.id);
 
         console.log('Setting admin user in context and localStorage:', adminUser);
 

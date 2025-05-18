@@ -215,8 +215,17 @@ export async function createFormWithQuestions(
   settings: FormSettings
 ): Promise<{ formId: number; success: boolean }> {
   try {
-    // Generate a unique URL for the form
-    const formUrl = `${window.location.origin}/applications/submit/${programId}`;
+    // Check if programId is valid (not 0 or undefined)
+    if (!programId || programId === 0) {
+      console.error('Invalid program ID for form creation:', programId);
+      return {
+        formId: 0,
+        success: false
+      };
+    }
+
+    // Generate a unique URL for the form using the correct format
+    const formUrl = `${window.location.origin}/apply/${programId}`;
 
     // Create the form first
     const formData = {
@@ -458,5 +467,65 @@ export async function deleteForm(programId: number | string): Promise<{ message:
   } catch (error) {
     console.error('Error in deleteForm:', error);
     throw error;
+  }
+}
+
+/**
+ * Get all submissions for a program
+ * @param programId The ID of the program
+ * @returns A promise with the submissions for the program
+ */
+export async function getSubmissionsByProgram(programId: number | string) {
+  try {
+    console.log(`Fetching submissions for program ID: ${programId}`);
+
+    // Utiliser l'URL relative avec API_BASE_URL pour être cohérent avec les autres appels
+    const response = await fetch(`${API_BASE_URL}/soum/programme/${programId}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
+    });
+
+    // Log the raw response for debugging
+    console.log(`Submissions API response status: ${response.status}`);
+
+    // Handle non-JSON responses
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Non-JSON response received:', await response.text());
+      return {
+        error: true,
+        message: 'Le serveur a retourné une réponse non-JSON',
+        submissions: []
+      };
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('Error getting submissions:', result);
+      return {
+        error: true,
+        message: result.error || 'Échec de récupération des soumissions',
+        submissions: []
+      };
+    }
+
+    console.log('Submissions retrieved successfully:', result);
+    return {
+      error: false,
+      message: '',
+      submissions: result
+    };
+  } catch (error) {
+    console.error('Error in getSubmissionsByProgram:', error);
+    // Return an error object instead of throwing
+    return {
+      error: true,
+      message: error instanceof Error ? error.message : 'Erreur inconnue',
+      submissions: []
+    };
   }
 }

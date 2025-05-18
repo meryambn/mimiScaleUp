@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../lib/constants';
+import { apiRequest as queryApiRequest } from '../lib/queryClient';
 
 // Helper function to make API requests with better error handling
 export async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -16,7 +17,7 @@ export async function apiRequest<T>(url: string, options: RequestInit = {}): Pro
     // Merge with provided options
     const fetchOptions = { ...defaultOptions, ...options };
 
-    // Make the request
+    // Use the queryApiRequest function to ensure consistent error handling
     const response = await fetch(url, fetchOptions);
 
     // Handle error responses
@@ -28,6 +29,7 @@ export async function apiRequest<T>(url: string, options: RequestInit = {}): Pro
       } catch (e) {
         errorMessage = response.statusText;
       }
+      console.error(`API request failed: ${response.status} ${errorMessage}`);
       throw new Error(`API request failed: ${response.status} ${errorMessage}`);
     }
 
@@ -83,16 +85,19 @@ export async function getAvailableMentors(): Promise<Mentor[]> {
 // Add a mentor to the admin's pool
 export async function addMentorToAdminPool(mentorId: number): Promise<boolean> {
   try {
+    console.log(`Adding mentor ${mentorId} to admin pool...`);
+
     // Use our apiRequest helper function
-    await apiRequest<{message: string}>(`${API_BASE_URL}/mentor/add`, {
+    const result = await apiRequest<{message: string}>(`${API_BASE_URL}/mentor/add`, {
       method: 'POST',
       body: JSON.stringify({ mentor_id: mentorId })
     });
 
+    console.log(`Successfully added mentor ${mentorId} to admin pool:`, result);
     return true;
   } catch (error) {
     console.error('Error adding mentor to admin pool:', error);
-    return false;
+    throw error; // Re-throw the error to allow proper error handling
   }
 }
 
@@ -114,15 +119,18 @@ export async function removeMentorFromAdminPool(mentorId: number): Promise<boole
 // Add a mentor to a program
 export async function addMentorToProgram(programId: number, mentorId: number): Promise<boolean> {
   try {
+    console.log(`Adding mentor ${mentorId} to program ${programId}...`);
+
     // Use our apiRequest helper function
-    await apiRequest<{message: string}>(`${API_BASE_URL}/programmes/${programId}/add-mentor`, {
+    const result = await apiRequest<{message: string}>(`${API_BASE_URL}/programmes/${programId}/add-mentor`, {
       method: 'POST',
       body: JSON.stringify({ mentorId })
     });
 
+    console.log(`Successfully added mentor ${mentorId} to program ${programId}:`, result);
     return true;
   } catch (error) {
     console.error('Error adding mentor to program:', error);
-    return false;
+    throw error; // Re-throw the error to allow proper error handling
   }
 }

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import MessagesDialog from "@/components/messages/MessagesDialog";
+import NotificationBell from "@/components/NotificationBell";
 
 interface StartupHeaderProps {
   onToggleSidebar: () => void;
@@ -96,10 +97,9 @@ const StartupHeader: React.FC<StartupHeaderProps> = ({ onToggleSidebar }) => {
             )}
           </Button>
           <MessagesDialog open={messagesOpen} onOpenChange={setMessagesOpen} />
-          <Button variant="ghost" size="sm" className="rounded-full h-6 w-6 p-0 relative">
-            <Bell className="h-3 w-3 text-gray-500" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2 items-center justify-center rounded-full bg-primary text-[6px] font-bold text-white">3</span>
-          </Button>
+          <div className="rounded-full relative flex items-center justify-center h-8 w-8">
+            <NotificationBell />
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

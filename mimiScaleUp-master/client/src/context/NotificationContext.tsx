@@ -46,7 +46,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const data = await getNotifications(user.id, user.role);
       setNotifications(data);
-      setUnreadCount(data.filter((notification) => !notification.is_read).length);
+      const unreadCount = data.filter((notification) => !notification.is_read).length;
+      setUnreadCount(unreadCount);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -56,7 +57,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const fetchUnreadCount = async () => {
-    if (!user?.id || !user?.role) return;
+    if (!user?.id || !user?.role) {
+      return;
+    }
 
     try {
       const count = await getUnreadNotificationCount(user.id, user.role);
@@ -68,14 +71,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const markAsRead = async (notificationId: number) => {
     if (!user?.id || !user?.role) {
-      console.error('User ID or role missing when trying to mark notification as read');
       return;
     }
 
     try {
-      console.log(`Marking notification ${notificationId} as read`);
       const result = await markNotificationAsRead(notificationId);
-      console.log('Mark as read result:', result);
 
       if (result) {
         // Update local state
@@ -100,14 +100,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const markAllAsRead = async () => {
     if (!user?.id || !user?.role) {
-      console.error('User ID or role missing when trying to mark all notifications as read');
       return;
     }
 
     try {
-      console.log(`Marking all notifications as read for user ${user.id} with role ${user.role}`);
       const result = await markAllNotificationsAsRead(user.id, user.role);
-      console.log('Mark all as read result:', result);
 
       if (result && result.length > 0) {
         // Update local state
@@ -117,8 +114,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         // Reset unread count
         setUnreadCount(0);
-      } else {
-        console.log('No notifications were marked as read');
       }
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
@@ -129,17 +124,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Fetch notifications when user changes
   useEffect(() => {
     if (user?.id && user?.role) {
-      fetchNotifications();
+      // Add a small delay to ensure the user data is fully loaded
+      const timeout = setTimeout(() => {
+        fetchNotifications();
+        fetchUnreadCount(); // Also fetch unread count immediately
+      }, 500);
+
+      return () => clearTimeout(timeout);
     }
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role]); // fetchNotifications is intentionally not in the dependency array
 
   // Periodically check for new notifications
   useEffect(() => {
     if (!user?.id || !user?.role) return;
 
+    // Fetch immediately on mount
+    fetchUnreadCount();
+
     const interval = setInterval(() => {
       fetchUnreadCount();
-    }, 60000); // Check every minute
+    }, 60000); // Check every 60 seconds
 
     return () => clearInterval(interval);
   }, [user?.id, user?.role]);

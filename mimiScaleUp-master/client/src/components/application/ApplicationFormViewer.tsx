@@ -9,7 +9,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { ApplicationSubmission } from './ApplicationSubmissionCard';
+import AddToProgramButton from './AddToProgramButton';
+import { useProgramContext } from '@/context/ProgramContext';
 
 interface ApplicationFormViewerProps {
   submission: ApplicationSubmission | null;
@@ -24,6 +27,7 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
   onOpenChange,
   onAddTeam
 }) => {
+  const { selectedProgramId } = useProgramContext();
   if (!submission) return null;
 
   const renderFormValue = (value: any) => {
@@ -44,11 +48,33 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
     }
   };
 
+  // Display actual name instead of "utilisateur"
+  const displayName = submission.teamName === "utilisateur" || !submission.teamName
+    ? submission.teamEmail.split('@')[0] // Use email username if no name
+    : submission.teamName;
+
+  // Function to get role badge
+  const getRoleBadge = (role?: string) => {
+    switch (role) {
+      case 'startup':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Startup</Badge>;
+      case 'particulier':
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800 hover:bg-purple-200">Particulier</Badge>;
+      case 'mentor':
+        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">Mentor</Badge>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Candidature de {submission.teamName}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Candidature de {displayName}</DialogTitle>
+            {getRoleBadge(submission.role)}
+          </div>
           <DialogDescription>
             Soumise le {new Date(submission.submittedAt).toLocaleString()}
           </DialogDescription>
@@ -59,7 +85,7 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Nom de l'équipe</h3>
-                <p className="mt-1">{submission.teamName}</p>
+                <p className="mt-1">{displayName}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Email</h3>
@@ -93,20 +119,17 @@ const ApplicationFormViewer: React.FC<ApplicationFormViewerProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fermer
           </Button>
-          {submission.status === 'pending' && onAddTeam && (
-            <Button
-              onClick={() => {
-                onAddTeam(submission);
-                onOpenChange(false);
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
-                color: 'white',
-                border: 'none'
-              }}
-            >
-              Ajouter au programme
-            </Button>
+          {submission.status === 'pending' && (
+            <div className="flex gap-2">
+              {/* Bouton pour ajouter directement au programme */}
+              <AddToProgramButton
+                submission={submission}
+                programId={selectedProgramId || ''}
+                onSuccess={() => {
+                  onOpenChange(false);
+                }}
+              />
+            </div>
           )}
         </DialogFooter>
       </DialogContent>

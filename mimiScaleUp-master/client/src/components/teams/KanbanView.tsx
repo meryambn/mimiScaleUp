@@ -4,10 +4,13 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MessageSquare, ArrowRight, ArrowLeft, Trophy } from 'lucide-react';
+import { MessageSquare, ArrowRight, ArrowLeft, Trophy, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useProgramContext } from '@/context/ProgramContext';
 import WinnerDialog from "@/components/teams/WinnerDialog";
+import { getProgramTeams, getTeamCurrentPhase, ensureTeamHasPhase } from '@/services/teamService';
+import { moveToPhase } from '@/services/phaseService';
+import { getPhases } from '@/services/programService';
 
 // Types
 interface Team {
@@ -32,6 +35,13 @@ interface KanbanViewProps {
   teams: Team[];
   onPhaseChange?: (teamId: number | string, newPhase: string) => void;
   onSelectWinner?: (teamId: number | string) => void;
+}
+
+// Interface for the team phase response from the backend
+interface TeamPhaseResponse {
+  phase_id: number;
+  nom: string;
+  description: string;
 }
 
 // Couleurs de secours pour les phases sans couleur définie
@@ -271,6 +281,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
   const [localTeams, setLocalTeams] = useState<Team[]>(teams);
   const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
   const [selectedWinner, setSelectedWinner] = useState<Team | null>(null);
+  const [isLoadingFromBackend, setIsLoadingFromBackend] = useState(false);
 
   // Mettre à jour les équipes locales lorsque les équipes changent
   React.useEffect(() => {
@@ -383,23 +394,190 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
   ];
 
   // Fonction pour déplacer une équipe vers une nouvelle phase
-  const handleMoveTeam = (teamId: number | string, newPhaseIndex: number) => {
+  const handleMoveTeam = async (teamId: number | string, newPhaseIndex: number) => {
     if (newPhaseIndex < 0 || newPhaseIndex >= phases.length) return;
+    if (!selectedProgram?.id) return;
 
-    const newPhase = phases[newPhaseIndex].name;
+    const newPhase = phases[newPhaseIndex];
+    console.log(`Moving team ${teamId} to phase ${newPhase.name} (index ${newPhaseIndex})`);
 
-    // Mettre à jour l'état local
-    setLocalTeams(prevTeams =>
-      prevTeams.map(team =>
-        team.id === teamId
-          ? { ...team, currentPhase: newPhase }
-          : team
-      )
-    );
+    try {
+      // Find the team to get its name
+      const team = localTeams.find(t => t.id === teamId);
+      const teamName = team?.name;
 
-    // Appeler le callback si fourni
-    if (onPhaseChange) {
-      onPhaseChange(teamId, newPhase);
+      console.log(`Team name for ID ${teamId}: ${teamName || 'Not found'}`);
+
+      // Appeler l'API pour déplacer l'équipe vers la nouvelle phase
+      const result = await moveToPhase({
+        entiteType: 'equipe',
+        entiteId: teamId,
+        phaseNextId: newPhase.id,
+        programmeId: selectedProgram.id,
+        ...(teamName && {
+          nom_entreprise: teamName,
+          // Also include it in the format the backend is looking for
+          soumission: {
+            nom_entreprise: teamName
+          }
+        })
+      });
+
+      // If we sent a name but the backend still used a default name, use our name
+      const displayName = teamName && result.nom && result.nom.startsWith('Startup ')
+        ? teamName
+        : result.nom || teamName;
+
+      // Mettre à jour l'état local
+      setLocalTeams(prevTeams =>
+        prevTeams.map(team => {
+          if (team.id === teamId) {
+            console.log(`Updating team ${team.name} from phase ${team.currentPhase} to ${newPhase.name}`);
+            return {
+              ...team,
+              currentPhase: newPhase.name,
+              // Use our name if the backend used a default name
+              name: displayName || team.name
+            };
+          }
+          return team;
+        })
+      );
+
+      // Appeler le callback si fourni
+      if (onPhaseChange) {
+        console.log(`Calling onPhaseChange callback for team ${teamId} to phase ${newPhase.name}`);
+        onPhaseChange(teamId, newPhase.name);
+      }
+
+      toast({
+        title: "Phase mise à jour",
+        description: `L'équipe a été déplacée vers ${newPhase.name}`,
+      });
+    } catch (error) {
+      console.error('Error moving team to phase:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors du déplacement de l'équipe.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Cette fonction est remplacée par l'utilisation de getProgramTeams avec ensurePhases=true
+
+  // Fonction pour charger les équipes depuis le backend
+  const loadTeamsFromBackend = async () => {
+    if (!selectedProgram?.id) {
+      toast({
+        title: "Erreur",
+        description: "Aucun programme sélectionné.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoadingFromBackend(true);
+      console.log('Loading teams from backend for program:', selectedProgram.id);
+
+      // Charger les équipes et s'assurer qu'elles ont toutes une phase assignée
+      console.log('Loading teams data from backend and ensuring all teams have phases...');
+      const backendData = await getProgramTeams(selectedProgram.id, true);
+
+      // Tableau temporaire pour stocker les équipes pendant que nous récupérons les phases
+      const tempTeams: Team[] = [];
+
+      // Traiter les équipes
+      for (const team of backendData.equipes) {
+        // Récupérer la phase actuelle de l'équipe
+        const phaseData = await getTeamCurrentPhase(team.id);
+
+        console.log(`Phase data for team ${team.id} (${team.nom_equipe}):`, phaseData);
+
+        // Trouver la phase correspondante dans le programme
+        let phaseName = 'Non assigné';
+        if (phaseData && phaseData.nom) {
+          // Chercher une phase correspondante dans les phases du programme
+          const matchingProgramPhase = programPhases.find(phase =>
+            phase.name.toLowerCase() === phaseData.nom.toLowerCase() ||
+            phase.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+            phaseData.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+          );
+
+          // Utiliser le nom exact de la phase du programme si trouvé, sinon utiliser le nom de la phase de la BD
+          phaseName = matchingProgramPhase ? matchingProgramPhase.name : phaseData.nom;
+          console.log(`Matched phase name for team ${team.nom_equipe}: ${phaseName}`);
+        }
+
+        tempTeams.push({
+          id: team.id,
+          name: team.nom_equipe,
+          currentPhase: phaseName,
+          progress: 0, // Valeur par défaut
+          status: 'active', // Valeur par défaut
+          description: `Équipe avec ${team.membres.length} membres`
+        });
+      }
+
+      // Traiter les startups individuelles
+      for (const startup of backendData.startups_individuelles) {
+        // Récupérer la phase actuelle de la startup
+        const phaseData = await getTeamCurrentPhase(startup.id, startup.nom);
+
+        console.log(`Phase data for startup ${startup.id} (${startup.nom}):`, phaseData);
+
+        // Trouver la phase correspondante dans le programme
+        let phaseName = 'Non assigné';
+        if (phaseData && phaseData.nom) {
+          // Chercher une phase correspondante dans les phases du programme
+          const matchingProgramPhase = programPhases.find(phase =>
+            phase.name.toLowerCase() === phaseData.nom.toLowerCase() ||
+            phase.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+            phaseData.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+          );
+
+          // Utiliser le nom exact de la phase du programme si trouvé, sinon utiliser le nom de la phase de la BD
+          phaseName = matchingProgramPhase ? matchingProgramPhase.name : phaseData.nom;
+          console.log(`Matched phase name for startup ${startup.nom}: ${phaseName}`);
+        }
+
+        // Use the teamName from phaseData if available, otherwise use startup.nom
+        const displayName = phaseData?.teamName || startup.nom;
+
+        tempTeams.push({
+          id: startup.id,
+          name: displayName,
+          currentPhase: phaseName,
+          progress: 0, // Valeur par défaut
+          status: 'active', // Valeur par défaut
+          description: 'Startup individuelle'
+        });
+      }
+
+      console.log('Teams loaded from backend with phases:', tempTeams);
+
+      // Log all available phases for debugging
+      console.log('Available program phases:', programPhases.map(p => ({ id: p.id, name: p.name })));
+
+      // Log all available kanban phases for debugging
+      console.log('Available kanban phases:', phases.map(p => ({ id: p.id, name: p.name })));
+
+      setLocalTeams(tempTeams);
+
+      toast({
+        title: "Équipes chargées",
+        description: `${tempTeams.length} équipes chargées depuis le backend.`,
+      });
+    } catch (error) {
+      console.error('Error loading teams from backend:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les équipes depuis le backend.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingFromBackend(false);
     }
   };
 
@@ -409,7 +587,9 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
 
     // Essayer de trouver une correspondance exacte avec le nom de la phase
     const exactMatch = phases.find(phase =>
-      phase.name.toLowerCase() === team.currentPhase.toLowerCase()
+      phase.name.toLowerCase() === team.currentPhase.toLowerCase() ||
+      phase.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+      team.currentPhase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     );
     if (exactMatch) return exactMatch.id;
 
@@ -500,6 +680,41 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col">
+        <div className="mb-4 flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Tableau Kanban des Équipes</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={loadTeamsFromBackend}
+              disabled={isLoadingFromBackend}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {isLoadingFromBackend ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Chargement...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Charger depuis le backend
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem('startups');
+                toast({
+                  title: "Cache effacé",
+                  description: "Le cache local a été effacé. Rechargez les données.",
+                });
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 flex items-center gap-2"
+            >
+              Effacer le cache
+            </button>
+          </div>
+        </div>
+
         {phases.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-lg">
             <p className="text-gray-500">Aucune phase définie dans ce programme.</p>

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
+import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasPhase } from '@/services/teamService';
+import { moveToPhase } from '@/services/phaseService';
+import { getPhases } from '@/services/programService';
 
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +63,23 @@ const StartupDetailPage = () => {
   // Check localStorage for teams first
   const [localStartup, setLocalStartup] = useState<any>(null);
 
+  // Fetch team details from backend
+  const { data: teamDetailsData, isLoading: isLoadingTeamDetails } = useQuery({
+    queryKey: ['team-details', id],
+    queryFn: async () => {
+      if (!id) return null;
+      return getTeamDetails(id);
+    },
+    enabled: !!id,
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: true
+  });
+
+  // Get the selected program ID
+  const selectedProgramId = React.useMemo(() => {
+    return selectedProgram?.id || teamDetailsData?.programme_id || null;
+  }, [selectedProgram, teamDetailsData]);
+
   // Charger les données de l'équipe depuis localStorage
   const loadStartupFromLocalStorage = React.useCallback(() => {
     try {
@@ -85,7 +105,47 @@ const StartupDetailPage = () => {
   // Charger les données au montage et lorsque l'ID change
   React.useEffect(() => {
     loadStartupFromLocalStorage();
-  }, [id, loadStartupFromLocalStorage]);
+
+    // Fetch the current phase from the backend and ensure it has a phase
+    if (id && selectedProgramId) {
+      ensureTeamHasPhase(id, selectedProgramId)
+        .then(phaseData => {
+          if (phaseData && phaseData.nom) {
+            console.log(`Fetched/ensured current phase for team ${id}:`, phaseData);
+
+            // Update the phase in localStorage
+            const storedStartups = localStorage.getItem('startups') || '[]';
+            const parsedStartups = JSON.parse(storedStartups);
+            const existingIndex = parsedStartups.findIndex((s: any) => String(s.id) === String(id));
+
+            if (existingIndex >= 0) {
+              parsedStartups[existingIndex].currentPhase = phaseData.nom;
+            } else {
+              parsedStartups.push({
+                id: id,
+                currentPhase: phaseData.nom
+              });
+            }
+
+            localStorage.setItem('startups', JSON.stringify(parsedStartups));
+
+            // Update the selected phase
+            setSelectedPhase(phaseData.nom);
+
+            // If we have a local startup, update its phase
+            if (localStartup) {
+              setLocalStartup({
+                ...localStartup,
+                currentPhase: phaseData.nom
+              });
+            }
+          }
+        })
+        .catch(error => {
+          console.error(`Error fetching phase for team ${id}:`, error);
+        });
+    }
+  }, [id, selectedProgramId, localStartup, loadStartupFromLocalStorage]);
 
   // Recharger les données lorsque l'URL change (paramètre t)
   React.useEffect(() => {
@@ -99,12 +159,51 @@ const StartupDetailPage = () => {
     };
   }, [loadStartupFromLocalStorage]);
 
+  // Fetch team from program teams
+  const { data: programTeamData, isLoading: isLoadingProgramTeam } = useQuery({
+    queryKey: ['program-team', id, selectedProgramId],
+    queryFn: async () => {
+      if (!id || !selectedProgramId) return null;
+      return getTeamFromProgram(selectedProgramId, id);
+    },
+    enabled: !!id && !!selectedProgramId,
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: true
+  });
+
+  // Fetch team data from localStorage or sample data
   const { data: startupData, isLoading } = useQuery({
-    queryKey: ['startup', id, localStartup],
+    queryKey: ['startup', id, localStartup, teamDetailsData],
     queryFn: async () => {
       // If we found a startup in localStorage, use that
       if (localStartup) {
+        // If we have team details from backend, merge them with localStorage data
+        if (teamDetailsData) {
+          return {
+            ...localStartup,
+            name: teamDetailsData.nom_equipe || localStartup.name,
+            description: teamDetailsData.description_equipe || localStartup.description,
+            // Keep other properties from localStorage
+          };
+        }
         return localStartup;
+      }
+
+      // If we have team details from backend but not in localStorage
+      if (teamDetailsData) {
+        // Create a startup object from team details
+        return {
+          id: teamDetailsData.id,
+          name: teamDetailsData.nom_equipe,
+          logo: `https://via.placeholder.com/100/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${teamDetailsData.nom_equipe?.substring(0, 2) || 'EQ'}`,
+          industry: "Équipe",
+          currentPhase: "Chargement...", // Will be updated by the phase query
+          progress: 50,
+          status: 'active',
+          programId: teamDetailsData.programme_id.toString(),
+          description: teamDetailsData.description_equipe || "",
+          members: teamDetailsData.membres || []
+        };
       }
 
       // Otherwise, use sample data
@@ -147,196 +246,13 @@ const StartupDetailPage = () => {
               fileUrl: '#',
               score: 88,
               phase: 'Idéation'
-            },
-            {
-              id: 3,
-              name: 'Documentation du Prototype',
-              description: 'Documentation technique du premier prototype fonctionnel',
-              dueDate: '2024-04-01',
-              submittedDate: '2024-03-30',
-              status: 'submitted',
-              fileUrl: '#',
-              phase: 'Prototypage'
-            },
-            {
-              id: 4,
-              name: 'Rapport de Tests',
-              description: 'Résultats des tests du prototype',
-              dueDate: '2024-04-15',
-              submittedDate: '2024-04-14',
-              status: 'submitted',
-              fileUrl: '#',
-              phase: 'Prototypage'
-            },
-            {
-              id: 5,
-              name: 'Retours Utilisateurs',
-              description: 'Synthèse des retours des premiers utilisateurs',
-              dueDate: '2024-05-01',
-              status: 'pending',
-              phase: 'Validation'
-            },
-            {
-              id: 6,
-              name: 'Demande de Brevet',
-              description: 'Demande provisoire de brevet pour la technologie de base',
-              dueDate: '2024-05-15',
-              status: 'pending',
-              phase: 'Validation'
-            },
-            {
-              id: 7,
-              name: 'Plan de Lancement',
-              description: 'Stratégie et calendrier de lancement du produit',
-              dueDate: '2024-06-01',
-              status: 'pending',
-              phase: 'Lancement'
             }
           ],
           evaluationCriteria: [
             { id: 1, name: 'Idée Innovante', weight: 40, score: 5, phase: 'Idéation', type: 'stars' },
             { id: 2, name: 'Analyse de Marché', weight: 30, score: 4, phase: 'Idéation', type: 'stars' },
-            { id: 3, name: 'Compétence de l\'Equipe', weight: 30, score: 5, phase: 'Idéation', type: 'stars' },
-
-            { id: 4, name: 'Qualité du Prototype', weight: 35, score: 4, phase: 'Prototypage', type: 'stars' },
-            { id: 5, name: 'Faisabilité Technique', weight: 35, score: 5, phase: 'Prototypage', type: 'yesno', booleanValue: true },
-            { id: 6, name: 'Expérience Utilisateur', weight: 30, score: 4, phase: 'Prototypage', type: 'numeric', numericValue: 8 },
-
-            { id: 7, name: 'Résultats des Tests', weight: 40, score: 5, phase: 'Validation', type: 'stars' },
-            { id: 8, name: 'Retour Utilisateurs', weight: 30, score: 4, phase: 'Validation', type: 'numeric', numericValue: 85 },
-            { id: 9, name: 'Potentiel de Croissance', weight: 30, score: 5, phase: 'Validation', type: 'text', textValue: 'Excellent potentiel avec une croissance estimée de 200% sur 2 ans.' },
-
-            { id: 10, name: 'Stratégie de Lancement', weight: 25, score: 5, phase: 'Lancement', type: 'stars' },
-            { id: 11, name: 'Plan Marketing', weight: 25, score: 4, phase: 'Lancement', type: 'yesno', booleanValue: true },
-            { id: 12, name: 'Modèle Économique', weight: 25, score: 5, phase: 'Lancement', type: 'numeric', numericValue: 92 },
-            { id: 13, name: 'Présentation Finale', weight: 25, score: 5, phase: 'Lancement', type: 'text', textValue: 'Présentation claire et convaincante avec démonstration efficace du produit.' }
-          ],
-          feedback: "The team has shown excellent technical capabilities and market understanding. Their product development timeline is on track, and they've responded well to mentorship."
-        },
-        "2": {
-          id: 2,
-          name: "HealthAI",
-          logo: "https://via.placeholder.com/100/2196F3/FFFFFF?text=HAI",
-          industry: "Healthcare Technology",
-          currentPhase: "Validation",
-          progress: 85,
-          status: 'active',
-          programId: "1",
-          description: "HealthAI is revolutionizing medical diagnosis using advanced machine learning algorithms. Their platform can analyze medical imaging data to detect conditions with high accuracy.",
-          team: [
-            { name: 'Dr. James Wilson', role: 'CEO' },
-            { name: 'Dr. Lisa Chang', role: 'Chief Medical Officer' },
-            { name: 'Alex Kumar', role: 'AI Research Lead' },
-            { name: 'Maria Garcia', role: 'Product Manager' }
-          ],
-          deliverables: [
-            {
-              id: 1,
-              name: 'Clinical Trial Results',
-              description: 'Results from initial clinical trials',
-              dueDate: '2024-02-28',
-              submittedDate: '2024-02-25',
-              status: 'evaluated',
-              fileUrl: '#',
-              score: 95
-            },
-            {
-              id: 2,
-              name: 'FDA Application Draft',
-              description: 'Draft of FDA approval application',
-              dueDate: '2024-04-15',
-              submittedDate: '2024-04-10',
-              status: 'submitted',
-              fileUrl: '#'
-            }
-          ],
-          evaluationCriteria: [
-            { id: 1, name: 'Idée Innovante', weight: 40, score: 5, phase: 'Idéation', type: 'stars' },
-            { id: 2, name: 'Analyse de Marché', weight: 30, score: 4, phase: 'Idéation', type: 'stars' },
-            { id: 3, name: 'Compétence de l\'Equipe', weight: 30, score: 5, phase: 'Idéation', type: 'stars' },
-
-            { id: 4, name: 'Qualité du Prototype', weight: 35, score: 4, phase: 'Prototypage', type: 'stars' },
-            { id: 5, name: 'Faisabilité Technique', weight: 35, score: 5, phase: 'Prototypage', type: 'yesno', booleanValue: true },
-            { id: 6, name: 'Expérience Utilisateur', weight: 30, score: 4, phase: 'Prototypage', type: 'numeric', numericValue: 8 },
-
-            { id: 7, name: 'Résultats des Tests', weight: 40, score: 5, phase: 'Validation', type: 'stars' },
-            { id: 8, name: 'Retour Utilisateurs', weight: 30, score: 4, phase: 'Validation', type: 'numeric', numericValue: 85 },
-            { id: 9, name: 'Potentiel de Croissance', weight: 30, score: 5, phase: 'Validation', type: 'text', textValue: 'Excellent potentiel avec une croissance estimée de 200% sur 2 ans.' },
-
-            { id: 10, name: 'Stratégie de Lancement', weight: 25, score: 5, phase: 'Lancement', type: 'stars' },
-            { id: 11, name: 'Plan Marketing', weight: 25, score: 4, phase: 'Lancement', type: 'yesno', booleanValue: true },
-            { id: 12, name: 'Modèle Économique', weight: 25, score: 5, phase: 'Lancement', type: 'numeric', numericValue: 92 },
-            { id: 13, name: 'Présentation Finale', weight: 25, score: 5, phase: 'Lancement', type: 'text', textValue: 'Présentation claire et convaincante avec démonstration efficace du produit.' }
-          ],
-          feedback: "Exceptional progress with clinical validation. The team has been responsive to feedback and effectively navigated regulatory challenges."
-        },
-        "5": {
-          id: 5,
-          name: "CyberShield",
-          logo: "https://via.placeholder.com/100/F44336/FFFFFF?text=CS",
-          industry: "Cybersecurity",
-          currentPhase: "Lancement",
-          progress: 95,
-          status: 'active',
-          programId: "1",
-          description: "CyberShield a développé une solution de sécurité innovante qui utilise l'intelligence artificielle pour détecter et prévenir les cyberattaques en temps réel. Leur technologie a déjà été adoptée par plusieurs grandes entreprises.",
-          team: [
-            { name: 'Alexandre Dubois', role: 'CEO & Fondateur' },
-            { name: 'Sophie Martin', role: 'CTO' },
-            { name: 'Thomas Lefebvre', role: 'Responsable Sécurité' },
-            { name: 'Julie Moreau', role: 'Développeur Principal' }
-          ],
-          deliverables: [
-            {
-              id: 1,
-              name: 'Rapport de Tests de Pénétration',
-              description: 'Résultats des tests de pénétration sur la plateforme',
-              dueDate: '2024-01-15',
-              submittedDate: '2024-01-10',
-              status: 'evaluated',
-              fileUrl: '#',
-              score: 98
-            },
-            {
-              id: 2,
-              name: 'Documentation API',
-              description: 'Documentation complète de l\'API pour l\'intégration avec d\'autres systèmes',
-              dueDate: '2024-02-28',
-              submittedDate: '2024-02-25',
-              status: 'evaluated',
-              fileUrl: '#',
-              score: 95
-            },
-            {
-              id: 3,
-              name: 'Pitch Final',
-              description: 'Présentation finale du produit et de la stratégie commerciale',
-              dueDate: '2024-03-30',
-              submittedDate: '2024-03-28',
-              status: 'evaluated',
-              fileUrl: '#',
-              score: 99
-            }
-          ],
-          evaluationCriteria: [
-            { id: 1, name: 'Idée Innovante', weight: 40, score: 5, phase: 'Idéation', type: 'stars' },
-            { id: 2, name: 'Analyse de Marché', weight: 30, score: 4, phase: 'Idéation', type: 'stars' },
-            { id: 3, name: 'Compétence de l\'Equipe', weight: 30, score: 5, phase: 'Idéation', type: 'stars' },
-
-            { id: 4, name: 'Qualité du Prototype', weight: 35, score: 4, phase: 'Prototypage', type: 'stars' },
-            { id: 5, name: 'Faisabilité Technique', weight: 35, score: 5, phase: 'Prototypage', type: 'yesno', booleanValue: true },
-            { id: 6, name: 'Expérience Utilisateur', weight: 30, score: 4, phase: 'Prototypage', type: 'numeric', numericValue: 8 },
-
-            { id: 7, name: 'Résultats des Tests', weight: 40, score: 5, phase: 'Validation', type: 'stars' },
-            { id: 8, name: 'Retour Utilisateurs', weight: 30, score: 4, phase: 'Validation', type: 'numeric', numericValue: 85 },
-            { id: 9, name: 'Potentiel de Croissance', weight: 30, score: 5, phase: 'Validation', type: 'text', textValue: 'Excellent potentiel avec une croissance estimée de 200% sur 2 ans.' },
-
-            { id: 10, name: 'Stratégie de Lancement', weight: 25, score: 5, phase: 'Lancement', type: 'stars' },
-            { id: 11, name: 'Plan Marketing', weight: 25, score: 4, phase: 'Lancement', type: 'yesno', booleanValue: true },
-            { id: 12, name: 'Modèle Économique', weight: 25, score: 5, phase: 'Lancement', type: 'numeric', numericValue: 92 },
-            { id: 13, name: 'Présentation Finale', weight: 25, score: 5, phase: 'Lancement', type: 'text', textValue: 'Présentation claire et convaincante avec démonstration efficace du produit.' }
-          ],
-          feedback: "L'équipe CyberShield a démontré une excellence exceptionnelle tout au long du programme. Leur solution est non seulement innovante mais aussi extrêmement robuste. Ils ont été sélectionnés comme gagnants du programme Tech Accelerator 2023 pour leur impact potentiel sur l'industrie de la cybersécurité."
+            { id: 3, name: 'Compétence de l\'Equipe', weight: 30, score: 5, phase: 'Idéation', type: 'stars' }
+          ]
         }
       };
 
@@ -470,6 +386,36 @@ const StartupDetailPage = () => {
     return isInLastPhase && lastPhase.hasWinner;
   }, [selectedProgram, startup]);
 
+  // Effet pour afficher les données de débogage et mettre à jour le nom de l'équipe
+  React.useEffect(() => {
+    if (teamDetailsData) {
+      console.log('Team details from backend:', teamDetailsData);
+
+      // Si nous avons des données d'équipe du backend, mettre à jour l'équipe locale
+      if (localStartup && teamDetailsData.nom_equipe) {
+        setLocalStartup({
+          ...localStartup,
+          name: teamDetailsData.nom_equipe
+        });
+      }
+    }
+  }, [teamDetailsData, localStartup]);
+
+  // Effet pour afficher les données de l'équipe du programme
+  React.useEffect(() => {
+    if (programTeamData) {
+      console.log('Team from program teams:', programTeamData);
+
+      // Si nous avons des données d'équipe du programme, mettre à jour l'équipe locale
+      if (localStartup && programTeamData.nom_equipe) {
+        setLocalStartup({
+          ...localStartup,
+          name: programTeamData.nom_equipe
+        });
+      }
+    }
+  }, [programTeamData, localStartup]);
+
   // Fonction pour sélectionner l'équipe comme gagnante
   const handleSelectWinner = () => {
     if (!startup || !selectedProgram) return;
@@ -498,7 +444,7 @@ const StartupDetailPage = () => {
       // Afficher une notification
       toast({
         title: "Gagnant sélectionné",
-        description: `${startup.name} a été sélectionné comme gagnant du programme.`,
+        description: `${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"} a été sélectionné comme gagnant du programme.`,
       });
 
       // Ouvrir le dialogue de félicitations
@@ -514,115 +460,151 @@ const StartupDetailPage = () => {
   };
 
   // Fonction pour passer à la phase suivante
-  const handleNextPhase = () => {
+  const handleNextPhase = async () => {
     if (!startup || !selectedProgram) return;
 
-    // Trouver la phase actuelle et la phase suivante
+    try {
+      // Trouver la phase actuelle et la phase suivante
+      // Trouver l'index de la phase actuelle (méthode améliorée)
+      let currentPhaseIndex = -1;
 
-    // Trouver l'index de la phase actuelle (méthode améliorée)
-    let currentPhaseIndex = -1;
-
-    // Méthode 1: Correspondance exacte
-    currentPhaseIndex = selectedProgram.phases.findIndex(phase =>
-      phase.name.toLowerCase() === startup.currentPhase.toLowerCase()
-    );
-
-    // Méthode 2: Inclusion partielle
-    if (currentPhaseIndex === -1) {
+      // Méthode 1: Correspondance exacte
       currentPhaseIndex = selectedProgram.phases.findIndex(phase =>
-        startup.currentPhase.toLowerCase().includes(phase.name.toLowerCase()) ||
-        phase.name.toLowerCase().includes(startup.currentPhase.toLowerCase())
+        phase.name.toLowerCase() === startup.currentPhase.toLowerCase()
       );
-    }
 
-    // Méthode 3: Recherche de numéro de phase
-    if (currentPhaseIndex === -1) {
-      const phaseNumberMatch = startup.currentPhase.match(/phase\s*(\d+)/i);
-      if (phaseNumberMatch && phaseNumberMatch[1]) {
-        const phaseNumber = parseInt(phaseNumberMatch[1]);
-        if (phaseNumber > 0 && phaseNumber <= selectedProgram.phases.length) {
-          currentPhaseIndex = phaseNumber - 1; // Les indices commencent à 0
-        }
+      // Méthode 2: Inclusion partielle
+      if (currentPhaseIndex === -1) {
+        currentPhaseIndex = selectedProgram.phases.findIndex(phase =>
+          startup.currentPhase.toLowerCase().includes(phase.name.toLowerCase()) ||
+          phase.name.toLowerCase().includes(startup.currentPhase.toLowerCase())
+        );
       }
-    }
 
-    // Méthode 4: Si aucune correspondance n'est trouvée, supposer que c'est la première phase
-    if (currentPhaseIndex === -1 && selectedProgram.phases.length > 0) {
-      currentPhaseIndex = 0;
-    }
-
-    // Si la phase actuelle est trouvée et ce n'est pas la dernière phase
-    if (currentPhaseIndex !== -1 && currentPhaseIndex < selectedProgram.phases.length - 1) {
-      // Obtenir la phase suivante
-      const nextPhase = selectedProgram.phases[currentPhaseIndex + 1];
-
-      // Mettre à jour l'équipe dans localStorage
-      try {
-        // Récupérer les équipes actuelles du localStorage
-        let storedStartups = localStorage.getItem('startups');
-        let parsedStartups = [];
-
-        if (storedStartups) {
-          parsedStartups = JSON.parse(storedStartups);
-          if (!Array.isArray(parsedStartups)) {
-            parsedStartups = [];
+      // Méthode 3: Recherche de numéro de phase
+      if (currentPhaseIndex === -1) {
+        const phaseNumberMatch = startup.currentPhase.match(/phase\s*(\d+)/i);
+        if (phaseNumberMatch && phaseNumberMatch[1]) {
+          const phaseNumber = parseInt(phaseNumberMatch[1]);
+          if (phaseNumber > 0 && phaseNumber <= selectedProgram.phases.length) {
+            currentPhaseIndex = phaseNumber - 1; // Les indices commencent à 0
           }
         }
+      }
 
-        // Vérifier si l'équipe existe déjà dans le localStorage
-        const existingIndex = parsedStartups.findIndex(s => String(s.id) === String(id));
+      // Méthode 4: Si aucune correspondance n'est trouvée, supposer que c'est la première phase
+      if (currentPhaseIndex === -1 && selectedProgram.phases.length > 0) {
+        currentPhaseIndex = 0;
+      }
 
-        // Créer une copie de l'équipe avec la nouvelle phase
-        const updatedTeam = {
-          ...(existingIndex >= 0 ? parsedStartups[existingIndex] : startup),
-          id: id,
-          currentPhase: nextPhase.name
-        };
+      // Si la phase actuelle est trouvée et ce n'est pas la dernière phase
+      if (currentPhaseIndex !== -1 && currentPhaseIndex < selectedProgram.phases.length - 1) {
+        // Obtenir la phase suivante
+        const nextPhase = selectedProgram.phases[currentPhaseIndex + 1];
+        console.log(`Moving ${startup.name} from phase ${startup.currentPhase} to ${nextPhase.name}`);
 
-        // Mettre à jour ou ajouter l'équipe dans le tableau
-        if (existingIndex >= 0) {
-          parsedStartups[existingIndex] = updatedTeam;
-        } else {
-          parsedStartups.push(updatedTeam);
+        // Récupérer les phases du backend pour obtenir l'ID de la phase
+        const backendPhases = await getPhases(selectedProgram.id);
+
+        // Trouver la phase correspondante dans le backend
+        const backendPhase = backendPhases.find(phase =>
+          phase.nom.toLowerCase() === nextPhase.name.toLowerCase() ||
+          phase.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+          nextPhase.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+        );
+
+        if (!backendPhase) {
+          console.error(`Phase "${nextPhase.name}" not found in backend phases`);
+          toast({
+            title: "Erreur",
+            description: `Phase "${nextPhase.name}" introuvable dans ce programme.`,
+            variant: "destructive"
+          });
+          return;
         }
 
-        // Sauvegarder dans localStorage
-        localStorage.setItem('startups', JSON.stringify(parsedStartups));
+        console.log(`Found backend phase: ${backendPhase.nom} (ID: ${backendPhase.id})`);
 
-        // Mettre à jour directement l'état local avec la nouvelle phase
-        if (startup) {
-          const updatedStartup = { ...startup, currentPhase: nextPhase.name };
-          setLocalStartup(updatedStartup);
+        // Appeler l'API pour déplacer l'équipe vers la nouvelle phase
+        await moveToPhase({
+          entiteType: 'equipe',
+          entiteId: id,
+          phaseNextId: backendPhase.id,
+          programmeId: selectedProgram.id
+        });
+
+        console.log(`Successfully moved team ${id} to phase ${backendPhase.nom} (ID: ${backendPhase.id})`);
+
+        // Mettre à jour l'équipe dans localStorage
+        try {
+          // Récupérer les équipes actuelles du localStorage
+          let storedStartups = localStorage.getItem('startups');
+          let parsedStartups = [];
+
+          if (storedStartups) {
+            parsedStartups = JSON.parse(storedStartups);
+            if (!Array.isArray(parsedStartups)) {
+              parsedStartups = [];
+            }
+          }
+
+          // Vérifier si l'équipe existe déjà dans le localStorage
+          const existingIndex = parsedStartups.findIndex(s => String(s.id) === String(id));
+
+          // Créer une copie de l'équipe avec la nouvelle phase
+          const updatedTeam = {
+            ...(existingIndex >= 0 ? parsedStartups[existingIndex] : startup),
+            id: id,
+            currentPhase: nextPhase.name
+          };
+
+          // Mettre à jour ou ajouter l'équipe dans le tableau
+          if (existingIndex >= 0) {
+            parsedStartups[existingIndex] = updatedTeam;
+          } else {
+            parsedStartups.push(updatedTeam);
+          }
+
+          // Sauvegarder dans localStorage
+          localStorage.setItem('startups', JSON.stringify(parsedStartups));
+
+          // Mettre à jour directement l'état local avec la nouvelle phase
+          if (startup) {
+            const updatedStartup = { ...startup, currentPhase: nextPhase.name };
+            setLocalStartup(updatedStartup);
+          }
+
+          // Forcer une mise à jour de toutes les équipes dans l'application
+          window.dispatchEvent(new Event('storage'));
+          // Créer un événement personnalisé pour notifier les autres composants
+          const event = new CustomEvent('team-phase-changed', {
+            detail: { teamId: id, newPhase: nextPhase.name }
+          });
+          document.dispatchEvent(event);
+
+          // Afficher une notification
+          toast({
+            title: "Phase mise à jour",
+            description: `${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"} est maintenant dans la phase "${nextPhase.name}".`,
+          });
+        } catch (error) {
+          console.error("Error updating startup phase in localStorage:", error);
         }
-
-        // Forcer une mise à jour de toutes les équipes dans l'application
-        window.dispatchEvent(new Event('storage'));
-        // Créer un événement personnalisé pour notifier les autres composants
-        const event = new CustomEvent('team-phase-changed', {
-          detail: { teamId: id, newPhase: nextPhase.name }
-        });
-        document.dispatchEvent(event);
-
-        // Afficher une notification
+      } else {
+        // Si c'est la dernière phase ou si la phase actuelle n'est pas trouvée
         toast({
-          title: "Phase mise à jour",
-          description: `${startup.name} est maintenant dans la phase "${nextPhase.name}".`,
-        });
-      } catch (error) {
-        console.error("Error updating startup phase in localStorage:", error);
-        toast({
-          title: "Erreur",
-          description: "Une erreur est survenue lors du changement de phase.",
+          title: "Impossible de changer de phase",
+          description: currentPhaseIndex === selectedProgram.phases.length - 1
+            ? `${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"} est déjà dans la dernière phase.`
+            : `Impossible de déterminer la phase actuelle de ${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"}.`,
           variant: "destructive"
         });
       }
-    } else {
-      // Si c'est la dernière phase ou si la phase actuelle n'est pas trouvée
+    } catch (error) {
+      console.error("Error moving team to next phase:", error);
       toast({
-        title: "Impossible de changer de phase",
-        description: currentPhaseIndex === selectedProgram.phases.length - 1
-          ? `${startup.name} est déjà dans la dernière phase.`
-          : `Impossible de déterminer la phase actuelle de ${startup.name}.`,
+        title: "Erreur",
+        description: "Une erreur est survenue lors du changement de phase.",
         variant: "destructive"
       });
     }
@@ -958,12 +940,14 @@ const StartupDetailPage = () => {
         <CardHeader className="flex flex-row items-center space-x-4">
           <img
             src={startup.logo}
-            alt={`${startup.name} logo`}
+            alt={`${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"} logo`}
             className="w-16 h-16 rounded-full object-cover"
           />
           <div className="flex-1">
             <div className="flex items-center space-x-4">
-              <CardTitle className="text-2xl">{startup.name}</CardTitle>
+              <CardTitle className="text-2xl">
+                {programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"}
+              </CardTitle>
               <Badge className={manualOverallScore > 50 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                 {manualOverallScore > 50 ? 'ACTIVE' : 'AT RISK'}
               </Badge>
@@ -986,7 +970,7 @@ const StartupDetailPage = () => {
               open={messageDialogOpen}
               onOpenChange={setMessageDialogOpen}
               teamId={id || '1'}
-              teamName={startup.name}
+              teamName={programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"}
               teamMembers={startup.team || startup.members || []}
             />
             {!isMentor && (
@@ -1504,7 +1488,7 @@ const StartupDetailPage = () => {
       <WinnerDialog
         open={winnerDialogOpen}
         onOpenChange={setWinnerDialogOpen}
-        teamName={startup.name}
+        teamName={programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"}
         programName={selectedProgram?.name || ""}
       />
     </div>

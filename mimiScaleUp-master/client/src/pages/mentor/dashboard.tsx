@@ -1,13 +1,12 @@
 import React from 'react';
-import Sidebar from '@/components/sidebar';
+import Layout from '@/components/layout/Layout';
 import Dashboard from '@/components/Dashboard';
 
 const MentorDashboardPage: React.FC = () => {
   return (
-    <div className="app-container">
-      <Sidebar />
+    <Layout>
       <Dashboard />
-    </div>
+    </Layout>
   );
 };
 

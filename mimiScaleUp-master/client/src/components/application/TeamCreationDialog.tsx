@@ -105,12 +105,22 @@ const TeamCreationDialog: React.FC<TeamCreationDialogProps> = ({
     onOpenChange(false);
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase();
+  const getInitials = (name: string | null | undefined) => {
+    // Handle null or undefined names
+    if (!name) {
+      return '?';
+    }
+
+    try {
+      return name
+        .split(' ')
+        .map(n => n[0] || '')
+        .join('')
+        .toUpperCase() || '?';
+    } catch (error) {
+      console.error('Error getting initials:', error);
+      return '?';
+    }
   };
 
   return (
@@ -202,12 +212,12 @@ const TeamCreationDialog: React.FC<TeamCreationDialogProps> = ({
                       />
                       <div className="flex items-center flex-grow space-x-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(submission.teamName)}&background=random`} />
+                          <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(submission.teamName || 'User')}&background=random`} />
                           <AvatarFallback>{getInitials(submission.teamName)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-grow">
-                          <div className="font-medium">{submission.teamName}</div>
-                          <div className="text-sm text-muted-foreground">{submission.industry}</div>
+                          <div className="font-medium">{submission.teamName || submission.teamEmail?.split('@')[0] || `Candidature ${submission.id}`}</div>
+                          <div className="text-sm text-muted-foreground">{submission.industry || 'Secteur non spécifié'}</div>
                         </div>
                         <div className="flex flex-col items-end">
                           <Badge variant="outline" className="bg-primary/10 mb-1">{submission.teamSize} membre{submission.teamSize !== 1 ? 's' : ''}</Badge>

@@ -31,16 +31,19 @@ export async function getProgramMentors(programId: number): Promise<Mentor[]> {
 // Add a mentor to a program
 export async function addMentorToProgram(programId: number, mentorId: number): Promise<boolean> {
   try {
+    console.log(`ProgramMentorService: Adding mentor ${mentorId} to program ${programId}...`);
+
     // Use our apiRequest helper function
-    await apiRequest<{message: string}>(`${API_BASE_URL}/programmes/${programId}/add-mentor`, {
+    const result = await apiRequest<{message: string}>(`${API_BASE_URL}/programmes/${programId}/add-mentor`, {
       method: 'POST',
       body: JSON.stringify({ mentorId })
     });
 
+    console.log(`ProgramMentorService: Successfully added mentor ${mentorId} to program ${programId}:`, result);
     return true;
   } catch (error) {
     console.error('Error adding mentor to program:', error);
-    return false;
+    throw error; // Re-throw the error to allow proper error handling
   }
 }
 

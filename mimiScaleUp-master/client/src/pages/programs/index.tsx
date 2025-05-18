@@ -39,6 +39,35 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
   const { selectedProgramId, setSelectedProgramId } = useProgramContext();
   const [, setLocation] = useLocation();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTemplate, setIsTemplate] = useState(false);
+
+  // Check if the program is a template
+  React.useEffect(() => {
+    const checkTemplate = async () => {
+      if (id) {
+        try {
+          const response = await fetch(`/api/programmes/${id}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            },
+            credentials: 'include'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.is_template === 'Modèle') {
+              setIsTemplate(true);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking template status:", error);
+        }
+      }
+    };
+
+    checkTemplate();
+  }, [id]);
 
   const formatDate = (dateString: string) => {
     const date = parseISO(dateString);
@@ -80,16 +109,28 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
   const isSelected = selectedProgramId === id;
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-green-100 text-green-800 border border-green-300">Actif</Badge>;
-      case 'completed':
-        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Terminé</Badge>;
-      case 'draft':
-        return <Badge className="bg-gray-100 text-gray-800 border border-gray-300">Brouillon</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800">Inconnu</Badge>;
-    }
+    return (
+      <div className="flex items-center space-x-2">
+        {/* Status badge */}
+        {status === 'active' && (
+          <Badge className="bg-green-100 text-green-800 border border-green-300">Actif</Badge>
+        )}
+        {status === 'completed' && (
+          <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Terminé</Badge>
+        )}
+        {status === 'draft' && (
+          <Badge className="bg-gray-100 text-gray-800 border border-gray-300">Brouillon</Badge>
+        )}
+        {status !== 'active' && status !== 'completed' && status !== 'draft' && (
+          <Badge className="bg-gray-100 text-gray-800">Inconnu</Badge>
+        )}
+
+        {/* Template badge */}
+        {isTemplate && (
+          <Badge className="bg-purple-100 text-purple-800 border border-purple-300">Modèle</Badge>
+        )}
+      </div>
+    );
   };
 
   return (
