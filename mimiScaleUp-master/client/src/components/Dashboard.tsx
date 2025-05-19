@@ -1,5 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Calendar,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  MapPin,
+  Video,
+  MessageSquare,
+  Award,
+  Star,
+  PlusCircle,
+  Download,
+  Loader2,
+  FileText,
+  FileSpreadsheet,
+  FileImage,
+  File,
+  Users,
+  Calendar as CalendarIcon,
+  Tasks,
+  ArrowUp,
+  ArrowDown,
+  LineChart,
+  Lightbulb,
+  MessageCircle,
+  UserPlus
+} from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { format, isBefore, isToday } from 'date-fns';
+import {
   FaUsers,
   FaCalendarAlt,
   FaTasks,
@@ -12,11 +44,61 @@ import {
   FaAward,
   FaLightbulb,
   FaComments,
-  FaUserPlus
+  FaUserPlus,
+  FaFileAlt,
+  FaFilePdf,
+  FaFileWord,
+  FaFileExcel,
+  FaFileImage
 } from 'react-icons/fa';
+import { IconType } from 'react-icons';
 import DynamicProgramTimeline from '@/components/widgets/DynamicProgramTimeline';
 import ProgramDetailsWidget from '@/components/widgets/ProgramDetailsWidget';
-import { useProgramContext } from '@/context/ProgramContext';
+import { useProgramme } from '@/hooks/useProgramme';
+import { useDeliverables } from '@/context/DeliverablesContext';
+import { getReunions, getTasks } from '../services/programService';
+import { getProgramResources } from '../services/resourceService';
+
+interface Deliverable {
+  id: number;
+  nom: string;
+  description: string;
+  date_echeance: string;
+  types_fichiers: string[];
+  phase_id: number;
+  status?: 'submitted' | 'pending' | 'approved' | 'rejected';
+}
+
+interface Task {
+  id: number;
+  title: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string;
+  assignee: string;
+}
+
+interface Meeting {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  isOnline: boolean;
+  location?: string;
+}
+
+interface Resource {
+  id: number;
+  title: string;
+  description?: string;
+  type: string;
+  is_external: boolean;
+  file_path?: string;
+  url?: string;
+  created_at: string;
+  program_id: number;
+  category?: string;
+}
 
 interface DashboardProps {
   onCreateTeamClick?: () => void;
@@ -24,6 +106,184 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
   const [activePhase, setActivePhase] = useState<number | string>(1);
+  const [sidebarActive, setSidebarActive] = useState(false);
+  const { programme, loading, error } = useProgramme();
+  const { upcomingDeliverables, getStatusText } = useDeliverables();
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [loadingDeliverables, setLoadingDeliverables] = useState(true);
+  const [errorDeliverables, setErrorDeliverables] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loadingResources, setLoadingResources] = useState(true);
+  const [errorResources, setErrorResources] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDeliverables = async () => {
+      try {
+        setLoadingDeliverables(true);
+        const response = await fetch(`/api/liverable/get/${activePhase}`);
+        if (!response.ok) {
+          throw new Error('Erreur lors de la récupération des livrables');
+        }
+        const data = await response.json();
+        setDeliverables(data);
+      } catch (err) {
+        setErrorDeliverables(err instanceof Error ? err.message : 'Une erreur est survenue');
+      } finally {
+        setLoadingDeliverables(false);
+      }
+    };
+
+    fetchDeliverables();
+  }, [activePhase]);
+
+  useEffect(() => {
+    const fetchResources = async () => {
+      if (!programme?.id) {
+        setLoadingResources(false);
+        return;
+      }
+
+      try {
+        setLoadingResources(true);
+        const { resources, externalResources } = await getProgramResources(programme.id);
+        
+        // Combine regular and external resources with proper typing
+        const allResources: Resource[] = [
+          ...(resources || []).map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            type: r.type,
+            is_external: false,
+            file_path: r.file_path,
+            created_at: r.created_at,
+            program_id: r.program_id,
+            category: r.category
+          })),
+          ...(externalResources || []).map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            type: r.type || 'Autre',
+            is_external: true,
+            url: r.url,
+            created_at: r.created_at,
+            program_id: r.program_id,
+            category: r.category
+          }))
+        ];
+
+        // Sort resources by creation date (newest first)
+        allResources.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        setResources(allResources);
+      } catch (err) {
+        console.error('Erreur lors de la récupération des ressources:', err);
+        setErrorResources(err instanceof Error ? err.message : 'Une erreur est survenue');
+      } finally {
+        setLoadingResources(false);
+      }
+    };
+
+    fetchResources();
+  }, [programme?.id]);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const tasksData = await getTasks(activePhase);
+        setTasks(tasksData.map((task: any) => ({
+          id: task.id,
+          title: task.nom,
+          status: task.status || 'todo',
+          priority: task.priorite || 'medium',
+          dueDate: task.date_decheance,
+          assignee: task.assignee || 'Non assigné'
+        })));
+      } catch (err) {
+        console.error('Erreur lors de la récupération des tâches:', err);
+      }
+    };
+
+    fetchTasks();
+  }, [activePhase]);
+
+  useEffect(() => {
+    const fetchReunions = async () => {
+      try {
+        const reunionsData = await getReunions(activePhase);
+        setMeetings(reunionsData.map((reunion: any) => ({
+          id: reunion.id,
+          title: reunion.nom_reunion,
+          date: reunion.date,
+          time: reunion.heure,
+          isOnline: reunion.lieu.toLowerCase().includes('en ligne') || reunion.lieu.toLowerCase().includes('zoom') || reunion.lieu.toLowerCase().includes('teams'),
+          location: reunion.lieu
+        })));
+      } catch (err) {
+        console.error('Erreur lors de la récupération des réunions:', err);
+      }
+    };
+
+    fetchReunions();
+  }, [activePhase]);
+
+  const handleDownload = async (resourceId: number) => {
+    try {
+      const response = await fetch(`/api/resources/download/${resourceId}`);
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = ''; // Le nom du fichier sera celui du serveur
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Erreur lors du téléchargement:', error);
+    }
+  };
+
+  const getResourceTypeIcon = (type: string) => {
+    switch(type.toLowerCase()) {
+      case 'document':
+        return <FileText size={16} className="text-blue-500" />;
+      case 'tableur':
+        return <FileSpreadsheet size={16} className="text-green-500" />;
+      case 'vidéo':
+        return <FileImage size={16} className="text-red-500" />;
+      case 'présentation':
+        return <FileImage size={16} className="text-orange-500" />;
+      default:
+        return <File size={16} className="text-gray-500" />;
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    switch(type) {
+      case 'pdf': 
+        return <FileText size={16} className="text-red-500" />;
+      case 'doc':
+      case 'docx': 
+        return <FileText size={16} className="text-blue-500" />;
+      case 'xls':
+      case 'xlsx': 
+        return <FileSpreadsheet size={16} className="text-green-500" />;
+      case 'ppt':
+      case 'pptx': 
+        return <FileImage size={16} className="text-orange-500" />;
+      default: 
+        return <File size={16} className="text-gray-500" />;
+    }
+  };
 
   // Convert activePhase to a number for phaseEvaluationCriteria if it's a string
   const getPhaseKey = (phase: number | string): number => {
@@ -33,92 +293,106 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
     }
     return phase;
   };
-  const [sidebarActive, setSidebarActive] = useState(false);
-  const { selectedProgram } = useProgramContext();
 
-  const mentors = [
-    {
-      id: 1,
-      name: "lyna arezki",
-      expertise: "Développement Web",
-      experience: "1 ans",
-      rating: 5,
-    }
-  ];
-
-  // Données simulées
+  // Données dynamiques pour les statistiques
   const statsData = {
-    teamMembers: { value: 8, change: +2 },
-    meetingsCompleted: { value: 24, change: +5 },
-    tasks: { completed: 15, pending: 7 },
-    funding: { amount: "10K DA", target: "1000K DA" },
+    teamMembers: { 
+      value: programme?.mentors?.length || 0, 
+      change: programme?.mentors?.length || 0 
+    },
+    meetingsCompleted: { 
+      value: programme?.meetings_completed || 0, 
+      change: programme?.meetings_completed || 0 
+    },
+    tasks: { 
+      completed: programme?.tasks_completed || 0, 
+      pending: programme?.tasks_pending || 0 
+    },
+    funding: { 
+      amount: `${programme?.ca_min || 0}K DA`, 
+      target: `${programme?.ca_max || 0}K DA` 
+    },
     kpis: [
-      { name: "Satisfaction", value: 82, unit: "%", trend: "up" },
-      { name: "Engagement", value: 67, unit: "%", trend: "up" },
-      { name: "Retention", value: 91, unit: "%", trend: "stable" }
+      { 
+        name: "Satisfaction", 
+        value: programme?.satisfaction_rate || 0, 
+        unit: "%", 
+        trend: programme?.satisfaction_trend || "stable" 
+      },
+      { 
+        name: "Engagement", 
+        value: programme?.engagement_rate || 0, 
+        unit: "%", 
+        trend: programme?.engagement_trend || "stable" 
+      },
+      { 
+        name: "Retention", 
+        value: programme?.retention_rate || 0, 
+        unit: "%", 
+        trend: programme?.retention_trend || "stable" 
+      }
     ]
   };
 
-  const upcomingMeetings = [
-    { title: "Révision hebdomadaire", time: "10:00 AM", type: "Equipe", participants: 5 },
-    { title: "Mentorat stratégique", time: "04:00 PM", type: "mentor", participants: 2 }
-  ];
+  // Données dynamiques pour les réunions à venir
+  const upcomingMeetings = programme?.upcoming_meetings || [];
 
-  const recentActivities = [
-    { type: "task", text: "Business plan validé", time: "Il y a 2 heures", icon: <FaCheckCircle /> },
-    { type: "meeting", text: "Réunion avec les investisseurs", time: "Hier", icon: <FaComments /> },
-    { type: "milestone", text: "MVP lancé", time: "Il y a 3 jours", icon: <FaAward /> },
-    { type: "idea", text: "Nouvelle fonctionnalité proposée", time: "Il y a 5 jours", icon: <FaLightbulb /> }
-  ];
+  // Données dynamiques pour les activités récentes
+  const recentActivities = programme?.recent_activities || [];
 
   // Critères d'évaluation par phase
-  const phaseEvaluationCriteria = {
-    1: [
-      { name: "Dossier complet soumis", status: "fulfilled", stars: 5 },
-      { name: "Présentation pitch", status: "fulfilled", stars: 4 },
-      { name: "Entretien avec le jury", status: "fulfilled", stars: 5 },
-      { name: "Validation comité", status: "fulfilled", stars: 5 }
-    ],
-    2: [
-      { name: "MVP développé", status: "fulfilled", stars: 4 },
-      { name: "Test utilisateur", status: "fulfilled", stars: 3 },
-      { name: "Levée de fonds", status: "pending", stars: 2 },
-      { name: "Recrutement équipe", status: "pending", stars: 1 },
-      { name: "Stratégie marketing", status: "pending", stars: 1 }
-    ],
-    3: [
-      { name: "Mentorat technique", status: "pending", stars: 0 },
-      { name: "Mentorat business", status: "pending", stars: 0 },
-      { name: "Réseautage", status: "not-met", stars: 0 },
-      { name: "Préparation scaling", status: "not-met", stars: 0 }
-    ],
-    4: [
-      { name: "Chiffre d'affaires", status: "not-met", stars: 0 },
-      { name: "Utilisateurs actifs", status: "not-met", stars: 0 },
-      { name: "Levée de fonds finale", status: "not-met", stars: 0 },
-      { name: "Perspective croissance", status: "not-met", stars: 0 }
-    ]
+  const phaseEvaluationCriteria = programme?.phase_criteria || {
+    1: [],
+    2: [],
+    3: [],
+    4: []
   };
 
-  // Get phase descriptions from selected program or use default
-  const getPhaseDescription = (phaseId: number | string) => {
-    if (selectedProgram && selectedProgram.phases) {
-      const phase = selectedProgram.phases.find(p => p.id === phaseId);
-      if (phase) {
-        return phase.description;
-      }
-    }
-
-    // Default descriptions if no program is selected
-    const defaultDescriptions = {
-      1: "Phase de sélection et validation du projet",
-      2: "Développement accéléré et recherche de financement",
-      3: "Accompagnement par des mentors experts",
-      4: "Présentation des résultats et perspectives"
-    };
-
-    return defaultDescriptions[phaseId as keyof typeof defaultDescriptions] || "Description non disponible";
+  const priorityColors = {
+    low: 'bg-green-100 text-green-800',
+    medium: 'bg-yellow-100 text-yellow-800',
+    high: 'bg-red-100 text-red-800'
   };
+
+  const statusIcons = {
+    todo: <Clock className="h-4 w-4 text-yellow-500" />,
+    in_progress: <FaSpinner className="h-4 w-4 text-blue-500 animate-spin" />,
+    completed: <CheckCircle className="h-4 w-4 text-green-500" />
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('fr-FR');
+  };
+
+  const formatTime = (time: string) => {
+    return time;
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <FaSpinner className="spinner" />
+        <p>Chargement du programme...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <FaTimesCircle className="error-icon" />
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!programme) {
+    return (
+      <div className="no-program-container">
+        <p>Aucun programme sélectionné</p>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">
@@ -135,8 +409,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
         {/* Header */}
         <header className="dashboard-header">
           <div>
-            <h1>Programme ScaleUp</h1>
-            <p className="subtitle">Tableau de bord de votre startup</p>
+            <h1>{programme?.nom}</h1>
+            <p className="subtitle">{programme?.description}</p>
           </div>
           <div className="dashboard-actions">
             {onCreateTeamClick && (
@@ -150,7 +424,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
             )}
             <div className="date-range">
               <span>Phase {activePhase} en cours</span>
-              <span>{getPhaseDescription(activePhase)}</span>
+              <span>Statut: {programme?.status}</span>
             </div>
           </div>
         </header>
@@ -175,176 +449,379 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
           </div>
         </section>
 
-        {/* Stats Grid */}
-        <section className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">
-              <FaUsers />
-            </div>
-            <div className="stat-content">
-              <h3>Équipe</h3>
-              <div className="stat-value">{statsData.teamMembers.value}</div>
-              <div className={`stat-change ${statsData.teamMembers.change > 0 ? 'positive' : 'negative'}`}>
-                {statsData.teamMembers.change > 0 ? <FaArrowUp /> : <FaArrowDown />}
-                {Math.abs(statsData.teamMembers.change)} membres
-              </div>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon">
-              <FaCalendarAlt />
-            </div>
-            <div className="stat-content">
-              <h3>Réunions</h3>
-              <div className="stat-value">{statsData.meetingsCompleted.value}</div>
-              <div className={`stat-change ${statsData.meetingsCompleted.change > 0 ? 'positive' : 'negative'}`}>
-                {statsData.meetingsCompleted.change > 0 ? <FaArrowUp /> : <FaArrowDown />}
-                {Math.abs(statsData.meetingsCompleted.change)} ce mois
-              </div>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon">
-              <FaTasks />
-            </div>
-            <div className="stat-content">
-              <h3>Tâches</h3>
-              <div className="stat-value">{statsData.tasks.completed + statsData.tasks.pending}</div>
-              <div className="task-progress">
-                <div className="progress-labels">
-                  <span>{statsData.tasks.completed} terminées</span>
-                  <span>{statsData.tasks.pending} en attente</span>
-                </div>
-                <div className="progress-bar-container">
-                  <div
-                    className="progress-bar"
-                    style={{
-                      width: `${(statsData.tasks.completed / (statsData.tasks.completed + statsData.tasks.pending)) * 100}%`
-                    }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* KPIs and Meetings Section */}
+        {/* Content Section */}
         <section className="content-section">
-          <div className="activities-section">
-            <h2>Votre mentor :</h2>
-            <div className="mentors-list">
-              {mentors.map((mentor) => (
-                <div key={mentor.id} className="mentor-card">
-                  <div className="mentor-avatar">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                      <path fillRule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="mentor-info">
-                    <h3>{mentor.name}</h3>
-                    <div className="mentor-expertise">
-                      <span>Expertise: </span>
-                      {mentor.expertise}
-                    </div>
-                    <div className="mentor-experience">
-                      <span>Expérience: </span>
-                      {mentor.experience}
-                    </div>
-                    <div className="mentor-rating">
-                      <span>Note: </span>
-                      {[...Array(5)].map((_, i) => (
-                        <span key={i} className={i < Math.floor(mentor.rating) ? 'star-filled' : 'star-empty'}>
-                          {i < Math.floor(mentor.rating) ? '★' : '☆'}
-                        </span>
-                      ))}
-                      <span className="rating-value">({mentor.rating})</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {/* Tasks Section */}
+          <div className="tasks-card">
+            <div className="flex items-center justify-between mb-6">
+              <h2>Tâches</h2>
+              <MessageSquare className="h-5 w-5 text-pink-500" />
             </div>
+
+            <div className="mb-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-green-50 p-2 rounded">
+                  <div className="text-xl font-bold text-green-600">
+                    {tasks.filter(t => t.status === 'completed').length}
+                  </div>
+                  <div className="text-xs text-green-600">Terminées</div>
+                </div>
+                <div className="bg-blue-50 p-2 rounded">
+                  <div className="text-xl font-bold text-blue-600">
+                    {tasks.filter(t => t.status === 'in_progress').length}
+                  </div>
+                  <div className="text-xs text-blue-600">En cours</div>
+                </div>
+                <div className="bg-yellow-50 p-2 rounded">
+                  <div className="text-xl font-bold text-yellow-600">
+                    {tasks.filter(t => t.status === 'todo').length}
+                  </div>
+                  <div className="text-xs text-yellow-600">À faire</div>
+                </div>
+              </div>
+            </div>
+
+            <ScrollArea className="h-[220px]">
+              <div className="space-y-3">
+                {tasks.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Aucune tâche trouvée</p>
+                  </div>
+                ) : (
+                  tasks.slice(0, 4).map((task) => (
+                    <div
+                      key={task.id}
+                      className="bg-white rounded-lg border p-3 space-y-2"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          {statusIcons[task.status]}
+                          <span className="text-sm font-medium">{task.title}</span>
+                        </div>
+                        <Badge className={priorityColors[task.priority]}>
+                          {task.priority}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>Échéance: {formatDate(task.dueDate)}</span>
+                        <span>{task.assignee}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
           </div>
+
+          {/* Meetings Section */}
           <div className="meetings-card">
-            <h2>Prochaines Réunions</h2>
-            <div className="meeting-list">
-              {upcomingMeetings.map((meeting, index) => (
-                <div key={index} className="meeting-item">
-                  <div className="meeting-type">{meeting.type === "team" ? "Équipe" : meeting.type === "client" ? "Client" : "Mentor"}</div>
-                  <div className="meeting-details">
-                    <div className="meeting-title">{meeting.title}</div>
-                    <div className="meeting-time">{meeting.time} • {meeting.participants} participants</div>
-                  </div>
-                  <button className="meeting-join">Rejoindre</button>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-6">
+              <h2>Réunions à venir</h2>
+              <Calendar className="h-5 w-5 text-orange-500" />
             </div>
-          </div>
-        </section>
 
-        {/* Evaluation and Activities Section */}
-        <section className="content-section">
-          <div className="evaluation-section">
-            <h2>Critères d'évaluation - Phase {activePhase}</h2>
-            <div className="criteria-container">
-              {phaseEvaluationCriteria[getPhaseKey(activePhase)] ? (
-                phaseEvaluationCriteria[getPhaseKey(activePhase)].map((criteria, index) => (
-                  <div key={index} className={`criteria-item ${criteria.status}`}>
-                    <div className="criteria-status">
-                      {criteria.status === 'fulfilled' && <FaCheckCircle />}
-                      {criteria.status === 'pending' && <FaSpinner className="spin" />}
-                      {criteria.status === 'not-met' && <FaTimesCircle />}
+            {meetings.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>Aucune réunion programmée</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-4">
+                  {meetings.slice(0, 4).map((meeting) => (
+                    <div
+                      key={meeting.id}
+                      className="bg-white rounded-lg border p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">{meeting.title}</h4>
+                        </div>
+                        <button className="px-3 py-1 text-sm bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors">
+                          Rejoindre
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 text-sm text-gray-500">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {formatDate(meeting.date)}, {formatTime(meeting.time)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          {meeting.isOnline ? (
+                            <>
+                              <Video className="h-4 w-4 text-blue-500" />
+                              <span className="text-blue-600">Réunion en ligne</span>
+                            </>
+                          ) : (
+                            <>
+                              <MapPin className="h-4 w-4" />
+                              <span>{meeting.location}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <span className="criteria-name">{criteria.name}</span>
-                    <div className="star-rating">
-                      {[...Array(5)].map((_, starIndex) => (
-                        <span
-                          key={starIndex}
-                          className={starIndex < criteria.stars ? 'active' : ''}
-                        >
-                          &#9733;
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="criteria-item">
-                  <span className="criteria-name">Aucun critère d'évaluation pour cette phase</span>
+                  ))}
                 </div>
-              )}
-            </div>
+              </ScrollArea>
+            )}
           </div>
 
-          <div className="activities-section">
-            <h2>Activités Récentes</h2>
-            <div className="activities-list">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="activity-item">
-                  <div className="activity-icon">{activity.icon}</div>
-                  <div className="activity-content">
-                    <div className="activity-text">{activity.text}</div>
-                    <div className="activity-time">{activity.time}</div>
-                  </div>
-                </div>
-              ))}
+          {/* Deliverables Section */}
+          <div className="deliverables-card">
+            <div className="flex items-center justify-between mb-6">
+              <h2>Livrables à venir</h2>
+              <FaFileAlt className="h-5 w-5 text-indigo-500" />
             </div>
+            {loadingDeliverables ? (
+              <div className="flex justify-center items-center h-40">
+                <FaSpinner className="h-8 w-8 animate-spin text-indigo-500" />
+              </div>
+            ) : errorDeliverables ? (
+              <div className="text-center py-8 text-red-500">
+                <p>Erreur: {errorDeliverables}</p>
+              </div>
+            ) : deliverables.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Aucun livrable à venir</p>
+                <p className="text-sm mt-2">Ajoutez des livrables dans la section Livrables</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {deliverables.slice(0, 5).map((deliverable) => {
+                  const isLate = isBefore(new Date(deliverable.date_echeance), new Date()) &&
+                                !isToday(new Date(deliverable.date_echeance)) &&
+                                deliverable.status === 'pending';
+
+                  return (
+                    <div
+                      key={deliverable.id}
+                      className={cn(
+                        "p-3 rounded-lg border",
+                        isLate ? "border-red-200 bg-red-50" :
+                        deliverable.status === 'submitted' ? "border-green-200 bg-green-50" :
+                        "border-gray-200 hover:bg-gray-50 transition-colors"
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium">{deliverable.nom}</div>
+                          <div className="text-sm text-gray-500 flex items-center mt-1">
+                            <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                            Échéance {format(new Date(deliverable.date_echeance), 'dd/MM/yyyy')}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            {deliverable.types_fichiers.map((type, index) => (
+                              <span key={index} className="text-xs text-gray-500">
+                                {getFileIcon(type.replace('.', ''))}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 items-end">
+                          <div className="flex items-center text-sm">
+                            {isLate ? (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            ) : deliverable.status === 'submitted' ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Clock className="h-4 w-4 text-amber-500" />
+                            )}
+                            <span className={cn(
+                              "ml-1.5",
+                              isLate ? "text-red-600" :
+                              deliverable.status === 'submitted' ? "text-green-600" :
+                              "text-amber-600"
+                            )}>
+                              {getStatusText(deliverable.status, deliverable.date_echeance)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Resources Section */}
+          <div className="resources-card">
+            <div className="flex items-center justify-between mb-6">
+              <h2>Ressources</h2>
+              <PlusCircle className="h-5 w-5 text-teal-500" />
+            </div>
+
+            {loadingResources ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+              </div>
+            ) : errorResources ? (
+              <div className="text-center py-8 text-red-500">
+                <p>Erreur: {errorResources}</p>
+              </div>
+            ) : resources.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Aucune ressource disponible</p>
+                <p className="text-sm mt-2">Ajoutez des ressources dans la section Ressources</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-4">
+                  {resources.slice(0, 4).map((resource) => (
+                    <div
+                      key={resource.id}
+                      className="bg-white rounded-lg border p-4 space-y-3"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          {getResourceTypeIcon(resource.type)}
+                          <div>
+                            <h4 className="text-sm font-medium">{resource.title}</h4>
+                            {resource.category && (
+                              <Badge className="bg-teal-100 text-teal-800">
+                                {resource.category}
+                              </Badge>
+                            )}
+                            {resource.is_external && (
+                              <Badge className="bg-blue-100 text-blue-800 ml-2">
+                                Externe
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {!resource.is_external && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDownload(resource.id)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {resource.is_external && resource.url && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => window.open(resource.url, '_blank')}
+                          >
+                            <FaFileAlt className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {resource.description && (
+                        <p className="text-sm text-gray-500">{resource.description}</p>
+                      )}
+                      <div className="text-xs text-gray-500">
+                        Ajouté le {new Date(resource.created_at).toLocaleDateString('fr-FR')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          {/* Evaluation Criteria Section */}
+          <div className="criteria-card">
+            <div className="flex items-center justify-between mb-6">
+              <h2>Critères d'évaluation</h2>
+              <Award className="h-5 w-5 text-indigo-500" />
+            </div>
+
+            {phaseEvaluationCriteria[getPhaseKey(activePhase)]?.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Award className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>Aucun critère d'évaluation pour cette phase</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-3">
+                  {phaseEvaluationCriteria[getPhaseKey(activePhase)]?.map((criteria, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-lg border p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {criteria.status === 'fulfilled' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                          {criteria.status === 'pending' && <FaSpinner className="h-4 w-4 text-blue-500 animate-spin" />}
+                          {criteria.status === 'not-met' && <AlertCircle className="h-4 w-4 text-red-500" />}
+                          <span className="font-medium">{criteria.name}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {[...Array(5)].map((_, starIndex) => (
+                            <Star
+                              key={starIndex}
+                              className={cn(
+                                "h-4 w-4",
+                                starIndex < criteria.stars ? "text-amber-400 fill-amber-400" : "text-gray-300"
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        <div className="flex items-center space-x-2">
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs font-medium",
+                            criteria.status === 'fulfilled' ? "bg-green-100 text-green-800" :
+                            criteria.status === 'pending' ? "bg-blue-100 text-blue-800" :
+                            "bg-red-100 text-red-800"
+                          )}>
+                            {criteria.status === 'fulfilled' ? 'Atteint' :
+                             criteria.status === 'pending' ? 'En cours' :
+                             'Non atteint'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
           </div>
         </section>
       </main>
 
-      <style jsx>{`
+      <style>{`
         .dashboard-container {
           display: flex;
           min-height: 100vh;
           background-color: #f9fafb;
         }
 
+        .loading-container,
+        .error-container,
+        .no-program-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          padding: 2rem;
+          text-align: center;
+        }
+
+        .spinner {
+          font-size: 2rem;
+          color: #e43e32;
+          animation: spin 2s linear infinite;
+        }
+
+        .error-icon {
+          font-size: 2rem;
+          color: #ef4444;
+        }
+
         .main-content {
           flex: 1;
           padding: 2rem;
-          padding-top: 100px; /* Add padding to account for the navbar height */
+          padding-top: 100px;
           position: relative;
           margin-left: 280px;
           min-height: 100vh;
@@ -588,291 +1065,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
         /* Content Section */
         .content-section {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(3, 1fr);
           gap: 1.5rem;
           margin-bottom: 2rem;
         }
 
         @media (max-width: 1200px) {
           .content-section {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
           }
         }
 
-        .meetings-card, .evaluation-section, .activities-section {
-          background: white;
-          border-radius: 12px;
-          padding: 1.5rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        }
-
-        .meetings-card h2, .evaluation-section h2, .activities-section h2 {
-          font-size: 1.25rem;
-          color: #111827;
-          margin-bottom: 1.5rem;
-          font-weight: 600;
-        }
-
-        /* Meetings List */
-        .meeting-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-
-        .meeting-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          border-radius: 8px;
-          background-color: #f9fafb;
-          transition: all 0.3s ease;
-        }
-
-        .meeting-item:hover {
-          background-color: #f3f4f6;
-        }
-
-        .meeting-type {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background-color: rgba(59, 130, 246, 0.1);
-          color: #3b82f6;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.8rem;
-          font-weight: 600;
-          flex-shrink: 0;
-        }
-
-        .meeting-details {
-          flex: 1;
-        }
-
-        .meeting-title {
-          font-weight: 600;
-          color: #111827;
-          margin-bottom: 0.25rem;
-        }
-
-        .meeting-time {
-          font-size: 0.85rem;
-          color: #6b7280;
-        }
-
-        .meeting-join {
-          background: var(--gradient);
-          color: white;
-          border: none;
-          padding: 0.5rem 1rem;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .meeting-join:hover {
-          background: var(--gradient);
-          opacity: 0.9;
-        }
-
-        /* Evaluation Section */
-        .criteria-container {
-          display: grid;
-          gap: 0.75rem;
-        }
-
-        .criteria-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          border-radius: 8px;
-          font-weight: 500;
-          background-color: #f9fafb;
-        }
-
-        .criteria-item.fulfilled {
-          background-color: rgba(16, 185, 129, 0.1);
-          color: #10b981;
-        }
-
-        .criteria-item.pending {
-          background-color: rgba(249, 115, 22, 0.1);
-          color: #f97316;
-        }
-
-        .criteria-item.not-met {
-          background-color: rgba(239, 68, 68, 0.1);
-          color: #ef4444;
-        }
-
-        .criteria-status {
-          font-size: 1.25rem;
-        }
-
-        .criteria-name {
-          flex: 1;
-        }
-
-        .star-rating {
-          display: flex;
-          gap: 0.25rem;
-          color: #d1d5db;
-          font-size: 1.1rem;
-        }
-
-        .star-rating .active {
-          color: #fbbf24;
-        }
-
-        /* Activities Section */
-        .activities-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .activity-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 0.75rem;
-          border-radius: 8px;
-          background-color: #f9fafb;
-          transition: all 0.3s ease;
-        }
-
-        .activity-item:hover {
-          background-color: #f3f4f6;
-        }
-
-        .activity-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background-color: rgba(228, 62, 50, 0.1);
-          color: #e43e32;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1rem;
-          flex-shrink: 0;
-        }
-
-        .activity-content {
-          flex: 1;
-        }
-
-        .activity-text {
-          font-weight: 500;
-          color: #111827;
-          margin-bottom: 0.1rem;
-        }
-
-        .activity-time {
-          font-size: 0.8rem;
-          color: #6b7280;
-        }
-
-        /* Mentor Section */
-        .mentors-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .mentor-card {
-          background: white;
-          border-radius: 12px;
-          padding: 0.1rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-          display: flex;
-          flex-direction: column;
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .mentor-avatar {
-          width: 80px;
-          height: 80px;
-          border-radius: 50%;
-          overflow: hidden;
-          margin: 0 auto 1rem;
-          border: 3px solid #f3f4f6;
-          color: #6b7280;
-        }
-
-        .mentor-info {
-          text-align: center;
-          margin-bottom: 1.5rem;
-        }
-
-        .mentor-info h3 {
-          font-size: 1.2rem;
-          color: #111827;
-          margin-bottom: 0.5rem;
-        }
-
-        .mentor-expertise,
-        .mentor-experience,
-        .mentor-rating {
-          font-size: 0.9rem;
-          color: #6b7280;
-          margin-bottom: 0.3rem;
-        }
-
-        .mentor-expertise span,
-        .mentor-experience span,
-        .mentor-rating span {
-          font-weight: 600;
-          color: #374151;
-        }
-
-        .mentor-rating .star-filled {
-          color: #fbbf24;
-        }
-
-        .mentor-rating .star-empty {
-          color: #d1d5db;
-        }
-
-        .mentor-rating .rating-value {
-          margin-left: 0.3rem;
-          color: #6b7280;
-        }
-
-        /* Animations */
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
           .main-content {
             padding: 1.5rem;
-            padding-top: 100px; /* Maintain padding for navbar on mobile */
+            padding-top: 100px;
             margin-left: 0;
           }
 
-          .phases-container {
-            grid-template-columns: 1fr;
-          }
-
-          .stats-grid {
-            grid-template-columns: 1fr 1fr;
-          }
-
-          .mobile-menu-btn {
-            display: block;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .stats-grid {
+          .content-section {
             grid-template-columns: 1fr;
           }
 
@@ -890,6 +1101,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
           .date-range {
             align-items: flex-start;
           }
+        }
+
+        .tasks-card,
+        .meetings-card,
+        .deliverables-card,
+        .resources-card,
+        .criteria-card {
+          background: white;
+          border-radius: 12px;
+          padding: 1.5rem;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .tasks-card h2,
+        .meetings-card h2,
+        .deliverables-card h2,
+        .resources-card h2,
+        .criteria-card h2 {
+          font-size: 1.25rem;
+          color: #111827;
+          margin: 0;
+          font-weight: 600;
         }
       `}</style>
     </div>

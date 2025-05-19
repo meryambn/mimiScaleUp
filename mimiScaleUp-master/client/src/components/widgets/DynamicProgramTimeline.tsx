@@ -3,7 +3,7 @@ import { Clock, CheckCircle, AlertCircle, Milestone } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useProgramContext } from '@/context/ProgramContext';
+import { useProgrammePhases } from '@/hooks/useProgrammePhases';
 import {
   Card,
   CardHeader,
@@ -14,20 +14,20 @@ import {
 
 // Define the phase interface that works for both timeline styles
 interface TimelinePhase {
-  id: number | string;
-  name: string;
-  startDate?: string | Date;
-  endDate?: string | Date;
+  id: number;
+  nom: string;
+  date_debut: string;
+  date_fin: string;
+  description: string;
+  programme_id: number;
+  gagnant: boolean;
+  status?: 'completed' | 'in-progress' | 'upcoming';
   progress?: number;
-  status: 'completed' | 'in-progress' | 'upcoming' | 'not_started';
-  description?: string;
-  color?: string;
 }
 
 interface DynamicProgramTimelineProps {
   onPhaseSelect?: (phaseId: number | string) => void;
   selectedPhase?: number | string | null;
-  phases?: TimelinePhase[];
   title?: string;
   description?: string;
   showCard?: boolean;
@@ -37,28 +37,21 @@ interface DynamicProgramTimelineProps {
 const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
   onPhaseSelect,
   selectedPhase: externalSelectedPhase,
-  phases: externalPhases,
   title = "Chronologie du Programme",
   description = "Cliquez sur une phase pour filtrer",
   showCard = true,
   viewType = 'vertical'
 }) => {
-  const [phases, setPhases] = useState<TimelinePhase[]>([]);
-  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
   const [internalSelectedPhase, setInternalSelectedPhase] = useState<number | string | null>(null);
+  const { phases, loading, error } = useProgrammePhases();
 
   // Determine if we're using external or internal state for selected phase
-  const selectedPhaseValue = externalSelectedPhase !== undefined ? externalSelectedPhase : selectedPhaseId;
+  const selectedPhaseValue = externalSelectedPhase !== undefined ? externalSelectedPhase : internalSelectedPhase;
   
   // Notify parent component when phase is selected
   const handlePhaseSelect = (phaseId: number | string | null) => {
     // Update internal state
     setInternalSelectedPhase(phaseId);
-    
-    // Update context if we're using it
-    if (setSelectedPhaseId && externalSelectedPhase === undefined) {
-      setSelectedPhaseId(phaseId);
-    }
     
     // Notify parent component
     if (phaseId !== null && onPhaseSelect) {
@@ -71,96 +64,23 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
     return phases.find(phase => phase.id === selectedPhaseValue);
   };
 
-  useEffect(() => {
-    // If external phases are provided, use them
-    if (externalPhases && externalPhases.length > 0) {
-      setPhases(externalPhases);
-    } 
-    // Otherwise, use phases from the selected program in context
-    else if (selectedProgram && selectedProgram.phases && selectedProgram.phases.length > 0) {
-      // Convert program phases to timeline phases
-      const timelinePhases = selectedProgram.phases.map(phase => {
-        // Calculate progress based on dates
-        const now = new Date();
-        const startDate = new Date(phase.startDate);
-        const endDate = new Date(phase.endDate);
-        const totalDuration = endDate.getTime() - startDate.getTime();
-        const elapsedDuration = now.getTime() - startDate.getTime();
-        let progress = 0;
+  // Calculate phase status and progress
+  const calculatePhaseStatus = (phase: TimelinePhase) => {
+    const now = new Date();
+    const startDate = new Date(phase.date_debut);
+    const endDate = new Date(phase.date_fin);
 
-        if (now > endDate) {
-          progress = 100;
-        } else if (now >= startDate && now <= endDate) {
-          progress = Math.min(Math.round((elapsedDuration / totalDuration) * 100), 100);
-        }
-
-        // Determine status based on dates
-        let status: 'completed' | 'in-progress' | 'upcoming' = 'upcoming';
-        if (now > endDate) {
-          status = 'completed';
-        } else if (now >= startDate && now <= endDate) {
-          status = 'in-progress';
-        }
-
-        return {
-          id: phase.id,
-          name: phase.name,
-          startDate: phase.startDate,
-          endDate: phase.endDate,
-          progress,
-          status,
-          description: phase.description,
-          color: phase.color || getStatusColor(status)
-        };
-      });
-
-      setPhases(timelinePhases);
+    if (now > endDate) {
+      return { status: 'completed' as const, progress: 100 };
+    } else if (now >= startDate && now <= endDate) {
+      const totalDuration = endDate.getTime() - startDate.getTime();
+      const elapsedDuration = now.getTime() - startDate.getTime();
+      const progress = Math.min(Math.round((elapsedDuration / totalDuration) * 100), 100);
+      return { status: 'in-progress' as const, progress };
     } else {
-      // Use default phases if no program is selected
-      setPhases([
-        {
-          id: 1,
-          name: 'Phase 1',
-          startDate: '2024-01-15',
-          endDate: '2024-02-15',
-          progress: 100,
-          status: 'completed',
-          description: 'Sélection et validation du projet',
-          color: '#10b981' // green
-        },
-        {
-          id: 2,
-          name: 'Phase 2',
-          startDate: '2024-02-16',
-          endDate: '2024-03-15',
-          progress: 100,
-          status: 'completed',
-          description: 'Développement accéléré et recherche de financement',
-          color: '#10b981' // green
-        },
-        {
-          id: 3,
-          name: 'Phase 3',
-          startDate: '2024-03-16',
-          endDate: '2024-05-15',
-          progress: 65,
-          status: 'in-progress',
-          description: 'Accompagnement par des mentors experts',
-          color: '#3b82f6' // blue
-        },
-        {
-          id: 4,
-          name: 'Phase 4',
-          startDate: '2024-05-16',
-          endDate: '2024-06-30',
-          progress: 0,
-          status: 'upcoming',
-          description: 'Présentation des résultats et perspectives',
-          color: '#6b7280' // gray
-        }
-      ]);
+      return { status: 'upcoming' as const, progress: 0 };
     }
-  }, [selectedProgram, externalPhases]);
+  };
 
   // Helper function to get status color
   const getStatusColor = (status: TimelinePhase['status']) => {
@@ -198,22 +118,49 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-500">
+        <p>Erreur: {error}</p>
+      </div>
+    );
+  }
+
+  if (!phases.length) {
+    return (
+      <div className="p-4 text-gray-500">
+        <p>Aucune phase disponible</p>
+      </div>
+    );
+  }
+
   // Selected phase indicator component
   const SelectedPhaseIndicator = () => {
     if (!selectedPhaseValue || !getSelectedPhase()) return null;
+    
+    const selectedPhase = getSelectedPhase();
+    const { status } = calculatePhaseStatus(selectedPhase!);
     
     return (
       <div className="mt-2 p-3 bg-blue-50 rounded-md flex items-center">
         <div
           className={cn(
             "w-3 h-3 rounded-full mr-2",
-            getSelectedPhase()?.status === 'completed' ? "bg-green-500" :
-            getSelectedPhase()?.status === 'in-progress' ? "bg-blue-500" :
+            status === 'completed' ? "bg-green-500" :
+            status === 'in-progress' ? "bg-blue-500" :
             "bg-gray-400"
           )}
         ></div>
         <p className="text-sm">
-          <span className="font-medium">Phase sélectionnée:</span> {getSelectedPhase()?.name}
+          <span className="font-medium">Phase sélectionnée:</span> {selectedPhase?.nom}
         </p>
         <button
           className="ml-auto"
@@ -243,24 +190,27 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
       <div className="flex flex-col space-y-2">
         {/* Phase Timeline Bar */}
         <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
-          {phases.map((phase) => (
-            <div
-              key={phase.id}
-              className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
-                ${selectedPhaseValue === phase.id ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
-              `}
-              style={{
-                width,
-                backgroundColor: phase.color || getStatusColor(phase.status),
-                opacity: phase.status === 'not_started' || phase.status === 'upcoming' ? 0.5 : 1
-              }}
-              onClick={() => handlePhaseSelect(selectedPhaseValue === phase.id ? null : phase.id)}
-            >
-              <span className="text-white font-medium text-sm">
-                {phase.name}
-              </span>
-            </div>
-          ))}
+          {phases.map((phase) => {
+            const { status } = calculatePhaseStatus(phase);
+            return (
+              <div
+                key={phase.id}
+                className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
+                  ${selectedPhaseValue === phase.id ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
+                `}
+                style={{
+                  width,
+                  backgroundColor: getStatusColor(status),
+                  opacity: status === 'upcoming' ? 0.5 : 1
+                }}
+                onClick={() => handlePhaseSelect(selectedPhaseValue === phase.id ? null : phase.id)}
+              >
+                <span className="text-white font-medium text-sm">
+                  {phase.nom}
+                </span>
+              </div>
+            );
+          })}
         </div>
         <SelectedPhaseIndicator />
       </div>
@@ -281,67 +231,68 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
         <div className="relative mt-2 mb-8">
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
 
-          {phases.map((phase) => (
-            <div key={phase.id} className="relative mb-8 last:mb-0">
-              <div className="flex group">
-                {/* Timeline node */}
-                <div
-                  className={cn(
-                    "absolute z-10 left-4 w-8 h-8 rounded-full flex items-center justify-center -translate-x-1/2 bg-white border-2 cursor-pointer",
-                    selectedPhaseValue === phase.id ? "ring-2 ring-offset-1 ring-blue-500" : "",
-                    phase.status === 'completed' ? "border-green-500" :
-                    phase.status === 'in-progress' ? "border-blue-500 animate-pulse" :
-                    "border-gray-300"
-                  )}
-                  onClick={() => handlePhaseSelect(selectedPhaseValue === phase.id ? null : phase.id)}
-                >
-                  {getStatusIcon(phase.status)}
-                </div>
-
-                {/* Content card */}
-                <div
-                  className={cn(
-                    "ml-8 p-4 rounded-lg border shadow-sm w-full transition-all cursor-pointer",
-                    selectedPhaseValue === phase.id ? "ring-2 ring-offset-2 ring-blue-500" : "",
-                    phase.status === 'in-progress' ? "border-blue-200 bg-blue-50" :
-                    phase.status === 'completed' ? "border-green-200 bg-green-50" :
-                    "border-gray-200 bg-white hover:bg-gray-50"
-                  )}
-                  onClick={() => handlePhaseSelect(selectedPhaseValue === phase.id ? null : phase.id)}
-                >
-                  <div className="flex justify-between mb-2">
-                    <h4 className="font-medium">{phase.name}</h4>
-                    {getStatusBadge(phase.status)}
+          {phases.map((phase) => {
+            const { status, progress } = calculatePhaseStatus(phase);
+            return (
+              <div key={phase.id} className="relative mb-8 last:mb-0">
+                <div className="flex group">
+                  {/* Timeline node */}
+                  <div
+                    className={cn(
+                      "absolute z-10 left-4 w-8 h-8 rounded-full flex items-center justify-center -translate-x-1/2 bg-white border-2 cursor-pointer",
+                      selectedPhaseValue === phase.id ? "ring-2 ring-offset-1 ring-blue-500" : "",
+                      status === 'completed' ? "border-green-500" :
+                      status === 'in-progress' ? "border-blue-500 animate-pulse" :
+                      "border-gray-300"
+                    )}
+                    onClick={() => handlePhaseSelect(selectedPhaseValue === phase.id ? null : phase.id)}
+                  >
+                    {getStatusIcon(status)}
                   </div>
 
-                  {phase.description && (
-                    <p className="text-sm text-gray-600 mb-4">{phase.description}</p>
-                  )}
+                  {/* Content card */}
+                  <div
+                    className={cn(
+                      "ml-8 p-4 rounded-lg border shadow-sm w-full transition-all cursor-pointer",
+                      selectedPhaseValue === phase.id ? "ring-2 ring-offset-2 ring-blue-500" : "",
+                      status === 'in-progress' ? "border-blue-200 bg-blue-50" :
+                      status === 'completed' ? "border-green-200 bg-green-50" :
+                      "border-gray-200 bg-white hover:bg-gray-50"
+                    )}
+                    onClick={() => handlePhaseSelect(selectedPhaseValue === phase.id ? null : phase.id)}
+                  >
+                    <div className="flex justify-between mb-2">
+                      <h4 className="font-medium">{phase.nom}</h4>
+                      {getStatusBadge(status)}
+                    </div>
 
-                  {phase.progress !== undefined && phase.startDate && phase.endDate && (
+                    {phase.description && (
+                      <p className="text-sm text-gray-600 mb-4">{phase.description}</p>
+                    )}
+
                     <div className="mb-2">
                       <div className="text-xs text-gray-500 flex justify-between mb-1">
-                        <span>{typeof phase.startDate === 'string' ? phase.startDate : phase.startDate.toLocaleDateString()}</span>
-                        <span>{typeof phase.endDate === 'string' ? phase.endDate : phase.endDate.toLocaleDateString()}</span>
+                        <span>{new Date(phase.date_debut).toLocaleDateString()}</span>
+                        <span>{new Date(phase.date_fin).toLocaleDateString()}</span>
                       </div>
                       <Progress
-                        value={phase.progress}
+                        value={progress}
                         className={cn(
                           "h-2 bg-gray-100",
-                          phase.status === 'completed' ? "[&>div]:bg-green-500" :
-                          phase.status === 'in-progress' ? "[&>div]:bg-blue-500" :
+                          status === 'completed' ? "[&>div]:bg-green-500" :
+                          status === 'in-progress' ? "[&>div]:bg-blue-500" :
                           "[&>div]:bg-gray-300"
                         )}
                       />
                       <div className="text-xs text-right font-medium mt-1">
-                        {phase.progress}% Terminé
+                        {progress}% Terminé
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );

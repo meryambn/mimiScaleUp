@@ -50,6 +50,7 @@ import ParticulierTasksPage from './pages/particulier/tasks';
 import StartupAnalytics from './pages/startup/analytics';
 import FormulairePage from './pages/particulier/apply';
 import ApplyRedirect from './components/redirects/ApplyRedirect';
+import StartupProgramAccessWrapper from './components/StartupProgramAccessWrapper';
 
 // Redirect components to fix hooks issues
 const DashboardRedirect = () => {
@@ -100,7 +101,7 @@ const TeamsRedirect = () => {
 const TeamDetailRedirect = () => {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
 
   React.useEffect(() => {
     if (user?.role === 'admin') {
@@ -322,6 +323,39 @@ const StartupFormulaireRedirect = () => {
   return null;
 };
 
+const StartupDashboardRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { programs, selectedProgramId } = useProgramContext();
+
+  React.useEffect(() => {
+    // Utiliser le programme sélectionné s'il existe
+    if (selectedProgramId) {
+      setLocation(`/startup/dashboard/${selectedProgramId}`);
+    } else {
+      // Si aucun programme n'est sélectionné, rediriger vers le profil
+      setLocation('/startup/profile');
+    }
+  }, [setLocation, selectedProgramId]);
+  return null;
+};
+
+const StartupTasksRedirect = () => {
+  const [, setLocation] = useLocation();
+  const { programs } = useProgramContext();
+
+  React.useEffect(() => {
+    // Find the active program
+    const activeProgram = programs.find(p => p.status === "active");
+    if (activeProgram) {
+      setLocation(`/startup/tasks/${activeProgram.id}`);
+    } else {
+      setLocation('/startup/profile');
+    }
+  }, [programs, setLocation]);
+
+  return null;
+};
+
 const App = () => {
   // Removed redundant redirection logic from main component
   // since it's handled in the route component
@@ -352,7 +386,23 @@ const App = () => {
                     </Route>
 
                     <Route path="/startup/dashboard">
-                      {() => <StartupDashboardPage />}
+                      {() => (
+                        <StartupLayout>
+                          <StartupProgramAccessWrapper>
+                            <StartupDashboardPage />
+                          </StartupProgramAccessWrapper>
+                        </StartupLayout>
+                      )}
+                    </Route>
+
+                    <Route path="/startup/dashboard/:id">
+                      {() => (
+                        <StartupLayout>
+                          <StartupProgramAccessWrapper>
+                            <StartupDashboardPage />
+                          </StartupProgramAccessWrapper>
+                        </StartupLayout>
+                      )}
                     </Route>
 
                     <Route path="/particulier/dashboard">
@@ -378,7 +428,9 @@ const App = () => {
                     <Route path="/startup/livrable">
                       {() => (
                         <StartupLayout>
-                          <StartupDeliverablesPage />
+                          <StartupProgramAccessWrapper>
+                            <StartupDeliverablesPage />
+                          </StartupProgramAccessWrapper>
                         </StartupLayout>
                       )}
                     </Route>
@@ -394,7 +446,9 @@ const App = () => {
                     <Route path="/startup/ressource">
                       {() => (
                         <StartupLayout>
-                          <StartupResourcePage />
+                          <StartupProgramAccessWrapper>
+                            <StartupResourcePage />
+                          </StartupProgramAccessWrapper>
                         </StartupLayout>
                       )}
                     </Route>
@@ -465,7 +519,7 @@ const App = () => {
                       )}
                     </Route>
                     <Route path="/forms/create/:programId">
-                      {({ programId }) => (
+                      {({ programId }: { programId?: string }) => (
                         <Layout>
                           <CreateFormPage />
                         </Layout>
@@ -576,7 +630,7 @@ const App = () => {
                     </Route>
 
                     <Route path="/teams/:id">
-                      {({ id }) => (
+                      {({ id }: { id?: string }) => (
                         <Layout>
                           <StartupDetailPage />
                         </Layout>
@@ -637,7 +691,9 @@ const App = () => {
                     <Route path="/startup/meetings">
                       {() => (
                         <StartupLayout>
-                          <StartupMeetingsPage />
+                          <StartupProgramAccessWrapper>
+                            <StartupMeetingsPage />
+                          </StartupProgramAccessWrapper>
                         </StartupLayout>
                       )}
                     </Route>
@@ -645,15 +701,29 @@ const App = () => {
                     <Route path="/startup/tasks">
                       {() => (
                         <StartupLayout>
-                          <StartupTasksPage />
+                          <StartupProgramAccessWrapper>
+                            <StartupTasksPage />
+                          </StartupProgramAccessWrapper>
                         </StartupLayout>
+                      )}
+                    </Route>
+
+                    <Route path="/startup/tasks/:id">
+                      {() => (
+                         <StartupLayout>
+                           <StartupProgramAccessWrapper>
+                             <StartupTasksPage />
+                           </StartupProgramAccessWrapper>
+                         </StartupLayout>
                       )}
                     </Route>
 
                     <Route path="/startup/analytics">
                       {() => (
                         <StartupLayout>
-                          <StartupAnalytics />
+                          <StartupProgramAccessWrapper>
+                            <StartupAnalytics />
+                          </StartupProgramAccessWrapper>
                         </StartupLayout>
                       )}
                     </Route>
@@ -680,29 +750,35 @@ const App = () => {
                     </Route>
 
                     {/* Route de base pour les notifications */}
-                    <Route path="/particulier/notifications">
-                      {() => <NotificationsRedirect />}
-                    </Route>
-
-                    {/* Route avec ID pour les notifications */}
-                    <Route path="/particulier/notifications/:id">
-                      {() => <NotificationsPage />}
-                    </Route>
-
                     <Route path="/startup/notifications">
                       {() => <StartupNotificationsRedirect />}
                     </Route>
 
                     <Route path="/startup/notifications/:id">
-                      {() => <StartupNotificationsPage />}
+                      {() => (
+                      
+                         
+                            <StartupNotificationsPage />
+                         
+                      )}
                     </Route>
 
-                    {/* Route de base pour le formulaire */}
+                    <Route path="/particulier/notifications">
+                      {() => <NotificationsRedirect />}
+                    </Route>
+
+                    <Route path="/particulier/notifications/:id">
+                      {() => (
+                        <ParticulierLayout>
+                           <NotificationsPage />
+                        </ParticulierLayout>
+                      )}
+                    </Route>
+
                     <Route path="/particulier/apply">
                       {() => <FormulaireRedirect />}
                     </Route>
 
-                    {/* Route avec ID pour le formulaire */}
                     <Route path="/particulier/apply/:id">
                       {() => (
                         <ParticulierLayout>
@@ -723,7 +799,6 @@ const App = () => {
                       )}
                     </Route>
 
-                    {/* Legacy routes for backward compatibility */}
                     <Route path="/particulier/formulaire">
                       {() => <FormulaireRedirect />}
                     </Route>
@@ -743,7 +818,9 @@ const App = () => {
                     <Route path="/startup/feed">
                       {() => (
                         <StartupLayout>
-                          <FeedPage />
+                          <StartupProgramAccessWrapper>
+                            <FeedPage />
+                          </StartupProgramAccessWrapper>
                         </StartupLayout>
                       )}
                     </Route>
@@ -756,7 +833,6 @@ const App = () => {
                       )}
                     </Route>
 
-                    {/* Unified apply route that redirects based on user role */}
                     <Route path="/apply/:id">
                       {() => <ApplyRedirect />}
                     </Route>

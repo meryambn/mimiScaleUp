@@ -590,48 +590,59 @@ interface ProgramProviderProps {
   children: ReactNode;
 }
 
-// Utility function to deduplicate programs by ID
-// This function is used in the commented out setDeduplicatedPrograms function
-// and is kept for future use
-/*
-const deduplicatePrograms = (programs: Program[]): Program[] => {
-  const programsMap = new Map<string, Program>();
-
-  // Add all programs to the map (this will automatically deduplicate by ID)
-  programs.forEach(program => {
-    programsMap.set(program.id, program);
-  });
-
-  // Convert map back to array
-  return Array.from(programsMap.values());
-};
-*/
-
 export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) => {
   const [location] = useLocation();
-  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(() => {
+    // Récupérer l'ID du programme depuis le localStorage au chargement
+    const savedProgramId = localStorage.getItem('selectedProgramId');
+    return savedProgramId || null;
+  });
   const [programs, setPrograms] = useState<Program[]>(examplePrograms);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  // selectedProgram is used in the context value and returned in the context
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
-  // isLoading is used to track API request status
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  // selectedPhaseId is used to track the selected phase across components
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | number | null>(null);
-  // Get user from AuthContext
   const { user } = useAuth();
 
-  // Custom setter for programs that ensures deduplication
-  // Commented out as it's not currently used, but may be needed in the future
-  /*
-  const setDeduplicatedPrograms = (newPrograms: Program[] | ((prev: Program[]) => Program[])) => {
-    if (typeof newPrograms === 'function') {
-      setPrograms(prev => deduplicatePrograms(newPrograms(prev)));
+  // Mettre à jour le localStorage et le programme sélectionné quand selectedProgramId change
+  useEffect(() => {
+    if (selectedProgramId) {
+      localStorage.setItem('selectedProgramId', selectedProgramId);
+      // Forcer la mise à jour du programme sélectionné
+      const program = programs.find(p => p.id === selectedProgramId);
+      if (program) {
+        setSelectedProgram(program);
+      }
     } else {
-      setPrograms(deduplicatePrograms(newPrograms));
+      localStorage.removeItem('selectedProgramId');
+      setSelectedProgram(null);
+    }
+  }, [selectedProgramId, programs]);
+
+  // Vérifier la cohérence du programme sélectionné
+  useEffect(() => {
+    if (selectedProgramId && selectedProgram) {
+      if (selectedProgram.id !== selectedProgramId) {
+        console.log('Incohérence détectée entre selectedProgramId et selectedProgram, correction en cours...');
+        const program = programs.find(p => p.id === selectedProgramId);
+        if (program) {
+          setSelectedProgram(program);
+        }
+      }
+    }
+  }, [selectedProgramId, selectedProgram, programs]);
+
+  // Améliorer la fonction de sélection du programme
+  const selectProgram = (programId: string) => {
+    console.log('Selecting program with ID:', programId);
+    setSelectedProgramId(programId);
+    
+    // Forcer la mise à jour immédiate du programme sélectionné
+    const program = programs.find(p => p.id === programId);
+    if (program) {
+      setSelectedProgram(program);
     }
   };
-  */
 
   // Define the function to load programs from the backend
   const loadProgramsFromBackend = async () => {
@@ -1799,9 +1810,9 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
     <ProgramContext.Provider
       value={{
         selectedProgramId,
-        setSelectedProgramId,
+        setSelectedProgramId: selectProgram,
         programs,
-        selectedProgram: currentProgram,
+        selectedProgram,
         currentStep,
         setCurrentStep,
         resetProgramCreation,
