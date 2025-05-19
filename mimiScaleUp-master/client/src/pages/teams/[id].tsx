@@ -6,6 +6,7 @@ import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasP
 import { moveToPhase } from '@/services/phaseService';
 import { getPhases, getEvaluationCriteriaByPhaseName } from '@/services/programService';
 import { declareWinner } from '@/services/winnerService';
+import TeamDeliverableSubmissions from '@/components/deliverables/TeamDeliverableSubmissions';
 
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -163,20 +164,14 @@ const StartupDetailPage = () => {
               setSelectedPhase(phaseData.nom);
             }
 
-            // If we have a local startup, update its phase
-            if (localStartup) {
-              setLocalStartup({
-                ...localStartup,
-                currentPhase: phaseData.nom
-              });
-            }
+            // We'll handle localStartup updates in a separate effect to avoid the circular dependency
           }
         })
         .catch(error => {
           console.error(`Error fetching phase for team ${id}:`, error);
         });
     }
-  }, [id, selectedProgramId, localStartup, loadStartupFromLocalStorage]);
+  }, [id, selectedProgramId, userSelectedPhase, loadStartupFromLocalStorage]);
 
   // Recharger les données lorsque l'URL change (paramètre t)
   React.useEffect(() => {
@@ -301,7 +296,10 @@ const StartupDetailPage = () => {
 
   // Initialize scores when data is loaded
   React.useEffect(() => {
-    if (startup?.evaluationCriteria && Array.isArray(startup.evaluationCriteria)) {
+    if (!startup) return;
+
+    // Initialize evaluation criteria scores
+    if (startup.evaluationCriteria && Array.isArray(startup.evaluationCriteria)) {
       const initialScores: Record<number, number> = {};
       startup.evaluationCriteria.forEach((criterion: any) => {
         if (criterion && criterion.score) {
@@ -323,22 +321,28 @@ const StartupDetailPage = () => {
       }
     }
 
-    if (startup?.feedback) {
+    // Set feedback if available
+    if (startup.feedback) {
       setFeedback(startup.feedback);
     }
 
-    // Vérifier si l'équipe est déjà marquée comme gagnante dans les données locales
-    // Note: This is a fallback, the backend check will override this if needed
-    if (startup?.status === 'completed') {
+    // Check if team is already marked as winner
+    if (startup.status === 'completed') {
       setIsWinner(true);
     }
+  }, [startup]);
 
-    // Initialiser la phase sélectionnée avec la phase actuelle de l'équipe
+  // Separate effect for setting the selected phase to avoid dependency cycles
+  React.useEffect(() => {
+    // Only set the selected phase if:
+    // 1. We have a startup with a currentPhase
+    // 2. No phase is currently selected
+    // 3. User hasn't manually selected a phase
     if (startup?.currentPhase && !selectedPhase && !userSelectedPhase) {
       console.log(`Setting initial selected phase to current phase: ${startup.currentPhase}`);
       setSelectedPhase(startup.currentPhase);
     }
-  }, [startup]);
+  }, [startup?.currentPhase, selectedPhase, userSelectedPhase]);
 
   // Track changes to selectedPhase
   React.useEffect(() => {
@@ -427,31 +431,43 @@ const StartupDetailPage = () => {
   React.useEffect(() => {
     if (teamDetailsData) {
       console.log('Team details from backend:', teamDetailsData);
-
-      // Si nous avons des données d'équipe du backend, mettre à jour l'équipe locale
-      if (localStartup && teamDetailsData.nom_equipe) {
-        setLocalStartup({
-          ...localStartup,
-          name: teamDetailsData.nom_equipe
-        });
-      }
     }
-  }, [teamDetailsData, localStartup]);
+  }, [teamDetailsData]);
 
   // Effet pour afficher les données de l'équipe du programme
   React.useEffect(() => {
     if (programTeamData) {
       console.log('Team from program teams:', programTeamData);
+    }
+  }, [programTeamData]);
 
-      // Si nous avons des données d'équipe du programme, mettre à jour l'équipe locale
-      if (localStartup && programTeamData.nom_equipe) {
-        setLocalStartup({
-          ...localStartup,
-          name: programTeamData.nom_equipe
-        });
+  // Effet combiné pour mettre à jour localStartup en fonction des données externes
+  // Cet effet s'exécute lorsque teamDetailsData ou programTeamData changent, mais pas lorsque localStartup change
+  React.useEffect(() => {
+    // Ne mettre à jour que si nous avons déjà un localStartup
+    if (localStartup) {
+      // Créer un nouvel objet avec les mises à jour
+      const updates: any = {};
+
+      // Mettre à jour le nom si disponible dans teamDetailsData
+      if (teamDetailsData?.nom_equipe) {
+        updates.name = teamDetailsData.nom_equipe;
+      }
+
+      // Mettre à jour le nom si disponible dans programTeamData (priorité plus élevée)
+      if (programTeamData?.nom_equipe) {
+        updates.name = programTeamData.nom_equipe;
+      }
+
+      // N'appliquer les mises à jour que s'il y a des changements
+      if (Object.keys(updates).length > 0) {
+        setLocalStartup((prev: any) => ({
+          ...prev,
+          ...updates
+        }));
       }
     }
-  }, [programTeamData, localStartup]);
+  }, [teamDetailsData, programTeamData]);
 
   // Fonction pour sélectionner l'équipe comme gagnante
   const handleSelectWinner = async () => {
@@ -1276,46 +1292,114 @@ const StartupDetailPage = () => {
               )}
             </div>
           </div>
-          <div className="space-y-4">
-            {getPhaseDeliverables().length > 0 ? getPhaseDeliverables().map((deliverable: any) => (
-              <Card key={deliverable.id} className="cursor-pointer hover:shadow-lg transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>{deliverable.name}</CardTitle>
-                    <p className="text-sm text-gray-500">{deliverable.description}</p>
+
+          {/* Affichage des livrables soumis avec le nouveau composant */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Livrables soumis</CardTitle>
+              <p className="text-sm text-gray-500">
+                Gérez les livrables soumis par l'équipe et validez ou rejetez-les.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {/* Utiliser le composant TeamDeliverableSubmissions */}
+              {teamDetailsData && selectedProgram ? (
+                <>
+                  {/* Debug info */}
+                  <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+                    <p>Debug: Team ID: {id}</p>
+                    <p>Selected Phase: {selectedPhase}</p>
+                    <p>Phase ID: {selectedProgram.phases.find(p => p.name === selectedPhase)?.id || 'Not found'}</p>
+                    <p>teamDetailsData ID: {teamDetailsData?.id}</p>
+                    <p>teamDetailsData: {JSON.stringify(teamDetailsData)}</p>
+                    <p>selectedProgram phases: {JSON.stringify(selectedProgram.phases)}</p>
+                    <button
+                      className="mt-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
+                      onClick={() => {
+                        console.log('Debug - teamDetailsData:', teamDetailsData);
+                        console.log('Debug - selectedProgram:', selectedProgram);
+                        console.log('Debug - id from URL:', id);
+                      }}
+                    >
+                      Log Debug Info
+                    </button>
                   </div>
-                  <Badge className={getDeliverableStatusColor(deliverable.status)}>
-                    {deliverable.status.toUpperCase()}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1 text-sm">
-                      <div>Due: {deliverable.dueDate}</div>
-                      {deliverable.submittedDate && (
-                        <div>Submitted: {deliverable.submittedDate}</div>
-                      )}
-                      {deliverable.score && (
-                        <div>Score: {deliverable.score}%</div>
-                      )}
-                    </div>
-                    <div className="flex space-x-2">
-                      {deliverable.fileUrl && (
-                        <a href={deliverable.fileUrl} download style={{ backgroundColor: 'white', color: '#e43e32', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem', textDecoration: 'none' }}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </a>
-                      )}
-                    </div>
+
+                  {console.log('Rendering TeamDeliverableSubmissions with:', {
+                    teamId: id,
+                    phaseId: selectedProgram.phases.find(p => p.name === selectedPhase)?.id,
+                    selectedPhase
+                  })}
+
+                  {/* The teamId is used as candidatureId in the backend */}
+                  <TeamDeliverableSubmissions
+                    teamId={teamDetailsData?.id?.toString() || id || ''}
+                    phaseId={selectedProgram.phases.find(p => p.name === selectedPhase)?.id?.toString() || ''}
+                  />
+                </>
+              ) : (
+                <div className="text-center py-12 bg-red-50 rounded-lg">
+                  <p className="text-red-500 font-medium">Impossible d'afficher les livrables</p>
+                  <p className="text-sm text-red-400">
+                    {!teamDetailsData ? "Données de l'équipe non disponibles" : ""}
+                    {!selectedProgram ? "Programme non sélectionné" : ""}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Affichage des livrables disponibles (ancienne implémentation) */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Livrables disponibles</CardTitle>
+              <p className="text-sm text-gray-500">
+                Liste des livrables que l'équipe doit soumettre pour cette phase.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {getPhaseDeliverables().length > 0 ? getPhaseDeliverables().map((deliverable: any) => (
+                  <Card key={deliverable.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle>{deliverable.name}</CardTitle>
+                        <p className="text-sm text-gray-500">{deliverable.description}</p>
+                      </div>
+                      <Badge className={getDeliverableStatusColor(deliverable.status)}>
+                        {deliverable.status.toUpperCase()}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1 text-sm">
+                          <div>Due: {deliverable.dueDate}</div>
+                          {deliverable.submittedDate && (
+                            <div>Submitted: {deliverable.submittedDate}</div>
+                          )}
+                          {deliverable.score && (
+                            <div>Score: {deliverable.score}%</div>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          {deliverable.fileUrl && (
+                            <a href={deliverable.fileUrl} download style={{ backgroundColor: 'white', color: '#e43e32', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem', textDecoration: 'none' }}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500">Aucun livrable disponible pour la phase <span className="font-medium">{selectedPhase}</span>.</p>
                   </div>
-                </CardContent>
-              </Card>
-            )) : (
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <p className="text-gray-500">Aucun livrable disponible pour la phase <span className="font-medium">{selectedPhase}</span>.</p>
+                )}
               </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="evaluation">
