@@ -75,98 +75,6 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Get today's date for comparison
   const today = new Date().toISOString().split('T')[0];
 
-  // Load tasks for the selected program
-  const loadProgramTasks = async (programId: string) => {
-    try {
-      // Convert programId to number if needed
-      const programIdNumber = parseInt(programId);
-      if (isNaN(programIdNumber)) {
-        console.error('Invalid program ID:', programId);
-        return;
-      }
-
-      // Fetch tasks from the backend
-      const response = await fetch(`http://localhost:8083/api/taches/programme/${programIdNumber}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        },
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tasks: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      // Map backend tasks to frontend format
-      const mappedTasks: Task[] = data.map((task: any) => ({
-        id: String(task.id),
-        title: task.nom || task.title || 'Tâche sans titre',
-        description: task.description || '',
-        dueDate: task.date_echeance || new Date().toISOString().split('T')[0],
-        status: task.status === 'completed' ? 'completed' : 
-                task.status === 'in_progress' ? 'in_progress' : 'todo',
-        priority: task.priorite || 'medium',
-        assignee: task.assignee || 'Non assigné',
-        phaseId: String(task.phase_id),
-        phaseName: task.phase_name || 'Phase inconnue',
-        tags: task.tags || [],
-        isOverdue: task.is_overdue || false,
-        programId: String(programId),
-        forAllTeams: task.for_all_teams || false
-      }));
-
-      setTasks(mappedTasks);
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-      // For now, use mock data
-      const mockTasks: Task[] = [
-        {
-          id: '1',
-          title: 'Tâche 1',
-          description: 'Description de la tâche 1',
-          dueDate: '2024-03-20',
-          status: 'todo',
-          priority: 'high',
-          assignee: 'John Doe',
-          phaseId: 'phase-1',
-          phaseName: 'Application',
-          tags: ['important'],
-          isOverdue: false,
-          programId: programId,
-          forAllTeams: true
-        },
-        {
-          id: '2',
-          title: 'Tâche 2',
-          description: 'Description de la tâche 2',
-          dueDate: '2024-03-25',
-          status: 'in_progress',
-          priority: 'medium',
-          assignee: 'Jane Smith',
-          phaseId: 'phase-2',
-          phaseName: 'Selection',
-          tags: ['urgent'],
-          isOverdue: false,
-          programId: programId,
-          forAllTeams: false
-        }
-      ];
-      setTasks(mockTasks);
-    }
-  };
-
-  // Load tasks when selected program changes
-  useEffect(() => {
-    if (selectedProgramId) {
-      loadProgramTasks(selectedProgramId);
-    } else {
-      setTasks([]);
-    }
-  }, [selectedProgramId]);
-
   // Sync selectedPhase with selectedPhaseId from ProgramContext
   useEffect(() => {
     if (selectedPhaseId) {
@@ -581,18 +489,14 @@ export const TasksProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Function to create a new task
   const createTask = (task: Omit<Task, 'id'>): string => {
-    if (!selectedProgramId) {
-      throw new Error('No program selected');
-    }
-
+    const newTaskId = uuidv4();
     const newTask: Task = {
       ...task,
-      id: uuidv4(),
-      programId: selectedProgramId
+      id: newTaskId
     };
 
     setTasks(prevTasks => [...prevTasks, newTask]);
-    return newTask.id;
+    return newTaskId;
   };
 
   // Function to add multiple tasks at once

@@ -81,7 +81,9 @@ const Sidebar = () => {
       return role === 'startup' ? '/startup/tasks' : '/particulier/tasks';
     };
 
-    
+    const getAnalyticsPath = () => {
+      return '/startup/analytics';
+    };
 
     const getFeedPath = () => {
       const role = localStorage.getItem('role');
@@ -117,7 +119,7 @@ const Sidebar = () => {
                 to={getDashboardPath()}
               >
                 <div className="icon"><FaTachometerAlt /></div>
-                <span>Tableau de bord</span>
+                <span>Dashboard</span>
               </Link>
 
               <Link
@@ -125,7 +127,7 @@ const Sidebar = () => {
                 to={getMeetingsPath()}
               >
                 <div className="icon"><FaCalendarAlt /></div>
-                <span>Réunions</span>
+                <span>Meeting</span>
               </Link>
 
               <Link
@@ -149,10 +151,19 @@ const Sidebar = () => {
                 to={getTasksPath()}
               >
                 <div className="icon"><FaRocket /></div>
-                <span>Taches</span>
+                <span>Tasks</span>
               </Link>
 
-            
+              {/* Afficher Analytics seulement pour les startups */}
+              {localStorage.getItem('role') === 'startup' && (
+                <Link
+                  className={`nav-item ${isActive('/startup/analytics') ? 'active' : ''}`}
+                  to={getAnalyticsPath()}
+                >
+                  <div className="icon"><FaChartBar /></div>
+                  <span>Analytics</span>
+                </Link>
+              )}
 
               <Link
                 className={`nav-item ${isActive('/startup/feed') || isActive('/particulier/feed') ? 'active' : ''}`}
