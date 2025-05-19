@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getProgramTeams, getTeamCurrentPhase, ensureTeamHasPhase, BackendTeam, BackendStartup } from '@/services/teamService';
 import { moveToPhase } from '@/services/phaseService';
 import { getPhases } from '@/services/programService';
+import { declareWinner, getProgramWinner } from '@/services/winnerService';
 
 interface TeamMember {
   id: number;
@@ -355,37 +356,68 @@ const TeamsPage = () => {
   };
 
   // Fonction pour sélectionner un gagnant
-  const handleSelectWinner = (teamId: number | string) => {
+  const handleSelectWinner = async (teamId: number | string) => {
     // Trouver l'équipe sélectionnée comme gagnante
     const winningTeam = allStartups.find(startup => startup.id === teamId);
 
-    if (winningTeam) {
-      setWinner(teamId);
-      setSelectedWinner(winningTeam);
+    if (winningTeam && selectedProgramId) {
+      try {
+        // Récupérer les phases du programme
+        const phases = await getPhases(selectedProgramId);
 
-      // Mettre à jour le statut de l'équipe gagnante
-      const updatedStartups = allStartups.map(startup =>
-        startup.id === teamId ? { ...startup, status: 'completed' as const } : startup
-      );
+        // Trouver la dernière phase du programme
+        const lastPhase = phases[phases.length - 1];
+        if (!lastPhase) {
+          toast({
+            title: "Erreur",
+            description: "Impossible de trouver la dernière phase du programme.",
+            variant: "destructive"
+          });
+          return;
+        }
 
-      // Mettre à jour localStorage si l'équipe modifiée est une équipe locale
-      const isLocalStartup = localStartups.some(s => s.id === teamId);
-      if (isLocalStartup) {
-        const updatedLocalStartups = localStartups.map(startup =>
+        console.log(`Declaring team ${teamId} as winner of phase ${lastPhase.id} (${lastPhase.nom})`);
+
+        // Appeler l'API pour déclarer le gagnant
+        await declareWinner(lastPhase.id, teamId);
+
+        setWinner(teamId);
+        setSelectedWinner(winningTeam);
+
+        // Mettre à jour le statut de l'équipe gagnante
+        const updatedStartups = allStartups.map(startup =>
           startup.id === teamId ? { ...startup, status: 'completed' as const } : startup
         );
-        setLocalStartups(updatedLocalStartups);
-        localStorage.setItem('startups', JSON.stringify(updatedLocalStartups));
+
+        // Mettre à jour localStorage si l'équipe modifiée est une équipe locale
+        const isLocalStartup = localStartups.some(s => s.id === teamId);
+        if (isLocalStartup) {
+          const updatedLocalStartups = localStartups.map(startup =>
+            startup.id === teamId ? { ...startup, status: 'completed' as const } : startup
+          );
+          setLocalStartups(updatedLocalStartups);
+          localStorage.setItem('startups', JSON.stringify(updatedLocalStartups));
+        }
+
+        // Afficher une notification
+        toast({
+          title: "Gagnant sélectionné",
+          description: `${winningTeam.name} a été déclaré gagnant du programme.`,
+        });
+
+        // Ouvrir le dialogue de félicitations
+        setWinnerDialogOpen(true);
+
+        // Invalider le cache pour forcer un rechargement des données
+        window.dispatchEvent(new Event('storage'));
+      } catch (error) {
+        console.error("Error declaring winner:", error);
+        toast({
+          title: "Erreur",
+          description: "Une erreur est survenue lors de la déclaration du gagnant.",
+          variant: "destructive"
+        });
       }
-
-      // Afficher une notification
-      toast({
-        title: "Gagnant sélectionné",
-        description: `${winningTeam.name} a été sélectionné comme gagnant du programme.`,
-      });
-
-      // Ouvrir le dialogue de félicitations
-      setWinnerDialogOpen(true);
     }
   };
 
@@ -725,6 +757,7 @@ const TeamsPage = () => {
           onOpenChange={setWinnerDialogOpen}
           teamName={selectedWinner.name}
           programName={selectedProgram?.name || ""}
+          isAdmin={true}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import ParticulierHeader from "./ParticulierHeader";
 import { useLocation } from "wouter";
 import "../../styles/userStyles.css";
 import TeamNotificationHandler from "@/components/notification/TeamNotificationHandler";
+import WinnerNotificationHandler from "@/components/notification/WinnerNotificationHandler";
 
 interface ParticulierLayoutProps {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ const ParticulierLayout: React.FC<ParticulierLayoutProps> = ({ children }) => {
       <ParticulierHeader onToggleSidebar={toggleSidebar} />
       {children}
       <TeamNotificationHandler />
+      <WinnerNotificationHandler />
     </div>
   );
 };

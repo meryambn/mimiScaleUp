@@ -19,6 +19,11 @@ export interface ApplicationSubmission {
   submittedAt: string;
   formData: Record<string, any>;
   role?: 'startup' | 'particulier' | 'mentor' | string;
+  teamInfo?: {
+    id: number;
+    name: string;
+    type: 'team' | 'individual';
+  };
 }
 
 interface ApplicationSubmissionCardProps {
@@ -74,6 +79,14 @@ const ApplicationSubmissionCard: React.FC<ApplicationSubmissionCardProps> = ({
               {getRoleBadge(submission.role)}
               {getStatusBadge(submission.status)}
             </div>
+            {/* Only show team membership for actual teams */}
+            {submission.status === 'approved' &&
+             submission.teamInfo &&
+             submission.teamInfo.type === 'team' && (
+              <div className="mt-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-md">
+                Membre de l'équipe "{submission.teamInfo.name}"
+              </div>
+            )}
           </div>
         </div>
         <div className="text-sm text-muted-foreground">

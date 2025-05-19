@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
-import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasPhase } from '@/services/teamService';
+import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasPhase, checkIfTeamIsWinner } from '@/services/teamService';
 import { moveToPhase } from '@/services/phaseService';
-import { getPhases } from '@/services/programService';
+import { getPhases, getEvaluationCriteriaByPhaseName } from '@/services/programService';
+import { declareWinner } from '@/services/winnerService';
 
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +55,7 @@ const StartupDetailPage = () => {
   const [isWinner, setIsWinner] = useState(false);
   const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
   const [selectedPhase, setSelectedPhase] = useState<string>("");
+  const [userSelectedPhase, setUserSelectedPhase] = useState<boolean>(false);
   const { selectedProgram } = useProgramContext();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -79,6 +81,33 @@ const StartupDetailPage = () => {
   const selectedProgramId = React.useMemo(() => {
     return selectedProgram?.id || teamDetailsData?.programme_id || null;
   }, [selectedProgram, teamDetailsData]);
+
+  // Fetch evaluation criteria for the selected phase
+  const { data: phaseCriteria, isLoading: isLoadingCriteria } = useQuery({
+    queryKey: ['phase-criteria', selectedProgramId, selectedPhase],
+    queryFn: async () => {
+      if (!selectedProgramId || !selectedPhase) return [];
+      return getEvaluationCriteriaByPhaseName(selectedProgramId, selectedPhase);
+    },
+    enabled: !!selectedProgramId && !!selectedPhase,
+    staleTime: 30000, // 30 seconds
+  });
+
+  // Check if the team is a winner
+  useQuery({
+    queryKey: ['team-winner-status', id, selectedProgramId],
+    queryFn: async () => {
+      if (!id || !selectedProgramId) return false;
+      const isWinner = await checkIfTeamIsWinner(id, selectedProgramId);
+      if (isWinner) {
+        console.log(`Team ${id} is a winner, updating UI`);
+        setIsWinner(true);
+      }
+      return isWinner;
+    },
+    enabled: !!id && !!selectedProgramId,
+    staleTime: 30000, // 30 seconds
+  });
 
   // Charger les données de l'équipe depuis localStorage
   const loadStartupFromLocalStorage = React.useCallback(() => {
@@ -129,8 +158,10 @@ const StartupDetailPage = () => {
 
             localStorage.setItem('startups', JSON.stringify(parsedStartups));
 
-            // Update the selected phase
-            setSelectedPhase(phaseData.nom);
+            // Update the selected phase only if the user hasn't manually selected a phase
+            if (!userSelectedPhase) {
+              setSelectedPhase(phaseData.nom);
+            }
 
             // If we have a local startup, update its phase
             if (localStartup) {
@@ -296,21 +327,29 @@ const StartupDetailPage = () => {
       setFeedback(startup.feedback);
     }
 
-    // Vérifier si l'équipe est déjà marquée comme gagnante
+    // Vérifier si l'équipe est déjà marquée comme gagnante dans les données locales
+    // Note: This is a fallback, the backend check will override this if needed
     if (startup?.status === 'completed') {
       setIsWinner(true);
     }
 
     // Initialiser la phase sélectionnée avec la phase actuelle de l'équipe
-    if (startup?.currentPhase) {
+    if (startup?.currentPhase && !selectedPhase && !userSelectedPhase) {
+      console.log(`Setting initial selected phase to current phase: ${startup.currentPhase}`);
       setSelectedPhase(startup.currentPhase);
     }
   }, [startup]);
 
+  // Track changes to selectedPhase
+  React.useEffect(() => {
+    console.log(`Selected phase changed to: ${selectedPhase}`);
+    // When selectedPhase changes, we should refetch the criteria
+  }, [selectedPhase]);
+
   // Écouter les événements de changement de phase
   React.useEffect(() => {
     const handlePhaseChange = (event: CustomEvent) => {
-      const { teamId, newPhase } = event.detail;
+      const { teamId } = event.detail;
 
       // Vérifier si c'est cette équipe qui a changé de phase
       if (String(teamId) === id) {
@@ -373,17 +412,15 @@ const StartupDetailPage = () => {
   }, [id]);
 
   // Vérifier si l'équipe est dans la dernière phase et si cette phase a un gagnant
-  const isInFinalPhase = React.useMemo(() => {
+  // This is used in the UI to determine if the "Select as Winner" button should be shown
+  const isInLastPhase = React.useMemo(() => {
     if (!selectedProgram || !startup) return false;
 
     // Obtenir la dernière phase du programme
     const lastPhase = selectedProgram.phases[selectedProgram.phases.length - 1];
 
     // Vérifier si l'équipe est dans la dernière phase
-    const isInLastPhase = startup.currentPhase.toLowerCase().includes(lastPhase.name.toLowerCase());
-
-    // Vérifier si la dernière phase a un gagnant
-    return isInLastPhase && lastPhase.hasWinner;
+    return startup.currentPhase.toLowerCase().includes(lastPhase.name.toLowerCase());
   }, [selectedProgram, startup]);
 
   // Effet pour afficher les données de débogage et mettre à jour le nom de l'équipe
@@ -417,43 +454,71 @@ const StartupDetailPage = () => {
   }, [programTeamData, localStartup]);
 
   // Fonction pour sélectionner l'équipe comme gagnante
-  const handleSelectWinner = () => {
+  const handleSelectWinner = async () => {
     if (!startup || !selectedProgram) return;
 
-    // Mettre à jour l'état local
-    setIsWinner(true);
-
-    // Mettre à jour le statut de l'équipe dans localStorage
     try {
-      const storedStartups = localStorage.getItem('startups');
-      if (storedStartups) {
-        const parsedStartups = JSON.parse(storedStartups);
-        if (Array.isArray(parsedStartups)) {
-          const updatedStartups = parsedStartups.map(s =>
-            String(s.id) === id ? { ...s, status: 'completed' } : s
-          );
-          localStorage.setItem('startups', JSON.stringify(updatedStartups));
+      // Trouver la dernière phase du programme
+      const lastPhase = selectedProgram.phases[selectedProgram.phases.length - 1];
+      if (!lastPhase) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de trouver la dernière phase du programme.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-          // Mettre à jour l'équipe locale
-          if (localStartup) {
-            setLocalStartup({ ...localStartup, status: 'completed' });
-          }
-        }
+      // Récupérer les phases du backend pour obtenir l'ID de la phase
+      const backendPhases = await getPhases(selectedProgram.id);
+
+      // Trouver la phase correspondante dans le backend
+      const backendPhase = backendPhases.find(phase =>
+        phase.nom.toLowerCase() === lastPhase.name.toLowerCase() ||
+        phase.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+        lastPhase.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      );
+
+      if (!backendPhase) {
+        console.error(`Phase "${lastPhase.name}" not found in backend phases`);
+        toast({
+          title: "Erreur",
+          description: `Phase "${lastPhase.name}" introuvable dans ce programme.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log(`Found backend phase: ${backendPhase.nom} (ID: ${backendPhase.id})`);
+
+      // Appeler l'API pour déclarer le gagnant
+      if (backendPhase.id && id) {
+        await declareWinner(backendPhase.id, id);
+      } else {
+        throw new Error("Missing phase ID or team ID for declaring winner");
+      }
+
+      // Mettre à jour l'état local
+      setIsWinner(true);
+
+      // Mettre à jour l'équipe locale
+      if (localStartup) {
+        setLocalStartup({ ...localStartup, status: 'completed' });
       }
 
       // Afficher une notification
       toast({
         title: "Gagnant sélectionné",
-        description: `${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"} a été sélectionné comme gagnant du programme.`,
+        description: `${programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"} a été déclaré gagnant du programme.`,
       });
 
       // Ouvrir le dialogue de félicitations
       setWinnerDialogOpen(true);
     } catch (error) {
-      console.error("Error updating startup in localStorage:", error);
+      console.error("Error declaring winner:", error);
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de la sélection du gagnant.",
+        description: "Une erreur est survenue lors de la déclaration du gagnant.",
         variant: "destructive"
       });
     }
@@ -526,12 +591,16 @@ const StartupDetailPage = () => {
         console.log(`Found backend phase: ${backendPhase.nom} (ID: ${backendPhase.id})`);
 
         // Appeler l'API pour déplacer l'équipe vers la nouvelle phase
-        await moveToPhase({
-          entiteType: 'equipe',
-          entiteId: id,
-          phaseNextId: backendPhase.id,
-          programmeId: selectedProgram.id
-        });
+        if (id && backendPhase.id && selectedProgram.id) {
+          await moveToPhase({
+            entiteType: 'equipe',
+            entiteId: id,
+            phaseNextId: backendPhase.id,
+            programmeId: selectedProgram.id
+          });
+        } else {
+          throw new Error("Missing required IDs for moving team to next phase");
+        }
 
         console.log(`Successfully moved team ${id} to phase ${backendPhase.nom} (ID: ${backendPhase.id})`);
 
@@ -875,52 +944,89 @@ const StartupDetailPage = () => {
     return 'star_rating'; // Par défaut
   };
 
-  // Fonction pour filtrer les critères d'évaluation en fonction de la phase sélectionnée
+  // Fonction pour obtenir les critères d'évaluation en fonction de la phase sélectionnée
   const getPhaseCriteria = () => {
-    if (!startup?.evaluationCriteria || !Array.isArray(startup.evaluationCriteria)) {
-      return [];
+    // Si nous avons des critères du backend, les utiliser en priorité
+    if (phaseCriteria && Array.isArray(phaseCriteria) && phaseCriteria.length > 0) {
+      console.log('Using backend criteria for phase:', selectedPhase);
+      console.log('Backend criteria:', phaseCriteria);
+
+      // Transformer les critères du backend au format attendu par l'interface
+      const formattedCriteria = phaseCriteria.map((criterion: any) => {
+        // Mapper le type du backend au type attendu par l'interface
+        let type = 'star_rating';
+        if (criterion.type === 'numerique') type = 'numeric';
+        else if (criterion.type === 'etoiles') type = 'star_rating';
+        else if (criterion.type === 'oui_non') type = 'yes_no';
+        else if (criterion.type === 'liste_deroulante') type = 'liste_deroulante';
+
+        return {
+          id: criterion.id,
+          name: criterion.nom_critere || 'Critère sans nom',
+          weight: criterion.poids || 10,
+          score: criteriaScores[criterion.id] || 0,
+          phase: selectedPhase,
+          type: type,
+          // Initialiser les valeurs spécifiques au type
+          booleanValue: (type === 'yesno' || type === 'yes_no') ? false : undefined,
+          numericValue: type === 'numeric' ? 0 : undefined,
+          textValue: type === 'liste_deroulante' ? '' : undefined,
+          // Initialiser les champs de validation
+          filledByTeam: criterion.rempli_par === 'equipes',
+          accessible_mentors: criterion.accessible_mentors || false,
+          accessible_equipes: criterion.accessible_equipes || false,
+          validated: false,
+          requiresValidation: criterion.necessite_validation || false
+        };
+      });
+
+      console.log('Formatted backend criteria:', formattedCriteria);
+      return formattedCriteria;
     }
 
-    // Filtrer les critères par phase sélectionnée
-    let criteria = [];
-    if (selectedPhase) {
-      criteria = startup.evaluationCriteria.filter((criterion: any) => criterion.phase === selectedPhase);
-    } else if (startup.currentPhase) {
-      // Si aucune phase n'est sélectionnée, retourner les critères de la phase actuelle
-      criteria = startup.evaluationCriteria.filter((criterion: any) => criterion.phase === startup.currentPhase);
-    } else {
-      // Par défaut, retourner tous les critères
-      criteria = startup.evaluationCriteria;
-    }
+    // Fallback: utiliser les critères du localStorage si disponibles
+    if (startup?.evaluationCriteria && Array.isArray(startup.evaluationCriteria)) {
+      console.log('Using localStorage criteria as fallback');
 
-    // Initialiser les valeurs pour chaque critère sans forcer le type
-    criteria = criteria.map((criterion: any) => {
-      // Utiliser le type existant du critère
-      const type = criterion.type || 'star_rating'; // Par défaut, utiliser star_rating
+      // Filtrer les critères par phase sélectionnée
+      let criteria = [];
+      if (selectedPhase) {
+        criteria = startup.evaluationCriteria.filter((criterion: any) => criterion.phase === selectedPhase);
+      } else if (startup.currentPhase) {
+        // Si aucune phase n'est sélectionnée, retourner les critères de la phase actuelle
+        criteria = startup.evaluationCriteria.filter((criterion: any) => criterion.phase === startup.currentPhase);
+      } else {
+        // Par défaut, retourner tous les critères
+        criteria = startup.evaluationCriteria;
+      }
 
-      // Initialiser les valeurs spécifiques au type si elles n'existent pas
-      return {
-        ...criterion,
-        // Assurer que le type est préservé
-        type: type,
+      // Initialiser les valeurs pour chaque critère sans forcer le type
+      criteria = criteria.map((criterion: any) => {
+        // Utiliser le type existant du critère
+        const type = criterion.type || 'star_rating'; // Par défaut, utiliser star_rating
+
         // Initialiser les valeurs spécifiques au type si elles n'existent pas
-        booleanValue: (type === 'yesno' || type === 'yes_no') ? (criterion.booleanValue !== undefined ? criterion.booleanValue : false) : undefined,
-        numericValue: type === 'numeric' ? (criterion.numericValue !== undefined ? criterion.numericValue : 0) : undefined,
-        textValue: type === 'liste_deroulante' ? (criterion.textValue !== undefined ? criterion.textValue : '') : undefined,
-        // Initialiser les champs de validation
-        filledByTeam: criterion.filledByTeam !== undefined ? criterion.filledByTeam : Math.random() > 0.5, // Simulation: certains critères sont remplis par l'équipe
-        validated: criterion.validated !== undefined ? criterion.validated : false,
-        requiresValidation: criterion.requiresValidation !== undefined ? criterion.requiresValidation : true
-      };
-    });
+        return {
+          ...criterion,
+          // Assurer que le type est préservé
+          type: type,
+          // Initialiser les valeurs spécifiques au type si elles n'existent pas
+          booleanValue: (type === 'yesno' || type === 'yes_no') ? (criterion.booleanValue !== undefined ? criterion.booleanValue : false) : undefined,
+          numericValue: type === 'numeric' ? (criterion.numericValue !== undefined ? criterion.numericValue : 0) : undefined,
+          textValue: type === 'liste_deroulante' ? (criterion.textValue !== undefined ? criterion.textValue : '') : undefined,
+          // Initialiser les champs de validation
+          filledByTeam: criterion.filledByTeam !== undefined ? criterion.filledByTeam : Math.random() > 0.5, // Simulation: certains critères sont remplis par l'équipe
+          validated: criterion.validated !== undefined ? criterion.validated : false,
+          requiresValidation: criterion.requiresValidation !== undefined ? criterion.requiresValidation : true
+        };
+      });
 
-    // Afficher les critères dans la console pour déboguer
-    console.log('Critères filtrés avec types préservés:', criteria);
-    criteria.forEach((criterion: any) => {
-      console.log(`Critère ${criterion.id} - ${criterion.name} - Type: ${criterion.type}`);
-    });
+      console.log('Fallback criteria:', criteria);
+      return criteria;
+    }
 
-    return criteria;
+    // Si aucune source de critères n'est disponible, retourner un tableau vide
+    return [];
   };
 
   return (
@@ -975,7 +1081,7 @@ const StartupDetailPage = () => {
             />
             {!isMentor && (
               <>
-                {isInFinalPhase && !isWinner ? (
+                {isInLastPhase && !isWinner ? (
                   <button
                     style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
                     onClick={handleSelectWinner}
@@ -1050,7 +1156,11 @@ const StartupDetailPage = () => {
                           } ${
                             phase.name === startup.currentPhase ? 'border-b-4 border-white' : ''
                           }`}
-                          onClick={() => setSelectedPhase(phase.name)}
+                          onClick={() => {
+                            console.log(`Selecting phase: ${phase.name}`);
+                            setUserSelectedPhase(true); // Mark that user has manually selected a phase
+                            setSelectedPhase(phase.name);
+                          }}
                         >
                           {phase.name}
                           {phase.name === startup.currentPhase && (
@@ -1115,7 +1225,7 @@ const StartupDetailPage = () => {
                     ))
                   ) : startup.members ? (
                     // For teams created from submissions
-                    startup.members.map((member: any, index: number) => (
+                    startup.members.map((member: any) => (
                       <div key={member.id} className="flex justify-between text-sm">
                         <span>{member.name}</span>
                         <span className="text-gray-500">{member.email}</span>
@@ -1135,8 +1245,35 @@ const StartupDetailPage = () => {
             <p className="text-sm text-gray-700">
               Livrables pour la phase: <span className="font-medium">{selectedPhase}</span>
             </p>
-            <div className="text-xs text-gray-500">
-              Pour changer de phase, utilisez la timeline dans l'onglet <span className="font-medium">Aperçu</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-gray-500">Changer de phase:</span>
+              <select
+                className="text-xs border rounded p-1"
+                value={selectedPhase}
+                onChange={(e) => {
+                  console.log(`Selecting phase from dropdown: ${e.target.value}`);
+                  setUserSelectedPhase(true); // Mark that user has manually selected a phase
+                  setSelectedPhase(e.target.value);
+                }}
+              >
+                {selectedProgram?.phases.map((phase, index) => (
+                  <option key={index} value={phase.name}>
+                    {phase.name} {phase.name === startup.currentPhase ? '(Actuelle)' : ''}
+                  </option>
+                ))}
+              </select>
+              {userSelectedPhase && selectedPhase !== startup?.currentPhase && (
+                <button
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => {
+                    setUserSelectedPhase(false);
+                    setSelectedPhase(startup.currentPhase);
+                    console.log(`Reset to current phase: ${startup.currentPhase}`);
+                  }}
+                >
+                  Revenir à la phase actuelle
+                </button>
+              )}
             </div>
           </div>
           <div className="space-y-4">
@@ -1189,13 +1326,44 @@ const StartupDetailPage = () => {
                   <CardTitle>Team Evaluation</CardTitle>
                   <p className="text-sm text-gray-500">Overall assessment of the team's performance for phase: <span className="font-medium">{selectedPhase}</span></p>
                 </div>
-                <div className="text-xs text-gray-500">
-                  Pour changer de phase, utilisez la timeline dans l'onglet <span className="font-medium">Aperçu</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">Changer de phase:</span>
+                  <select
+                    className="text-xs border rounded p-1"
+                    value={selectedPhase}
+                    onChange={(e) => {
+                      console.log(`Selecting phase from dropdown: ${e.target.value}`);
+                      setUserSelectedPhase(true); // Mark that user has manually selected a phase
+                      setSelectedPhase(e.target.value);
+                    }}
+                  >
+                    {selectedProgram?.phases.map((phase, index) => (
+                      <option key={index} value={phase.name}>
+                        {phase.name} {phase.name === startup.currentPhase ? '(Actuelle)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {userSelectedPhase && selectedPhase !== startup?.currentPhase && (
+                    <button
+                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => {
+                        setUserSelectedPhase(false);
+                        setSelectedPhase(startup.currentPhase);
+                        console.log(`Reset to current phase: ${startup.currentPhase}`);
+                      }}
+                    >
+                      Revenir à la phase actuelle
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {getPhaseCriteria().length > 0 ? (
+              {isLoadingCriteria ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Chargement des critères d'évaluation...</p>
+                </div>
+              ) : getPhaseCriteria().length > 0 ? (
                 <div className="space-y-6">
                   {getPhaseCriteria().map((criterion: any) => (
                     <div key={criterion.id} className="space-y-2">
@@ -1341,7 +1509,7 @@ const StartupDetailPage = () => {
                                 <option value="">Sélectionnez une option...</option>
                                 {criterion.options && criterion.options.length > 0 ? (
                                   // Afficher les options personnalisées si elles existent
-                                  criterion.options.map((option, index) => (
+                                  criterion.options.map((option: string, index: number) => (
                                     <option key={index} value={option}>{option}</option>
                                   ))
                                 ) : (
@@ -1490,6 +1658,7 @@ const StartupDetailPage = () => {
         onOpenChange={setWinnerDialogOpen}
         teamName={programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"}
         programName={selectedProgram?.name || ""}
+        isAdmin={true}
       />
     </div>
   );

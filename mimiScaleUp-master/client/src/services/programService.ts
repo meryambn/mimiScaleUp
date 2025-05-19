@@ -1081,6 +1081,49 @@ export async function getCriteres(phaseId: number | string): Promise<any[]> {
 }
 
 /**
+ * Get evaluation criteria for a phase by phase name
+ * @param programId The ID of the program
+ * @param phaseName The name of the phase
+ * @returns A promise with the evaluation criteria data
+ */
+export async function getEvaluationCriteriaByPhaseName(programId: number | string, phaseName: string): Promise<any[]> {
+  try {
+    console.log(`Getting evaluation criteria for phase "${phaseName}" in program ${programId}`);
+
+    // Step 1: Get all phases for the program
+    const phases = await getPhases(programId);
+
+    if (!phases || phases.length === 0) {
+      console.log(`No phases found for program ${programId}`);
+      return [];
+    }
+
+    // Step 2: Find the phase with the matching name
+    const matchingPhase = phases.find(phase =>
+      phase.nom.toLowerCase() === phaseName.toLowerCase() ||
+      phase.nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ===
+      phaseName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    );
+
+    if (!matchingPhase) {
+      console.log(`No phase found with name "${phaseName}" in program ${programId}`);
+      return [];
+    }
+
+    console.log(`Found matching phase: ${matchingPhase.nom} (ID: ${matchingPhase.id})`);
+
+    // Step 3: Get the criteria for the matching phase
+    const criteria = await getCriteres(matchingPhase.id);
+
+    console.log(`Retrieved ${criteria.length} evaluation criteria for phase "${phaseName}"`);
+    return criteria;
+  } catch (error) {
+    console.error(`Exception during getting evaluation criteria for phase "${phaseName}":`, error);
+    return [];
+  }
+}
+
+/**
  * Create a livrable (deliverable) for a phase
  * @param phaseId The ID of the phase
  * @param livrableData The livrable data to create

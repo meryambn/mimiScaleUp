@@ -16,13 +16,15 @@ interface WinnerDialogProps {
   onOpenChange: (open: boolean) => void;
   teamName: string;
   programName: string;
+  isAdmin?: boolean;
 }
 
 const WinnerDialog: React.FC<WinnerDialogProps> = ({
   open,
   onOpenChange,
   teamName,
-  programName
+  programName,
+  isAdmin = false
 }) => {
   // Lancer des confettis lorsque le dialogue s'ouvre
   React.useEffect(() => {
@@ -46,12 +48,20 @@ const WinnerDialog: React.FC<WinnerDialogProps> = ({
           </div>
           <DialogTitle className="text-center text-xl">Félicitations!</DialogTitle>
           <DialogDescription className="text-center">
-            <p className="text-lg font-semibold mt-2 text-amber-600">
-              {teamName}
-            </p>
-            <p className="mt-2">
-              a été sélectionné comme gagnant du programme
-            </p>
+            {isAdmin ? (
+              <>
+                <p className="text-lg font-semibold mt-2 text-amber-600">
+                  {teamName}
+                </p>
+                <p className="mt-2">
+                  a été sélectionné comme gagnant du programme
+                </p>
+              </>
+            ) : (
+              <p className="text-lg mt-2">
+                Votre {teamName.includes('équipe') ? 'équipe' : 'startup'} a gagné le programme
+              </p>
+            )}
             <p className="text-lg font-semibold mt-1 mb-2">
               {programName}
             </p>
@@ -59,7 +69,10 @@ const WinnerDialog: React.FC<WinnerDialogProps> = ({
         </DialogHeader>
         <div className="bg-amber-50 p-4 rounded-md my-4">
           <p className="text-sm text-amber-800">
-            Cette équipe sera mise en avant dans le tableau de bord du programme et recevra un badge spécial "Gagnant" sur sa page de profil.
+            {isAdmin
+              ? "Cette équipe sera mise en avant dans le tableau de bord du programme et recevra un badge spécial \"Gagnant\" sur sa page de profil."
+              : "Votre profil sera mis en avant dans le tableau de bord du programme et recevra un badge spécial \"Gagnant\"."
+            }
           </p>
         </div>
         <DialogFooter className="sm:justify-center">

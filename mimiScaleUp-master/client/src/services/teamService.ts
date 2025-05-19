@@ -192,15 +192,45 @@ export async function addSubmissionAsTeam(
 export async function addSubmissionToProgram(
   submissionId: string | number,
   programId: string | number,
-  assignToPhase: boolean = true
+  assignToPhase: boolean = true,
+  startupName?: string
 ): Promise<AddToProgramResponse> {
   console.log('Adding submission to program:', submissionId);
   console.log('Program ID:', programId);
 
+  // If no startup name was provided, try to get it from the submission data
+  if (!startupName) {
+    try {
+      // Try to get the startup name from the application submissions
+      const { getSubmissionsByProgram } = await import('@/services/formService');
+      const submissionsResult = await getSubmissionsByProgram(programId);
+
+      if (submissionsResult && submissionsResult.submissions) {
+        const submission = submissionsResult.submissions.find(
+          (s: any) => String(s.id) === String(submissionId)
+        );
+
+        if (submission && submission.teamName && submission.teamName !== 'utilisateur') {
+          console.log(`Found submission name: ${submission.teamName} for ID: ${submissionId}`);
+          startupName = submission.teamName;
+        } else if (submission && submission.teamEmail) {
+          // Use email username as fallback
+          const emailUsername = submission.teamEmail.split('@')[0];
+          console.log(`Using email username as startup name: ${emailUsername} for ID: ${submissionId}`);
+          startupName = emailUsername;
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching startup name:`, error);
+    }
+  }
+
   // Create the request data
   const requestData = {
     soumissionId: submissionId,
-    programmeId: programId
+    programmeId: programId,
+    // Include the startup name if we have it
+    ...(startupName && { nom_entreprise: startupName })
   };
 
   console.log('Sending data to backend:', requestData);
@@ -625,5 +655,110 @@ export async function getTeamFromProgram(programId: string | number, teamId: str
   } catch (error) {
     console.error('Error finding team in program:', error);
     return null;
+  }
+}
+
+/**
+ * Checks if a submission has been accepted and updates its status to 'approved'
+ * @param submissionId The ID of the submission to check
+ * @param programId The ID of the program
+ * @returns A promise that resolves to an object with acceptance status and team information
+ */
+export async function checkSubmissionAccepted(
+  submissionId: string | number,
+  programId: string | number
+): Promise<{
+  accepted: boolean;
+  teamInfo?: {
+    id: number;
+    name: string;
+    type: 'team' | 'individual';
+  }
+}> {
+  console.log(`Checking if submission ${submissionId} has been accepted in program ${programId}`);
+
+  try {
+    // Get all teams and individual startups for the program
+    const programTeams = await getProgramTeams(programId);
+
+    // Check if the submission is in any team
+    const teamWithSubmission = programTeams.equipes.find(team =>
+      team.membres && team.membres.some(membreId => String(membreId) === String(submissionId))
+    );
+
+    if (teamWithSubmission) {
+      console.log(`Submission ${submissionId} is part of team ${teamWithSubmission.nom_equipe} (ID: ${teamWithSubmission.id})`);
+      return {
+        accepted: true,
+        teamInfo: {
+          id: teamWithSubmission.id,
+          name: teamWithSubmission.nom_equipe,
+          type: 'team'
+        }
+      };
+    }
+
+    // Check if the submission is an individual startup in the program
+    const individualStartup = programTeams.startups_individuelles.find(
+      startup => String(startup.id) === String(submissionId)
+    );
+
+    if (individualStartup) {
+      console.log(`Submission ${submissionId} is an individual startup: ${individualStartup.nom}`);
+      // For individual startups, we don't include teamInfo
+      return {
+        accepted: true
+        // No teamInfo for individual startups
+      };
+    }
+
+    // If we get here, the submission is not accepted
+    console.log(`Submission ${submissionId} is not accepted in program ${programId}`);
+    return { accepted: false };
+  } catch (error) {
+    console.error(`Error checking if submission ${submissionId} is accepted:`, error);
+    return { accepted: false };
+  }
+}
+
+/**
+ * Checks if a team is a winner in a program
+ * @param teamId The ID of the team to check
+ * @param programId The ID of the program
+ * @returns A promise that resolves to true if the team is a winner, false otherwise
+ */
+export async function checkIfTeamIsWinner(teamId: string | number, programId: string | number): Promise<boolean> {
+  console.log(`Checking if team ${teamId} is a winner in program ${programId}`);
+
+  try {
+    // First, get the phases for the program
+    const { getPhases } = await import('@/services/programService');
+    const phases = await getPhases(programId);
+
+    if (!phases || phases.length === 0) {
+      console.log(`No phases found for program ${programId}`);
+      return false;
+    }
+
+    // Get the last phase
+    const lastPhase = phases[phases.length - 1];
+    console.log(`Last phase for program ${programId} is ${lastPhase.nom} (ID: ${lastPhase.id})`);
+
+    // Check if the last phase has a winner
+    if (lastPhase.gagnant_candidature_id) {
+      console.log(`Last phase has a winner: ${lastPhase.gagnant_candidature_id}`);
+
+      // Check if the winner is the team we're looking for
+      const isWinner = String(lastPhase.gagnant_candidature_id) === String(teamId);
+      console.log(`Team ${teamId} is ${isWinner ? '' : 'not '}the winner`);
+
+      return isWinner;
+    } else {
+      console.log(`Last phase does not have a winner yet`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error checking if team ${teamId} is a winner:`, error);
+    return false;
   }
 }

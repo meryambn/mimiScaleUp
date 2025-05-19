@@ -117,22 +117,38 @@ const ApplicationsPage = () => {
 
       // Call the team service to add the submission as a team
       if (selectedProgramId) {
-        await addSubmissionAsTeam(submission, selectedProgramId);
+        const result = await addSubmissionAsTeam(submission, selectedProgramId);
+
+        // Get the team ID and name from the result
+        const teamId = result?.candidature?.id;
+        const teamName = result?.candidature?.nom_equipe;
+
+        // Update the submission status and team info in the UI
+        // For individual startups, we don't include teamInfo
+        const updatedSubmissions = submissions.map(s =>
+          s.id === submission.id ? {
+            ...s,
+            status: 'approved' as const,
+            // Only include teamInfo for actual teams, not for individual startups
+            ...(teamId && teamName ? {
+              teamInfo: {
+                id: teamId,
+                name: teamName,
+                type: 'team' as const
+              }
+            } : {})
+          } : s
+        );
+        setSubmissions(updatedSubmissions);
+
+        // Show success message
+        toast({
+          title: "Équipe ajoutée au programme",
+          description: `${submission.teamName} a été ajouté avec succès à ${selectedProgram?.name} en tant qu'équipe "${teamName}".`,
+        });
       } else {
         throw new Error("Aucun programme sélectionné");
       }
-
-      // Update the submission status in the UI
-      const updatedSubmissions = submissions.map(s =>
-        s.id === submission.id ? { ...s, status: 'approved' as const } : s
-      );
-      setSubmissions(updatedSubmissions);
-
-      // Show success message
-      toast({
-        title: "Équipe ajoutée au programme",
-        description: `${submission.teamName} a été ajouté avec succès à ${selectedProgram?.name}.`,
-      });
 
       // Refresh submissions from backend
       fetchSubmissionsFromBackend(selectedProgramId);
@@ -489,10 +505,15 @@ const ApplicationsPage = () => {
       }
 
       if (result.submissions && Array.isArray(result.submissions)) {
-        setSubmissions(result.submissions);
+        // Store the submissions
+        const fetchedSubmissions = result.submissions;
+
+        // Check if submissions have been accepted
+        await checkAndUpdateSubmissionStatus(fetchedSubmissions, programId);
+
         toast({
           title: "Soumissions récupérées",
-          description: `${result.submissions.length} soumissions récupérées avec succès.`,
+          description: `${fetchedSubmissions.length} soumissions récupérées avec succès.`,
         });
       } else {
         setSubmissions([]);
@@ -509,6 +530,69 @@ const ApplicationsPage = () => {
     }
   };
 
+  // Function to check if submissions have been accepted and update their status
+  const checkAndUpdateSubmissionStatus = async (submissionsList: ApplicationSubmission[], programId: string | number | null) => {
+    if (!programId || !submissionsList.length) return;
+
+    try {
+      // Import the team service dynamically to avoid circular dependencies
+      const { checkSubmissionAccepted } = await import('@/services/teamService');
+
+      // Create a copy of the submissions to update
+      const updatedSubmissions = [...submissionsList];
+      let statusChanged = false;
+
+      // Check each submission
+      for (let i = 0; i < updatedSubmissions.length; i++) {
+        const submission = updatedSubmissions[i];
+
+        // Only check submissions that are not already approved or have different team info
+        if (submission.status !== 'approved' || !submission.teamInfo) {
+          const result = await checkSubmissionAccepted(submission.id, programId);
+
+          // If the submission is accepted, update its status and team info (if it's a team)
+          if (result.accepted) {
+            console.log(`Updating submission ${submission.id} status to 'approved'`);
+
+            // Only include teamInfo if it exists and is a team (not for individual startups)
+            const updatedSubmission = {
+              ...submission,
+              status: 'approved' as const
+            };
+
+            // Only add teamInfo if it's provided and is a team
+            if (result.teamInfo && result.teamInfo.type === 'team') {
+              updatedSubmission.teamInfo = result.teamInfo;
+
+              // Show a toast notification about the team membership
+              toast({
+                title: "Soumission approuvée",
+                description: `${submission.teamName} fait partie de l'équipe "${result.teamInfo.name}"`,
+                duration: 3000
+              });
+            }
+
+            updatedSubmissions[i] = updatedSubmission;
+            statusChanged = true;
+          }
+        }
+      }
+
+      // Update the state if any status changed
+      if (statusChanged) {
+        console.log('Updating submissions with new status values and team info');
+        setSubmissions(updatedSubmissions);
+      } else {
+        // If no status changed, just set the submissions
+        setSubmissions(updatedSubmissions);
+      }
+    } catch (error) {
+      console.error('Error checking submission status:', error);
+      // Still set the submissions even if there was an error
+      setSubmissions(submissionsList);
+    }
+  };
+
   // Fetch submissions when program is selected
   React.useEffect(() => {
     if (programId) {
@@ -516,6 +600,22 @@ const ApplicationsPage = () => {
       fetchSubmissionsFromBackend(programId);
     }
   }, [programId]);
+
+  // Set up automatic status checking
+  React.useEffect(() => {
+    if (programId && submissions.length > 0) {
+      console.log('Setting up automatic submission status checking');
+
+      // Set up interval to periodically check submission status
+      const statusCheckInterval = setInterval(() => {
+        console.log('Automatically checking submission status...');
+        checkAndUpdateSubmissionStatus(submissions, programId);
+      }, 30000); // Check every 30 seconds
+
+      // Clean up interval on unmount or when dependencies change
+      return () => clearInterval(statusCheckInterval);
+    }
+  }, [programId, submissions]);
 
   // Use real data from backend
   const applicationSubmissions = submissions;
@@ -1245,7 +1345,16 @@ const ApplicationsPage = () => {
                 <h3 className="text-lg font-medium">Soumissions de candidature</h3>
                 <button
                   onClick={() => setShowTeamCreationDialog(true)}
-                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', border: 'none' }}
+                  style={{
+                    background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    border: 'none'
+                  }}
                 >
                   <UsersRound className="h-4 w-4 mr-2" />
                   Créer une équipe
@@ -1372,25 +1481,41 @@ const ApplicationsPage = () => {
 
             // Call the team service to create a team
             if (selectedProgramId) {
-              await createTeam(teamData, selectedProgramId);
+              const result = await createTeam(teamData, selectedProgramId);
+
+              // Get the team ID and name from the result
+              const teamId = result?.candidature?.id;
+              const teamName = result?.candidature?.nom_equipe || teamData.name;
+
+              // Update the submission status and team info in the UI for all team members
+              // For team members, we include teamInfo since they are part of an actual team
+              const updatedSubmissions = submissions.map(s =>
+                teamData.members.some(m => m.id === s.id) ? {
+                  ...s,
+                  status: 'approved' as const,
+                  // Only include teamInfo for actual teams
+                  ...(teamId ? {
+                    teamInfo: {
+                      id: teamId,
+                      name: teamName,
+                      type: 'team' as const
+                    }
+                  } : {})
+                } : s
+              );
+              setSubmissions(updatedSubmissions);
+
+              // No need to show invitation dialog in admin interface
+              // Notifications will be sent to team members automatically
+
+              // Show success message
+              toast({
+                title: "Équipe créée avec succès",
+                description: `${teamData.name} a été créée avec ${teamData.members.length} membres.`,
+              });
             } else {
               throw new Error("Aucun programme sélectionné");
             }
-
-            // Update the submission status in the UI for all team members
-            const updatedSubmissions = submissions.map(s =>
-              teamData.members.some(m => m.id === s.id) ? { ...s, status: 'approved' as const } : s
-            );
-            setSubmissions(updatedSubmissions);
-
-            // No need to show invitation dialog in admin interface
-            // Notifications will be sent to team members automatically
-
-            // Show success message
-            toast({
-              title: "Équipe créée avec succès",
-              description: `${teamData.name} a été créée avec ${teamData.members.length} membres.`,
-            });
 
             // Refresh submissions from backend
             fetchSubmissionsFromBackend(selectedProgramId);

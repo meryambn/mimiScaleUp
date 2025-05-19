@@ -4,6 +4,7 @@ import StartupHeader from "./StartupHeader";
 import { useLocation } from "wouter";
 import "../../styles/userStyles.css";
 import TeamNotificationHandler from "@/components/notification/TeamNotificationHandler";
+import WinnerNotificationHandler from "@/components/notification/WinnerNotificationHandler";
 
 interface StartupLayoutProps {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ const StartupLayout: React.FC<StartupLayoutProps> = ({ children }) => {
       <StartupHeader onToggleSidebar={toggleSidebar} />
       {children}
       <TeamNotificationHandler />
+      <WinnerNotificationHandler />
     </div>
   );
 };

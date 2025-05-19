@@ -65,7 +65,7 @@ const NotificationBell: React.FC = () => {
     }
   };
 
-  // Handle notification clicks for form access and team notifications
+  // Handle notification clicks for form access, team notifications, and winner announcements
   const handleNotificationClick = (notification: any) => {
     // Handle form access notifications
     if (notification.type === 'form_access' && notification.related_id) {
@@ -94,6 +94,18 @@ const NotificationBell: React.FC = () => {
 
       // The TeamNotificationHandler component will automatically show the popup
       // when it detects an unread team notification
+    }
+
+    // Handle winner announcement notifications
+    else if (notification.type === 'winner_announcement') {
+      // Mark the notification as read
+      markAsRead(notification.id);
+
+      // Close the notification dropdown
+      setIsOpen(false);
+
+      // The WinnerNotificationHandler component will automatically show the popup
+      // when it detects an unread winner notification
     }
   };
 
@@ -137,8 +149,8 @@ const NotificationBell: React.FC = () => {
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`notification-item ${!notification.is_read ? 'unread' : ''} ${notification.type === 'form_access' || notification.type === 'team_creation' || notification.type === 'team_addition' ? 'clickable' : ''}`}
-                    onClick={() => (notification.type === 'form_access' || notification.type === 'team_creation' || notification.type === 'team_addition') ? handleNotificationClick(notification) : null}
+                    className={`notification-item ${!notification.is_read ? 'unread' : ''} ${notification.type === 'form_access' || notification.type === 'team_creation' || notification.type === 'team_addition' || notification.type === 'winner_announcement' ? 'clickable' : ''}`}
+                    onClick={() => (notification.type === 'form_access' || notification.type === 'team_creation' || notification.type === 'team_addition' || notification.type === 'winner_announcement') ? handleNotificationClick(notification) : null}
                   >
                     <div className="notification-content">
                       <div className="notification-title">{notification.title}</div>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Trophy } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useProgramContext } from '@/context/ProgramContext';
+import { getProgramWinner, WinnerResponse } from '@/services/winnerService';
+import { useQuery } from '@tanstack/react-query';
 
 interface Team {
   id: number | string;
@@ -19,87 +21,34 @@ const WinnerTeamWidget = () => {
   const { selectedProgramId } = useProgramContext();
   const [, setLocation] = useLocation();
 
+  // Utiliser React Query pour récupérer le gagnant du programme
+  const { data: winnerData, isLoading } = useQuery({
+    queryKey: ['program-winner', selectedProgramId],
+    queryFn: () => selectedProgramId ? getProgramWinner(selectedProgramId) : null,
+    enabled: !!selectedProgramId,
+    staleTime: 60000, // 1 minute
+    refetchOnWindowFocus: true
+  });
+
+  // Mettre à jour l'état local lorsque les données du gagnant changent
   useEffect(() => {
-    // Charger les équipes depuis localStorage
-    try {
-      const storedStartups = localStorage.getItem('startups');
-      let foundWinner = false;
-
-      if (storedStartups) {
-        const parsedStartups = JSON.parse(storedStartups);
-        if (Array.isArray(parsedStartups)) {
-          // Filtrer les équipes du programme sélectionné qui sont marquées comme gagnantes
-          const winners = parsedStartups.filter(
-            startup => startup.programId === selectedProgramId && startup.status === 'completed'
-          );
-
-          if (winners.length > 0) {
-            setWinnerTeam(winners[0]);
-            foundWinner = true;
-          }
-        }
-      }
-
-      // Si aucun gagnant n'a été trouvé dans localStorage, vérifier les équipes par défaut
-      if (!foundWinner) {
-        // Exemple d'équipes par défaut
-        const sampleStartups = [
-          {
-            id: 5,
-            name: "CyberShield",
-            logo: "https://via.placeholder.com/100/F44336/FFFFFF?text=CS",
-            industry: "Cybersecurity",
-            currentPhase: "Lancement",
-            progress: 95,
-            status: 'completed',
-            programId: "1"
-          }
-        ];
-
-        // Vérifier si l'une des équipes par défaut est un gagnant pour le programme sélectionné
-        const sampleWinner = sampleStartups.find(
-          startup => startup.programId === selectedProgramId && startup.status === 'completed'
-        );
-
-        if (sampleWinner) {
-          setWinnerTeam(sampleWinner);
-          foundWinner = true;
-        }
-      }
-
-      // Si aucun gagnant n'a été trouvé, vérifier les équipes par défaut pour le programme "1"
-      if (!foundWinner && selectedProgramId === "1") {
-        setWinnerTeam({
-          id: 5,
-          name: "CyberShield",
-          logo: "https://via.placeholder.com/100/F44336/FFFFFF?text=CS",
-          industry: "Cybersecurity",
-          currentPhase: "Lancement",
-          progress: 95,
-          status: 'completed',
-          programId: "1"
-        });
-      } else if (!foundWinner) {
-        setWinnerTeam(null);
-      }
-    } catch (error) {
-      console.error("Error loading startups from localStorage:", error);
-
-      // En cas d'erreur, utiliser l'équipe par défaut pour le programme "1"
-      if (selectedProgramId === "1") {
-        setWinnerTeam({
-          id: 5,
-          name: "CyberShield",
-          logo: "https://via.placeholder.com/100/F44336/FFFFFF?text=CS",
-          industry: "Cybersecurity",
-          currentPhase: "Lancement",
-          progress: 95,
-          status: 'completed',
-          programId: "1"
-        });
-      }
+    if (winnerData) {
+      // Convertir les données du backend au format attendu par le composant
+      setWinnerTeam({
+        id: winnerData.candidature_id,
+        name: winnerData.nom_equipe,
+        logo: undefined, // Le backend ne fournit pas de logo
+        industry: winnerData.type === 'startup_individuelle' ? 'Startup individuelle' : 'Équipe',
+        currentPhase: winnerData.phase_nom,
+        progress: 100, // Le gagnant a complété 100% du programme
+        status: 'completed',
+        programId: String(selectedProgramId)
+      });
+    } else if (!isLoading) {
+      // Si aucun gagnant n'a été trouvé et que le chargement est terminé
+      setWinnerTeam(null);
     }
-  }, [selectedProgramId]);
+  }, [winnerData, isLoading, selectedProgramId]);
 
   if (!winnerTeam) {
     return (

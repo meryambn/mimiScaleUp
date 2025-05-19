@@ -37,7 +37,13 @@ const AddToProgramButton: React.FC<AddToProgramButtonProps> = ({
 
     try {
       // Call the service to add the submission to the program
-      await addSubmissionToProgram(submission.id, programId);
+      // Pass the team name to ensure it's sent to the backend
+      await addSubmissionToProgram(
+        submission.id,
+        programId,
+        true, // assignToPhase = true
+        submission.teamName !== 'utilisateur' ? submission.teamName : submission.teamEmail.split('@')[0]
+      );
 
       // Show success message
       toast({
@@ -68,12 +74,12 @@ const AddToProgramButton: React.FC<AddToProgramButtonProps> = ({
       variant={variant}
       className={className}
       style={
-        variant === 'default' 
+        variant === 'default'
           ? {
               background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)',
               color: 'white',
               border: 'none'
-            } 
+            }
           : {}
       }
     >

@@ -11,6 +11,7 @@ import WinnerDialog from "@/components/teams/WinnerDialog";
 import { getProgramTeams, getTeamCurrentPhase, ensureTeamHasPhase } from '@/services/teamService';
 import { moveToPhase } from '@/services/phaseService';
 import { getPhases } from '@/services/programService';
+import { declareWinner, isTeamWinner, getProgramWinner } from '@/services/winnerService';
 
 // Types
 interface Team {
@@ -180,7 +181,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phase
             </button>
           </div>
 
-          {isLastPhase && hasWinner && team.status !== 'completed' && (
+          {isLastPhase && team.status !== 'completed' && (
             <div className="mt-2 pt-2 border-t border-gray-100">
               <button
                 className="w-full h-7"
@@ -192,7 +193,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phase
               </button>
             </div>
           )}
-          {isLastPhase && hasWinner && team.status === 'completed' && (
+          {isLastPhase && team.status === 'completed' && (
             <div className="mt-2 pt-2 border-t border-gray-100">
               <button
                 className="w-full h-7"
@@ -288,6 +289,66 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
     setLocalTeams(teams);
   }, [teams]);
 
+  // Check winner status when the component mounts
+  React.useEffect(() => {
+    if (selectedProgram?.id) {
+      console.log('Component mounted, checking winner status for all teams');
+      // Force a refresh from the backend to get the latest winner status
+      loadTeamsFromBackend();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProgram?.id]);
+
+  // Check if any teams are winners when the component loads or when teams change
+  React.useEffect(() => {
+    const checkWinnerStatus = async () => {
+      if (!selectedProgram?.id || localTeams.length === 0) return;
+
+      console.log('Checking winner status for all teams in Kanban view');
+
+      try {
+        // Get the winner for the program directly from the backend
+        const winner = await getProgramWinner(selectedProgram.id);
+
+        if (winner && winner.candidature_id) {
+          console.log(`Found winner for program ${selectedProgram.id}: ${winner.candidature_id}`);
+
+          // Create a copy of the teams to update
+          const updatedTeams = localTeams.map(team => {
+            // If this team is the winner, mark it as completed
+            if (String(team.id) === String(winner.candidature_id)) {
+              console.log(`Team ${team.name} (${team.id}) is the winner, updating status`);
+              return {
+                ...team,
+                status: 'completed',
+                progress: 100 // Set progress to 100% for winners
+              };
+            }
+            return team;
+          });
+
+          // Update the state with the winner status
+          console.log('Updating teams with winner status');
+          setLocalTeams(updatedTeams);
+        } else {
+          console.log(`No winner found for program ${selectedProgram.id}`);
+        }
+      } catch (error) {
+        console.error(`Error checking winner status for program ${selectedProgram.id}:`, error);
+      }
+    };
+
+    // Run the check immediately
+    checkWinnerStatus();
+
+    // Also set up an interval to check periodically
+    const intervalId = setInterval(checkWinnerStatus, 5000); // Check every 5 seconds
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProgram?.id]);
+
   // Écouter les événements de changement de phase
   React.useEffect(() => {
     const handlePhaseChange = (event: CustomEvent) => {
@@ -309,31 +370,13 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
     };
 
     // Écouter les événements de stockage (pour la synchronisation entre les onglets)
-    const handleStorageChange = () => {
+    const handleStorageChange = async () => {
       console.log('KanbanView: Changement de stockage détecté, mise à jour des équipes');
-      try {
-        const storedStartups = localStorage.getItem('startups');
-        if (storedStartups) {
-          const parsedStartups = JSON.parse(storedStartups);
-          if (Array.isArray(parsedStartups)) {
-            // Mettre à jour les équipes locales avec les données du localStorage
-            setLocalTeams(prevTeams => {
-              const updatedTeams = prevTeams.map(team => {
-                const storedTeam = parsedStartups.find(s => String(s.id) === String(team.id));
-                if (storedTeam) {
-                  console.log(`KanbanView: Mise à jour de l'équipe ${team.name} depuis localStorage`);
-                  return { ...team, ...storedTeam };
-                }
-                return team;
-              });
-              return updatedTeams;
-            });
 
-            // Ne pas forcer un rafraîchissement de la page pour éviter les rechargements
-          }
-        }
-      } catch (error) {
-        console.error("Error refreshing teams from localStorage:", error);
+      // Instead of relying on localStorage, force a refresh from the backend
+      if (selectedProgram?.id) {
+        console.log('Forcing a refresh from the backend after storage change');
+        await loadTeamsFromBackend();
       }
     };
 
@@ -348,29 +391,51 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
     };
   }, []);
 
-  // Forcer une mise à jour des équipes depuis localStorage au montage
+  // Instead of loading from localStorage, we'll rely on the backend data
   React.useEffect(() => {
-    try {
-      const storedStartups = localStorage.getItem('startups');
-      if (storedStartups) {
-        const parsedStartups = JSON.parse(storedStartups);
-        if (Array.isArray(parsedStartups)) {
-          // Mettre à jour les équipes locales avec les données du localStorage
-          const updatedTeams = teams.map(team => {
-            const storedTeam = parsedStartups.find(s => String(s.id) === String(team.id));
-            if (storedTeam) {
-              console.log(`KanbanView: Initialisation de l'équipe ${team.name} depuis localStorage`);
-              return { ...team, ...storedTeam };
-            }
-            return team;
-          });
-          setLocalTeams(updatedTeams);
+    // If we have a selected program, load teams from the backend
+    if (selectedProgram?.id && teams.length > 0) {
+      console.log('Initial teams loaded, checking winner status');
+
+      // Check if any of the teams are winners
+      const checkWinnerStatus = async () => {
+        try {
+          const winner = await getProgramWinner(selectedProgram.id);
+          if (winner && winner.candidature_id) {
+            console.log(`Found winner for program ${selectedProgram.id}: ${winner.candidature_id}`);
+
+            // Update the winner status in the teams array
+            const updatedTeams = teams.map(team => {
+              if (String(team.id) === String(winner.candidature_id)) {
+                console.log(`Team ${team.name} (${team.id}) is the winner, updating status`);
+                return {
+                  ...team,
+                  status: 'completed',
+                  progress: 100
+                };
+              }
+              return team;
+            });
+
+            // Set the teams with winner status
+            setLocalTeams(updatedTeams);
+          } else {
+            // If no winner, just use the teams as is
+            setLocalTeams(teams);
+          }
+        } catch (error) {
+          console.error(`Error checking winner status during initial load:`, error);
+          // If there's an error, just use the teams as is
+          setLocalTeams(teams);
         }
-      }
-    } catch (error) {
-      console.error("Error refreshing teams from localStorage:", error);
+      };
+
+      checkWinnerStatus();
+    } else {
+      // If no selected program or no teams, just use the teams as is
+      setLocalTeams(teams);
     }
-  }, [teams]);
+  }, [teams, selectedProgram?.id]);
 
   // Convertir les phases du programme en phases Kanban
   const programPhases = selectedProgram?.phases || [];
@@ -510,12 +575,16 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
           console.log(`Matched phase name for team ${team.nom_equipe}: ${phaseName}`);
         }
 
+        // Check if this team is a winner
+        const isWinner = await isTeamWinner(selectedProgram.id, team.id);
+        console.log(`Team ${team.nom_equipe} (${team.id}) is ${isWinner ? '' : 'not '}a winner`);
+
         tempTeams.push({
           id: team.id,
           name: team.nom_equipe,
           currentPhase: phaseName,
-          progress: 0, // Valeur par défaut
-          status: 'active', // Valeur par défaut
+          progress: isWinner ? 100 : 0, // 100% progress for winners
+          status: isWinner ? 'completed' : 'active', // 'completed' status for winners
           description: `Équipe avec ${team.membres.length} membres`
         });
       }
@@ -545,12 +614,16 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
         // Use the teamName from phaseData if available, otherwise use startup.nom
         const displayName = phaseData?.teamName || startup.nom;
 
+        // Check if this startup is a winner
+        const isWinner = await isTeamWinner(selectedProgram.id, startup.id);
+        console.log(`Startup ${displayName} (${startup.id}) is ${isWinner ? '' : 'not '}a winner`);
+
         tempTeams.push({
           id: startup.id,
           name: displayName,
           currentPhase: phaseName,
-          progress: 0, // Valeur par défaut
-          status: 'active', // Valeur par défaut
+          progress: isWinner ? 100 : 0, // 100% progress for winners
+          status: isWinner ? 'completed' : 'active', // 'completed' status for winners
           description: 'Startup individuelle'
         });
       }
@@ -563,6 +636,26 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
       // Log all available kanban phases for debugging
       console.log('Available kanban phases:', phases.map(p => ({ id: p.id, name: p.name })));
 
+      // Before setting the teams, check if any of them are winners
+      try {
+        const winner = await getProgramWinner(selectedProgram.id);
+        if (winner && winner.candidature_id) {
+          console.log(`Found winner for program ${selectedProgram.id}: ${winner.candidature_id}`);
+
+          // Update the winner status in the tempTeams array
+          for (let i = 0; i < tempTeams.length; i++) {
+            if (String(tempTeams[i].id) === String(winner.candidature_id)) {
+              console.log(`Team ${tempTeams[i].name} (${tempTeams[i].id}) is the winner, updating status`);
+              tempTeams[i].status = 'completed';
+              tempTeams[i].progress = 100;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error checking winner status during team loading:`, error);
+      }
+
+      // Set the teams with winner status already checked
       setLocalTeams(tempTeams);
 
       toast({
@@ -618,54 +711,62 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
   };
 
   // Fonction pour gérer la sélection d'un gagnant
-  const handleSelectWinner = (teamId: number | string) => {
+  const handleSelectWinner = async (teamId: number | string) => {
     // Trouver l'équipe sélectionnée
     const team = localTeams.find(t => t.id === teamId);
     if (!team) return;
 
-    // Mettre à jour l'état local
-    setLocalTeams(prevTeams =>
-      prevTeams.map(t =>
-        t.id === teamId
-          ? { ...t, status: 'completed' }
-          : t
-      )
-    );
-
-    // Stocker l'équipe sélectionnée pour le dialogue
-    setSelectedWinner(team);
-
-    // Ouvrir le dialogue de félicitations
-    setWinnerDialogOpen(true);
-
-    // Appeler le callback si fourni
-    if (onSelectWinner) {
-      onSelectWinner(teamId);
+    // Trouver la dernière phase du programme
+    const lastPhase = programPhases[programPhases.length - 1];
+    if (!lastPhase) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de trouver la dernière phase du programme.",
+        variant: "destructive"
+      });
+      return;
     }
 
-    // Mettre à jour le statut de l'équipe dans localStorage
     try {
-      const storedStartups = localStorage.getItem('startups');
-      if (storedStartups) {
-        const parsedStartups = JSON.parse(storedStartups);
-        if (Array.isArray(parsedStartups)) {
-          const updatedStartups = parsedStartups.map(s =>
-            String(s.id) === String(teamId) ? { ...s, status: 'completed' } : s
-          );
-          localStorage.setItem('startups', JSON.stringify(updatedStartups));
-        }
+      // Appeler l'API pour déclarer le gagnant
+      await declareWinner(lastPhase.id, teamId);
+
+      // Mettre à jour l'état local immédiatement
+      setLocalTeams(prevTeams =>
+        prevTeams.map(t =>
+          t.id === teamId
+            ? { ...t, status: 'completed', progress: 100 } // Also update progress to 100%
+            : t
+        )
+      );
+
+      // Stocker l'équipe sélectionnée pour le dialogue
+      setSelectedWinner(team);
+
+      // Ouvrir le dialogue de félicitations
+      setWinnerDialogOpen(true);
+
+      // Appeler le callback si fourni
+      if (onSelectWinner) {
+        onSelectWinner(teamId);
       }
 
       // Afficher une notification
       toast({
         title: "Gagnant sélectionné",
-        description: `${team.name} a été sélectionné comme gagnant du programme.`,
+        description: `${team.name} a été déclaré gagnant du programme.`,
       });
+
+      // Force a refresh from the backend after a short delay to ensure the winner status is updated
+      setTimeout(() => {
+        console.log('Forcing a refresh from the backend after selecting a winner');
+        loadTeamsFromBackend();
+      }, 1000);
     } catch (error) {
-      console.error("Error updating startup in localStorage:", error);
+      console.error("Error declaring winner:", error);
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de la sélection du gagnant.",
+        description: "Une erreur est survenue lors de la déclaration du gagnant.",
         variant: "destructive"
       });
     }
@@ -722,10 +823,10 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
         ) : (
           <div className="flex overflow-x-auto gap-4 pb-4 min-h-[70vh]">
             {teamsByPhase.map((phase, index) => {
-              // Vérifier si c'est la dernière phase et si elle a un gagnant
+              // Vérifier si c'est la dernière phase
               const isLastPhase = index === phases.length - 1;
-              const lastPhaseInProgram = programPhases[programPhases.length - 1];
-              const hasWinner = !!(isLastPhase && lastPhaseInProgram?.hasWinner);
+              // Nous n'avons plus besoin de vérifier si la phase a un gagnant
+              const hasWinner = true; // Toujours vrai pour permettre la sélection d'un gagnant
 
               return (
                 <PhaseColumn
@@ -753,6 +854,7 @@ const KanbanView: React.FC<KanbanViewProps> = ({ teams, onPhaseChange, onSelectW
           onOpenChange={setWinnerDialogOpen}
           teamName={selectedWinner.name}
           programName={selectedProgram?.name || ""}
+          isAdmin={true}
         />
       )}
     </DndProvider>

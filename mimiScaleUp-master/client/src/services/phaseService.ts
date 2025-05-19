@@ -60,7 +60,11 @@ export async function moveToPhase(request: MoveToPhaseRequest): Promise<MoveToPh
           nom_entreprise: request.nom_entreprise
         };
       }
-      console.log(`Sending startup name '${request.nom_entreprise}' to backend in soumission object`);
+
+      // Also include the name directly in the request body for our updated backend
+      requestBody.nom_entreprise = request.nom_entreprise;
+
+      console.log(`Sending startup name '${request.nom_entreprise}' to backend in both formats`);
     }
 
     // Call the backend API to move the entity to the phase
