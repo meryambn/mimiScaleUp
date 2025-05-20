@@ -31,6 +31,8 @@ import { MeetingsProvider } from "@/context/MeetingsContext";
 import { TasksProvider } from "@/context/TasksContext";
 import { ResourcesProvider } from "@/context/ResourcesContext";
 import { DeliverablesProvider } from "@/context/DeliverablesContext";
+import { ChatProvider } from "@/context/ChatContext";
+import "@/styles/chat.css";
 import Layout from "@/components/layout/Layout";
 import StartupLayout from "./components/layout/StartupLayout";
 import ParticulierLayout from "./components/layout/ParticulierLayout";
@@ -334,7 +336,8 @@ const App = () => {
               <TasksProvider>
                 <ResourcesProvider>
                   <DeliverablesProvider>
-                  <Switch>
+                    <ChatProvider>
+                      <Switch>
                     <Route path="/">
                       {() => <RedirectToHome />}
                     </Route>
@@ -768,8 +771,9 @@ const App = () => {
                         </Layout>
                       )}
                     </Route>
-                  </Switch>
-                  <Toaster />
+                      </Switch>
+                      <Toaster />
+                    </ChatProvider>
                   </DeliverablesProvider>
                 </ResourcesProvider>
               </TasksProvider>
