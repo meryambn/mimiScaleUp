@@ -10,17 +10,15 @@ import {
 } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
-import PhaseFilterWidget from '@/components/widgets/PhaseFilterWidget';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, FileText, Video, Download, ExternalLink, X } from "lucide-react";
 import { useResources } from '@/context/ResourcesContext';
 import { useProgramContext } from '@/context/ProgramContext';
 
 const StartupResourcePage = () => {
-  const [activePhase, setActivePhase] = useState(1);
+  const { selectedProgram } = useProgramContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const { selectedProgram } = useProgramContext();
   const {
     resources,
     externalResources,
@@ -33,154 +31,20 @@ const StartupResourcePage = () => {
     error
   } = useResources();
 
-  // Ressources organisées par phase pour les startups (fallback mock data)
-  const resourcesByPhase = {
-    1: [
-      {
-        id: "1",
-        title: "Guide de démarrage Phase 1",
-        description: "Document détaillant les objectifs et livrables de la phase 1",
-        type: "document",
-        size: "2.4 MB",
-        url: "#",
-        createdAt: "2023-05-10"
-      },
-      {
-        id: "2",
-        title: "Template Business Plan",
-        description: "Modèle à compléter pour votre business plan initial",
-        type: "document",
-        size: "1.1 MB",
-        url: "#",
-        createdAt: "2023-05-15"
-      },
-      {
-        id: "3",
-        title: "Modèle étude de marché",
-        description: "Structure pour votre analyse de marché",
-        type: "document",
-        size: "1.5 MB",
-        url: "#",
-        createdAt: "2023-05-20"
-      }
-    ],
-    2: [
-      {
-        id: "4",
-        title: "Guide développement MVP",
-        description: "Méthodologie pour développer votre produit minimum viable",
-        type: "document",
-        size: "3.2 MB",
-        url: "#",
-        createdAt: "2023-06-10"
-      },
-      {
-        id: "5",
-        title: "Tableau de suivi technique",
-        description: "Template pour le suivi de votre développement",
-        type: "spreadsheet",
-        size: "2.8 MB",
-        url: "#",
-        createdAt: "2023-06-15"
-      }
-    ],
-    3: [
-      {
-        id: "6",
-        title: "Guide levée de fonds",
-        description: "Processus et conseils pour votre levée de fonds",
-        type: "document",
-        size: "4.1 MB",
-        url: "#",
-        createdAt: "2023-07-10"
-      },
-      {
-        id: "7",
-        title: "Pitch Deck Template",
-        description: "Modèle pour votre présentation aux investisseurs",
-        type: "presentation",
-        size: "5.7 MB",
-        url: "#",
-        createdAt: "2023-07-15"
-      },
-      {
-        id: "8",
-        title: "Modèle contrat investisseur",
-        description: "Structure de contrat type pour levée de fonds",
-        type: "document",
-        size: "2.3 MB",
-        url: "#",
-        createdAt: "2023-07-20"
-      }
-    ],
-    4: [
-      {
-        id: "9",
-        title: "Guide scaling et croissance",
-        description: "Stratégies pour scaler votre entreprise",
-        type: "document",
-        size: "3.5 MB",
-        url: "#",
-        createdAt: "2023-08-10"
-      },
-      {
-        id: "10",
-        title: "Tableau de bord croissance",
-        description: "Modèle Excel pour suivre vos KPI de croissance",
-        type: "spreadsheet",
-        size: "4.2 MB",
-        url: "#",
-        createdAt: "2023-08-15"
-      },
-      {
-        id: "11",
-        title: "Template rapport final",
-        description: "Structure pour votre rapport de fin de programme",
-        type: "document",
-        size: "1.8 MB",
-        url: "#",
-        createdAt: "2023-08-20"
-      }
-    ]
-  };
-
-  // Mock external resources
-  const externalResourcesByPhase = {
-    1: [
-      { id: "e1", title: "YCombinator Startup School", url: "https://www.startupschool.org/" },
-      { id: "e2", title: "Startup Playbook", url: "https://playbook.samaltman.com/" }
-    ],
-    2: [
-      { id: "e3", title: "500 Startups Resources", url: "https://500.co/startups" },
-      { id: "e4", title: "Techstars Entrepreneur's Toolkit", url: "https://www.techstars.com/entrepreneurs" }
-    ],
-    3: [
-      { id: "e5", title: "Fundraising Resources", url: "https://www.ycombinator.com/library/4A-a-guide-to-seed-fundraising" },
-      { id: "e6", title: "Pitch Deck Examples", url: "https://slidebean.com/blog/startups-pitch-deck-examples" }
-    ],
-    4: [
-      { id: "e7", title: "Scaling Strategies", url: "https://www.forbes.com/sites/theyec/2020/01/30/10-strategies-for-scaling-your-business/" },
-      { id: "e8", title: "Growth Metrics Guide", url: "https://www.geckoboard.com/best-practice/kpi-examples/startup-kpis/" }
-    ]
-  };
-
-  const currentResources = resourcesByPhase[activePhase];
-  const currentExternalResources = externalResourcesByPhase[activePhase];
-
-  // Filtrer les ressources selon la recherche et le filtre actif
-  const localFilteredResources = currentResources.filter(resource => {
+  // Filter resources based on search and active filter
+  const localFilteredResources = resources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          resource.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = activeFilter === 'all' || resource.type === activeFilter;
     return matchesSearch && matchesFilter;
   });
 
-  const localFilteredExternalResources = currentExternalResources.filter(resource => {
+  const localFilteredExternalResources = externalResources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
-  // Use either API resources or local mock resources
+  // Use either API resources or local filtered resources
   const displayResources = filteredResources.length > 0 ? filteredResources : localFilteredResources;
   const displayExternalResources = filteredExternalResources.length > 0 ? filteredExternalResources : localFilteredExternalResources;
 
@@ -207,12 +71,6 @@ const StartupResourcePage = () => {
     }
   };
 
-  const handlePhaseChange = (phase) => {
-    setActivePhase(phase);
-    setSearchTerm('');
-    setActiveFilter('all');
-  };
-
   // Format date
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
@@ -231,13 +89,8 @@ const StartupResourcePage = () => {
         {/* Header */}
         <header className="resources-header">
           <div>
-            <h1>Ressources</h1>
+            <h1>Ressources - {selectedProgram?.name || 'Programme'}</h1>
             <p className="subtitle">Documents et templates pour votre startup</p>
-            {selectedProgram && (
-              <p className="text-gray-500 text-sm">
-                Programme: <span className="font-medium">{selectedProgram.name}</span>
-              </p>
-            )}
           </div>
         </header>
 
@@ -247,7 +100,7 @@ const StartupResourcePage = () => {
             <FaSearch className="search-icon" />
             <input
               type="text"
-              placeholder="Rechercher une ressource..."
+              placeholder="Rechercher des ressources..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -447,34 +300,6 @@ const StartupResourcePage = () => {
           color: #6b7280;
           font-size: 1rem;
           margin: 0;
-        }
-
-        /* Phases Navigation */
-        .phases-section {
-          margin-bottom: 1.5rem;
-        }
-
-        .phases-tabs {
-          display: flex;
-          gap: 0.5rem;
-          overflow-x: auto;
-          padding-bottom: 0.5rem;
-        }
-
-        .phase-tab {
-          padding: 0.75rem 1.5rem;
-          background: #f3f4f6;
-          border: none;
-          border-radius: 6px;
-          font-weight: 500;
-          cursor: pointer;
-          white-space: nowrap;
-          transition: all 0.3s;
-        }
-
-        .phase-tab.active {
-          background: var(--gradient);
-          color: white;
         }
 
         /* Search and Filters */

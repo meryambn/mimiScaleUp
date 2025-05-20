@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FaCalendarAlt,
   FaClock,
@@ -27,20 +27,49 @@ import {
   Search,
   List,
 } from "lucide-react";
+import { useProgramContext } from '@/context/ProgramContext';
+import { useMeetings } from '@/context/MeetingsContext';
 
 const StartupMeetingsPage = () => {
-  const [activePhase, setActivePhase] = useState(1);
+  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
+  const {
+    upcomingMeetings,
+    pastMeetings,
+    searchQuery,
+    setSearchQuery,
+    formatDate,
+    formatTime,
+    formatAttendees
+  } = useMeetings();
+  const [activePhase, setActivePhase] = useState(selectedPhaseId || 1);
   const [activeView, setActiveView] = useState<"list" | "calendar">("list");
-  const [searchQuery, setSearchQuery] = useState("");
   const [viewTab, setViewTab] = useState<"upcoming" | "past">("upcoming");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Phase data for the filter widget
-  const phases = [
-    { id: 1, name: "Phase 1", color: "#4f46e5", status: "completed" },
-    { id: 2, name: "Phase 2", color: "#0ea5e9", status: "in-progress" },
-    { id: 3, name: "Phase 3", color: "#10b981", status: "upcoming" },
-    { id: 4, name: "Phase 4", color: "#f59e0b", status: "not_started" }
-  ];
+  // Filter meetings based on availability and phase
+  const filterMeetingsByPhase = (meetings: any[]) => {
+    return meetings.filter(meeting => meeting.phaseId === activePhase);
+  };
+
+  const availableMeetings = filterMeetingsByPhase(upcomingMeetings.filter(meeting => meeting.isOnline));
+  const unavailableMeetings = filterMeetingsByPhase(upcomingMeetings.filter(meeting => !meeting.isOnline));
+  const allPastMeetings = filterMeetingsByPhase([...pastMeetings, ...unavailableMeetings]);
+
+  // Update active phase when selectedPhaseId changes
+  useEffect(() => {
+    if (selectedPhaseId) {
+      setActivePhase(selectedPhaseId);
+    }
+  }, [selectedPhaseId]);
+
+  // Simulate loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [availableMeetings, allPastMeetings]);
+
   const [showNewMeetingModal, setShowNewMeetingModal] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<any>(null);
   const [sidebarActive, setSidebarActive] = useState(false);
@@ -49,92 +78,15 @@ const StartupMeetingsPage = () => {
     date: '',
     time: '10:00',
     duration: '60',
-    participants: []
+    participants: [] as string[]
   });
 
-  // Réunions organisées par phase pour les startups
-  const meetings = {
-    1: [
-      {
-        id: 1,
-        type: "équipe",
-        title: "Kick-off du projet",
-        date: "2025-05-10",
-        time: "09:00",
-        duration: 60,
-        participants: ["Équipe Startup", "Mentor"],
-        canJoin: true
-      },
-      {
-        id: 2,
-        type: "client",
-        title: "Présentation initiale",
-        date: "2025-05-15",
-        time: "14:30",
-        duration: 90,
-        participants: ["Équipe Startup", "Client", "Mentor"],
-        canJoin: true
-      }
-    ],
-    2: [
-      {
-        id: 3,
-        type: "développement",
-        title: "Revue technique",
-        date: "2025-06-05",
-        time: "11:00",
-        duration: 120,
-        participants: ["Équipe Tech", "Lead Dev", "Mentor"],
-        canJoin: true
-      }
-    ],
-    3: [
-      {
-        id: 4,
-        type: "client",
-        title: "Démo client",
-        date: "2025-07-20",
-        time: "10:00",
-        duration: 90,
-        participants: ["Équipe Startup", "Client", "Mentor"],
-        canJoin: false
-      }
-    ],
-    4: [
-      {
-        id: 5,
-        type: "équipe",
-        title: "Rétrospective",
-        date: "2025-08-30",
-        time: "15:00",
-        duration: 120,
-        participants: ["Toute l'équipe", "Mentor"],
-        canJoin: true
-      }
-    ]
-  };
-
-  const currentMeetings = meetings[activePhase];
-
-  const formatDate = (dateString) => {
-    const options = { weekday: 'long', day: 'numeric', month: 'long' };
-    return new Date(dateString).toLocaleDateString('fr-FR', options);
-  };
-
-  const formatTimeRange = (time, duration) => {
-    const [hours, minutes] = time.split(':');
-    const endTime = new Date();
-    endTime.setHours(parseInt(hours) + Math.floor(duration / 60));
-    endTime.setMinutes(parseInt(minutes) + (duration % 60));
-    return `${time} - ${endTime.getHours()}:${endTime.getMinutes().toString().padStart(2, '0')}`;
-  };
-
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setNewMeeting(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCreateMeeting = (e) => {
+  const handleCreateMeeting = (e: React.FormEvent) => {
     e.preventDefault();
     // Logique pour créer la réunion
     setShowNewMeetingModal(false);
@@ -147,8 +99,20 @@ const StartupMeetingsPage = () => {
     });
   };
 
-  const handlePhaseChange = (phase) => {
+  const handlePhaseChange = (phase: number) => {
     setActivePhase(phase);
+    setSelectedPhaseId(phase); // Update program context when phase changes
+  };
+
+  // Get phase description
+  const getPhaseDescription = (phaseId: number) => {
+    if (selectedProgram && selectedProgram.phases) {
+      const phase = selectedProgram.phases.find(p => p.id === phaseId);
+      if (phase) {
+        return phase.description;
+      }
+    }
+    return "Description non disponible";
   };
 
   return (
@@ -160,7 +124,7 @@ const StartupMeetingsPage = () => {
         {/* Header */}
         <header className="meetings-header">
           <div>
-            <h1>Réunions - Phase {activePhase}</h1>
+            <h1>Réunions - {selectedProgram?.name || 'Programme'}</h1>
             <p className="subtitle">Vos sessions de collaboration par phase</p>
           </div>
           <div className="flex space-x-2">
@@ -208,11 +172,11 @@ const StartupMeetingsPage = () => {
         {/* Phases Navigation */}
         <section className="phases-section">
           <ProgramPhaseTimeline
-            phases={phases}
+            phases={selectedProgram?.phases || []}
             selectedPhase={activePhase}
             onPhaseChange={handlePhaseChange}
             title="Chronologie des phases"
-            description="Cliquez sur une phase pour filtrer les réunions"
+            description={getPhaseDescription(activePhase)}
           />
         </section>
 
@@ -221,7 +185,7 @@ const StartupMeetingsPage = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
-              placeholder="Rechercher des réunions..."
+              placeholder={`Rechercher des réunions pour la phase ${activePhase}...`}
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -249,31 +213,29 @@ const StartupMeetingsPage = () => {
         {/* Meeting Content */}
         {activeView === "calendar" ? (
           <CalendarView
-            meetings={currentMeetings}
-            getPhaseById={(phaseId) => phases.find(p => p.id === Number(phaseId))}
+            meetings={[...availableMeetings, ...allPastMeetings]}
+            getPhaseById={(phaseId) => selectedProgram?.phases?.find(p => p.id === Number(phaseId))}
           />
         ) : (
           <Tabs defaultValue="upcoming" onValueChange={(value) => setViewTab(value as "upcoming" | "past")}>
             <TabsList className="mb-6">
-              <TabsTrigger value="upcoming">Réunions à venir</TabsTrigger>
-              <TabsTrigger value="past">Réunions passées</TabsTrigger>
+              <TabsTrigger value="upcoming">
+                Réunions à venir - Phase {activePhase} ({availableMeetings.length})
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                Réunions passées - Phase {activePhase} ({allPastMeetings.length})
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upcoming">
               <section className="meetings-list">
                 <AnimatePresence>
-                  {currentMeetings.filter(m => {
-                    const meetingDate = new Date(m.date);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return meetingDate >= today;
-                  }).length > 0 ? (
-                    currentMeetings.filter(m => {
-                      const meetingDate = new Date(m.date);
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return meetingDate >= today;
-                    }).map(meeting => (
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    </div>
+                  ) : availableMeetings.length > 0 ? (
+                    availableMeetings.map(meeting => (
                       <motion.div
                         key={meeting.id}
                         className="meeting-card"
@@ -303,15 +265,12 @@ const StartupMeetingsPage = () => {
 
                           <div className="detail">
                             <FaClock className="icon" />
-                            <span>{formatTimeRange(meeting.time, meeting.duration)}</span>
+                            <span>{formatTime(meeting.time)}</span>
                           </div>
 
                           <div className="detail">
                             <FaUserFriends className="icon" />
-                            <span>
-                              {meeting.participants.length} participant{meeting.participants.length > 1 ? 's' : ''} • {' '}
-                              {meeting.participants.join(', ')}
-                            </span>
+                            <span>{formatAttendees(meeting.attendees)}</span>
                           </div>
                         </div>
 
@@ -326,18 +285,17 @@ const StartupMeetingsPage = () => {
                           </motion.button>
                           <motion.button
                             className="primary-btn"
-                            disabled={!meeting.canJoin}
-                            whileHover={meeting.canJoin ? { scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" } : {}}
-                            whileTap={meeting.canJoin ? { scale: 0.97 } : {}}
+                            whileHover={{ scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" }}
+                            whileTap={{ scale: 0.97 }}
                           >
-                            <FaVideo /> {meeting.canJoin ? 'Rejoindre' : 'Indisponible'}
+                            <FaVideo /> Rejoindre
                           </motion.button>
                         </div>
                       </motion.div>
                     ))
                   ) : (
                     <div className="empty-state">
-                      <p>Aucune réunion à venir pour cette phase</p>
+                      <p>Aucune réunion disponible pour cette phase</p>
                       <motion.button
                         className="primary-btn"
                         onClick={() => setShowNewMeetingModal(true)}
@@ -355,18 +313,12 @@ const StartupMeetingsPage = () => {
             <TabsContent value="past">
               <section className="meetings-list">
                 <AnimatePresence>
-                  {currentMeetings.filter(m => {
-                    const meetingDate = new Date(m.date);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return meetingDate < today;
-                  }).length > 0 ? (
-                    currentMeetings.filter(m => {
-                      const meetingDate = new Date(m.date);
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return meetingDate < today;
-                    }).map(meeting => (
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    </div>
+                  ) : allPastMeetings.length > 0 ? (
+                    allPastMeetings.map(meeting => (
                       <motion.div
                         key={meeting.id}
                         className="meeting-card"
@@ -396,15 +348,12 @@ const StartupMeetingsPage = () => {
 
                           <div className="detail">
                             <FaClock className="icon" />
-                            <span>{formatTimeRange(meeting.time, meeting.duration)}</span>
+                            <span>{formatTime(meeting.time)}</span>
                           </div>
 
                           <div className="detail">
                             <FaUserFriends className="icon" />
-                            <span>
-                              {meeting.participants.length} participant{meeting.participants.length > 1 ? 's' : ''} • {' '}
-                              {meeting.participants.join(', ')}
-                            </span>
+                            <span>{formatAttendees(meeting.attendees)}</span>
                           </div>
                         </div>
 
@@ -422,7 +371,7 @@ const StartupMeetingsPage = () => {
                             disabled={true}
                             style={{ backgroundColor: '#9ca3af', cursor: 'not-allowed' }}
                           >
-                            <FaVideo /> Terminée
+                            <FaVideo /> {meeting.isOnline ? 'Terminée' : 'Indisponible'}
                           </motion.button>
                         </div>
                       </motion.div>
@@ -430,6 +379,9 @@ const StartupMeetingsPage = () => {
                   ) : (
                     <div className="empty-state">
                       <p>Aucune réunion passée pour cette phase</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Les réunions passées et indisponibles apparaîtront ici.
+                      </p>
                     </div>
                   )}
                 </AnimatePresence>
@@ -597,7 +549,7 @@ const StartupMeetingsPage = () => {
                   <FaClock className="icon" />
                   <div>
                     <h4>Heure</h4>
-                    <p>{formatTimeRange(selectedMeeting.time, selectedMeeting.duration)}</p>
+                    <p>{formatTime(selectedMeeting.time)}</p>
                   </div>
                 </div>
 
@@ -605,7 +557,7 @@ const StartupMeetingsPage = () => {
                   <FaUserFriends className="icon" />
                   <div>
                     <h4>Participants</h4>
-                    <p>{selectedMeeting.participants.join(', ')}</p>
+                    <p>{formatAttendees(selectedMeeting.attendees)}</p>
                   </div>
                 </div>
               </div>
@@ -620,14 +572,14 @@ const StartupMeetingsPage = () => {
                 </motion.button>
                 <motion.button
                   className="primary-btn"
-                  disabled={!selectedMeeting.canJoin}
-                  whileHover={selectedMeeting.canJoin ? {
+                  disabled={!selectedMeeting.isOnline}
+                  whileHover={selectedMeeting.isOnline ? {
                     scale: 1.03,
                     boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)"
                   } : {}}
-                  whileTap={selectedMeeting.canJoin ? { scale: 0.97 } : {}}
+                  whileTap={selectedMeeting.isOnline ? { scale: 0.97 } : {}}
                 >
-                  <FaVideo /> {selectedMeeting.canJoin ? 'Rejoindre' : 'Indisponible'}
+                  <FaVideo /> {selectedMeeting.isOnline ? 'Rejoindre' : 'Indisponible'}
                 </motion.button>
               </div>
             </motion.div>

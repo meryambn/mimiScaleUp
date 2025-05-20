@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FaFileUpload,
   FaFilePdf,
@@ -14,158 +14,70 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
 import ProgramPhaseTimeline from '@/components/widgets/ProgramPhaseTimeline';
+import { useProgramContext } from '@/context/ProgramContext';
+import { useDeliverables } from '@/context/DeliverablesContext';
 
 const StartupDeliverablesPage = () => {
-  const [activePhase, setActivePhase] = useState(1);
-
-  // Phase data for the filter widget
-  const phases = [
-    { id: 1, name: "Phase 1", color: "#4f46e5", status: "completed" },
-    { id: 2, name: "Phase 2", color: "#0ea5e9", status: "in-progress" },
-    { id: 3, name: "Phase 3", color: "#10b981", status: "upcoming" },
-    { id: 4, name: "Phase 4", color: "#f59e0b", status: "not_started" }
-  ];
+  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
+  const { deliverables, filteredDeliverables, getStatusText, getSubmissionTypeIcon } = useDeliverables();
+  const [activePhase, setActivePhase] = useState(selectedPhaseId || 1);
   const [activeTab, setActiveTab] = useState('pending');
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Livrables par phase pour les startups
-  const phaseDeliverables = {
-    1: [
-      {
-        id: 1,
-        name: "Business Plan",
-        type: "pdf",
-        date: "2025-05-15",
-        status: "approved",
-        size: "2.4 MB",
-        required: true
-      },
-      {
-        id: 2,
-        name: "Présentation Pitch",
-        type: "ppt",
-        date: "2025-05-18",
-        status: "pending",
-        size: "3.2 MB",
-        required: true
-      }
-    ],
-    2: [
-      {
-        id: 3,
-        name: "Financial Projections",
-        type: "excel",
-        date: "2025-06-01",
-        status: "pending",
-        size: "1.8 MB",
-        required: true
-      },
-      {
-        id: 4,
-        name: "Rapport MVP",
-        type: "pdf",
-        date: "",
-        status: "not-submitted",
-        size: "",
-        required: true
-      }
-    ],
-    3: [
-      {
-        id: 5,
-        name: "Rapport Mentorat",
-        type: "pdf",
-        date: "",
-        status: "not-submitted",
-        size: "",
-        required: true
-      },
-      {
-        id: 6,
-        name: "Plan Scaling",
-        type: "pdf",
-        date: "",
-        status: "not-submitted",
-        size: "",
-        required: true
-      }
-    ],
-    4: [
-      {
-        id: 7,
-        name: "Rapport Final",
-        type: "pdf",
-        date: "",
-        status: "not-submitted",
-        size: "",
-        required: true
-      },
-      {
-        id: 8,
-        name: "Présentation Résultats",
-        type: "ppt",
-        date: "",
-        status: "not-submitted",
-        size: "",
-        required: true
-      }
-    ]
-  };
+  // Update active phase when selectedPhaseId changes
+  useEffect(() => {
+    if (selectedPhaseId) {
+      setActivePhase(selectedPhaseId);
+    }
+  }, [selectedPhaseId]);
 
-  // Documents requis par phase
-  const requiredDocuments = {
-    1: ["Business Plan", "Présentation Pitch", "CV Fondateurs"],
-    2: ["Financial Projections", "Rapport MVP", "Stratégie Marketing"],
-    3: ["Rapport Mentorat", "Plan Scaling", "Feedback Utilisateurs"],
-    4: ["Rapport Final", "Présentation Résultats", "Plan Futur"]
-  };
+  // Simulate loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [deliverables]);
 
-  const [deliverables, setDeliverables] = useState(phaseDeliverables[1]);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile({
-        name: file.name,
-        type: file.type.split('/')[1],
-        size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-        file: file
-      });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedFile) {
-      const newDeliverable = {
-        id: deliverables.length + 1,
-        name: selectedFile.name,
-        type: selectedFile.type,
-        date: new Date().toISOString().split('T')[0],
-        status: "pending",
-        size: selectedFile.size,
-        required: false
-      };
+      try {
+        // TODO: Replace with actual API call
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('phaseId', activePhase.toString());
 
-      const updatedDeliverables = [...deliverables, newDeliverable];
-      setDeliverables(updatedDeliverables);
+        const response = await fetch('/api/deliverables', {
+          method: 'POST',
+          body: formData
+        });
 
-      // Mettre à jour les livrables pour la phase active
-      phaseDeliverables[activePhase] = updatedDeliverables;
-
-      setSelectedFile(null);
-      setShowUploadModal(false);
+        if (response.ok) {
+          setSelectedFile(null);
+          setShowUploadModal(false);
+        }
+      } catch (error) {
+        console.error('Error uploading deliverable:', error);
+      }
     }
   };
 
-  const handlePhaseChange = (phase) => {
+  const handlePhaseChange = (phase: number) => {
     setActivePhase(phase);
-    setDeliverables(phaseDeliverables[phase]);
-    setActiveTab('pending'); // Réinitialiser l'onglet actif
+    setSelectedPhaseId(phase); // Update program context when phase changes
+    setActiveTab('pending');
   };
 
-  const getFileIcon = (type) => {
+  const getFileIcon = (type: string) => {
     switch(type) {
       case 'pdf': return <FaFilePdf className="file-icon pdf" />;
       case 'doc':
@@ -178,7 +90,7 @@ const StartupDeliverablesPage = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch(status) {
       case 'approved': return <FaCheckCircle className="status-icon approved" />;
       case 'pending': return <FaSpinner className="status-icon pending" />;
@@ -188,11 +100,34 @@ const StartupDeliverablesPage = () => {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     if (!dateString) return "Non soumis";
-    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    const options: Intl.DateTimeFormatOptions = { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
+
+  // Get phase description
+  const getPhaseDescription = (phaseId: number) => {
+    if (selectedProgram && selectedProgram.phases) {
+      const phase = selectedProgram.phases.find(p => p.id === phaseId);
+      if (phase) {
+        return phase.description;
+      }
+    }
+    return "Description non disponible";
+  };
+
+  // Filter deliverables by active phase and tab
+  const phaseDeliverables = filteredDeliverables.filter(d => 
+    String(d.phaseId) === String(activePhase)
+  );
+
+  const requiredDeliverables = phaseDeliverables.filter(d => d.required);
+  const optionalDeliverables = phaseDeliverables.filter(d => !d.required);
 
   return (
     <div className="deliverables-container">
@@ -203,7 +138,7 @@ const StartupDeliverablesPage = () => {
         {/* Header */}
         <header className="deliverables-header">
           <div>
-            <h1>Livrables - Phase {activePhase}</h1>
+            <h1>Livrables - {selectedProgram?.name || 'Programme'}</h1>
             <p className="subtitle">Documents à soumettre pour votre startup</p>
           </div>
           <motion.button
@@ -219,23 +154,50 @@ const StartupDeliverablesPage = () => {
         {/* Phases Navigation */}
         <section className="phases-section">
           <ProgramPhaseTimeline
-            phases={phases}
+            phases={selectedProgram?.phases || []}
             selectedPhase={activePhase}
             onPhaseChange={handlePhaseChange}
             title="Chronologie des phases"
-            description="Cliquez sur une phase pour filtrer les livrables"
+            description={getPhaseDescription(activePhase)}
           />
         </section>
 
         {/* Required Documents Section */}
         <section className="required-docs-section">
           <div className="required-docs-card">
-            <h2>Documents requis pour la Phase {activePhase}:</h2>
-            <ul>
-              {requiredDocuments[activePhase].map((doc, index) => (
-                <li key={index}>{doc}</li>
-              ))}
-            </ul>
+            <div className="card-header">
+              <div className="file-info">
+                <FaFileUpload className="file-icon" />
+                <div>
+                  <h3 className="file-name">Documents requis pour la Phase {activePhase}</h3>
+                  <p className="file-meta">
+                    {requiredDeliverables.length} document(s) requis
+                  </p>
+                </div>
+              </div>
+            </div>
+            {requiredDeliverables.length > 0 ? (
+              <div className="card-content">
+                <ul className="documents-list">
+                  {requiredDeliverables.map((deliverable) => (
+                    <li key={deliverable.id} className="document-item">
+                      {getSubmissionTypeIcon(deliverable.submissionType)}
+                      <span>{deliverable.name}</span>
+                      <span className="status-text">
+                        {getStatusText(deliverable.status, deliverable.dueDate)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="card-content empty-state">
+                <FaFileUpload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                <p className="text-gray-500">
+                  Aucun document requis pour cette phase.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -272,57 +234,69 @@ const StartupDeliverablesPage = () => {
         {/* Deliverables List */}
         <section className="deliverables-list">
           <AnimatePresence>
-            {deliverables
-              .filter(d => activeTab === 'all' || d.status === activeTab)
-              .map(deliverable => (
-                <motion.div
-                  key={deliverable.id}
-                  className={`deliverable-card ${deliverable.required ? 'required' : ''}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  whileHover={{ y: -5 }}
-                >
-                  <div className="card-header">
-                    <div className="file-info">
-                      {getFileIcon(deliverable.type)}
-                      <div>
-                        <h3 className="file-name">{deliverable.name}</h3>
-                        <p className="file-meta">
-                          {formatDate(deliverable.date)} • {deliverable.size || 'N/A'}
-                        </p>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : phaseDeliverables.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <FaFileUpload className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-lg font-medium text-gray-900">Aucun livrable</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Aucun livrable disponible pour la phase {activePhase}.
+                </p>
+              </div>
+            ) : (
+              phaseDeliverables
+                .filter(d => activeTab === 'all' || d.status === activeTab)
+                .map(deliverable => (
+                  <motion.div
+                    key={deliverable.id}
+                    className={`deliverable-card ${deliverable.required ? 'required' : ''}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    whileHover={{ y: -5 }}
+                  >
+                    <div className="card-header">
+                      <div className="file-info">
+                        {getSubmissionTypeIcon(deliverable.submissionType)}
+                        <div>
+                          <h3 className="file-name">{deliverable.name}</h3>
+                          <p className="file-meta">
+                            {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="file-status">
+                        {getStatusIcon(deliverable.status)}
+                        <span className={`status-text ${deliverable.status}`}>
+                          {getStatusText(deliverable.status, deliverable.dueDate)}
+                        </span>
                       </div>
                     </div>
-                    <div className="file-status">
-                      {getStatusIcon(deliverable.status)}
-                      <span className={`status-text ${deliverable.status}`}>
-                        {deliverable.status === 'approved' ? 'Validé' :
-                         deliverable.status === 'pending' ? 'En attente' :
-                         deliverable.status === 'rejected' ? 'Rejeté' : 'Non soumis'}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="card-actions">
-                    {deliverable.date && (
-                      <button className="action-btn download">
-                        Télécharger
-                      </button>
-                    )}
-                    {deliverable.status === 'pending' && (
-                      <button className="action-btn delete">
-                        <FaTrash /> Supprimer
-                      </button>
-                    )}
-                    {(deliverable.status === 'rejected' || deliverable.status === 'not-submitted') && (
-                      <button className="action-btn resubmit">
-                        {deliverable.status === 'rejected' ? 'Resoumettre' : 'Soumettre'}
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="card-actions">
+                      {deliverable.status === 'submitted' && (
+                        <button className="action-btn download">
+                          Télécharger
+                        </button>
+                      )}
+                      {deliverable.status === 'pending' && (
+                        <button className="action-btn delete">
+                          <FaTrash /> Supprimer
+                        </button>
+                      )}
+                      {(deliverable.status === 'rejected' || deliverable.status === 'not-submitted') && (
+                        <button className="action-btn resubmit">
+                          {deliverable.status === 'rejected' ? 'Resoumettre' : 'Soumettre'}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+            )}
           </AnimatePresence>
         </section>
       </main>
@@ -360,7 +334,7 @@ const StartupDeliverablesPage = () => {
                     type="text"
                     required
                     value={selectedFile?.name || ''}
-                    onChange={(e) => setSelectedFile(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setSelectedFile(prev => prev ? new File([prev], e.target.value) : null)}
                   />
                 </div>
 
@@ -377,10 +351,10 @@ const StartupDeliverablesPage = () => {
                   </label>
                   {selectedFile && (
                     <div className="file-preview">
-                      {getFileIcon(selectedFile.type)}
+                      {getFileIcon(selectedFile.type.split('/')[1])}
                       <div>
                         <p>{selectedFile.name}</p>
-                        <p className="file-size">{selectedFile.size}</p>
+                        <p className="file-size">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
                       </div>
                     </div>
                   )}
@@ -479,27 +453,73 @@ const StartupDeliverablesPage = () => {
         }
 
         .required-docs-card {
-          background: rgb(241, 241, 241);
+          background: white;
           border-radius: 8px;
-          padding: 1rem;
-          border-left: 4px solid rgb(255, 8, 8);
+          padding: 1.5rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          transition: all 0.3s ease;
+          border-left: 4px solid #e43e32;
         }
 
-        .required-docs-card h2 {
-          margin-top: 0;
-          color: #111827;
-          font-size: 1.2rem;
+        .required-docs-card:hover {
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
           margin-bottom: 1rem;
         }
 
-        .required-docs-card ul {
-          margin: 0;
-          padding-left: 1.5rem;
+        .file-info {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
         }
 
-        .required-docs-card li {
+        .file-icon {
+          font-size: 2rem;
+          color: #e43e32;
+        }
+
+        .file-name {
+          font-size: 1.1rem;
+          color: #111827;
+          margin: 0 0 0.25rem 0;
+        }
+
+        .file-meta {
+          color: #6b7280;
+          font-size: 0.85rem;
+          margin: 0;
+        }
+
+        .card-content {
+          padding-top: 1rem;
+        }
+
+        .documents-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+
+        .document-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem;
+          border-radius: 4px;
+          background: #f9fafb;
           margin-bottom: 0.5rem;
-          color: #374151;
+        }
+
+        .document-icon {
+          color: #e43e32;
+          font-size: 1.25rem;
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: 2rem 0;
         }
 
         /* Tabs Section */

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FaCheckCircle,
   FaRegCircle,
@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
 import TaskKanbanBoard from '@/components/tasks/TaskKanbanBoard';
+import ProgramPhaseTimeline from '@/components/widgets/ProgramPhaseTimeline';
 import {
   Tabs,
   TabsContent,
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useProgramContext } from '@/context/ProgramContext';
 
 // Define types
 interface Task {
@@ -32,49 +34,50 @@ interface Task {
 }
 
 const StartupTasksPage = () => {
-  const [activePhase, setActivePhase] = useState(1);
+  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
+  const [activePhase, setActivePhase] = useState(selectedPhaseId || 1);
   const [activeView, setActiveView] = useState<"list" | "kanban">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+  const [tasks, setTasks] = useState<Record<number, Task[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Update active phase when selectedPhaseId changes
+  useEffect(() => {
+    if (selectedPhaseId) {
+      setActivePhase(selectedPhaseId);
+    }
+  }, [selectedPhaseId]);
+
+  // Fetch tasks when phase changes
+  useEffect(() => {
+    const fetchTasks = async () => {
+      setIsLoading(true);
+      try {
+        // TODO: Replace with actual API call
+        const response = await fetch(`/api/tasks?phaseId=${activePhase}`);
+        const data = await response.json();
+        setTasks(prev => ({
+          ...prev,
+          [activePhase]: data
+        }));
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, [activePhase]);
 
   // Function to toggle filters visibility
   const toggleFilters = () => {
     setShowFilters(prev => !prev);
   };
-
-
-
-  // Phase data for the filter widget
-  const phases = [
-    { id: 1, name: "Phase 1", color: "#4f46e5", status: "completed" as const },
-    { id: 2, name: "Phase 2", color: "#0ea5e9", status: "in-progress" as const },
-    { id: 3, name: "Phase 3", color: "#10b981", status: "upcoming" as const },
-    { id: 4, name: "Phase 4", color: "#f59e0b", status: "not_started" as const }
-  ];
-
-  const [tasks, setTasks] = useState<Record<number, Task[]>>({
-    1: [
-      { id: 1, title: "Finaliser le business plan", completed: false, priority: "high", dueDate: "2025-06-10", status: "todo" },
-      { id: 2, title: "Préparer la présentation pitch", completed: true, priority: "medium", dueDate: "2025-05-28", status: "completed" }
-    ],
-    2: [
-      { id: 3, title: "Développer le MVP", completed: false, priority: "high", dueDate: "2025-07-15", status: "in_progress" },
-      { id: 4, title: "Réaliser des tests utilisateurs", completed: false, priority: "medium", dueDate: "2025-07-20", status: "todo" }
-    ],
-    3: [
-      { id: 5, title: "Rencontrer les mentors", completed: false, priority: "medium", dueDate: "2025-09-01", status: "todo" },
-      { id: 6, title: "Affiner la stratégie de scaling", completed: false, priority: "low", dueDate: "", status: "todo" }
-    ],
-    4: [
-      { id: 7, title: "Préparer le rapport final", completed: false, priority: "high", dueDate: "2025-11-15", status: "todo" },
-      { id: 8, title: "Présenter les résultats", completed: false, priority: "high", dueDate: "2025-11-30", status: "todo" }
-    ]
-  });
-
-
 
   const currentTasks = tasks[activePhase] || [];
 
@@ -100,7 +103,6 @@ const StartupTasksPage = () => {
 
     // Filter by tab
     if (activeTab === "my-tasks") {
-      // For now, we don't have assigned tasks, so return empty
       return false;
     } else if (activeTab === "overdue") {
       return !task.completed && task.dueDate && new Date(task.dueDate) < new Date();
@@ -109,45 +111,75 @@ const StartupTasksPage = () => {
     return true;
   });
 
-  const toggleTask = (id: number | string): void => {
-    setTasks(prevTasks => ({
-      ...prevTasks,
-      [activePhase]: prevTasks[activePhase].map((task: Task) =>
-        task.id === id ? {
-          ...task,
-          completed: !task.completed,
-          status: !task.completed ? 'completed' as const : 'todo' as const
-        } : task
-      )
-    }));
-  };
-
-  const handleStatusChange = (taskId: number | string, newStatus: 'todo' | 'in_progress' | 'completed'): void => {
-    setTasks(prevTasks => ({
-      ...prevTasks,
-      [activePhase]: prevTasks[activePhase].map((task: Task) =>
-        task.id === taskId ? {
-          ...task,
-          status: newStatus,
-          completed: newStatus === 'completed'
-        } : task
-      )
-    }));
-  };
-
-  const deleteTask = (id: number | string): void => {
-    setTasks(prevTasks => ({
-      ...prevTasks,
-      [activePhase]: prevTasks[activePhase].filter((task: Task) => task.id !== id)
-    }));
-  };
-
-
-
-  const handlePhaseChange = (phaseId: string | number | null): void => {
-    if (typeof phaseId === 'number') {
-      setActivePhase(phaseId);
+  const toggleTask = async (id: number | string): Promise<void> => {
+    try {
+      // TODO: Replace with actual API call
+      await fetch(`/api/tasks/${id}/toggle`, {
+        method: 'POST'
+      });
+      
+      setTasks(prevTasks => ({
+        ...prevTasks,
+        [activePhase]: prevTasks[activePhase].map((task: Task) =>
+          task.id === id ? {
+            ...task,
+            completed: !task.completed,
+            status: !task.completed ? 'completed' as const : 'todo' as const
+          } : task
+        )
+      }));
+    } catch (error) {
+      console.error('Error toggling task:', error);
     }
+  };
+
+  const handleStatusChange = async (taskId: number | string, newStatus: 'todo' | 'in_progress' | 'completed'): Promise<void> => {
+    try {
+      // TODO: Replace with actual API call
+      await fetch(`/api/tasks/${taskId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      setTasks(prevTasks => ({
+        ...prevTasks,
+        [activePhase]: prevTasks[activePhase].map((task: Task) =>
+          task.id === taskId ? {
+            ...task,
+            status: newStatus,
+            completed: newStatus === 'completed'
+          } : task
+        )
+      }));
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  };
+
+  const deleteTask = async (id: number | string): Promise<void> => {
+    try {
+      // TODO: Replace with actual API call
+      await fetch(`/api/tasks/${id}`, {
+        method: 'DELETE'
+      });
+
+      setTasks(prevTasks => ({
+        ...prevTasks,
+        [activePhase]: prevTasks[activePhase].filter((task: Task) => task.id !== id)
+      }));
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const handlePhaseChange = (phase: number) => {
+    setActivePhase(phase);
+    setSelectedPhaseId(phase); // Update program context when phase changes
+    setSearchQuery('');
+    setActiveTab('all');
   };
 
   const getPriorityColor = (priority: string): string => {
@@ -178,18 +210,21 @@ const StartupTasksPage = () => {
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
 
-  // Tâches recommandées par phase
-  const recommendedTasks: Record<number, string[]> = {
-    1: ["Business Plan", "Présentation Pitch", "Étude de marché"],
-    2: ["Développement MVP", "Tests utilisateurs", "Levée de fonds"],
-    3: ["Rencontres mentors", "Stratégie scaling", "Optimisation processus"],
-    4: ["Rapport final", "Présentation résultats", "Plan futur"]
+  // Get phase description
+  const getPhaseDescription = (phaseId: number) => {
+    if (selectedProgram && selectedProgram.phases) {
+      const phase = selectedProgram.phases.find(p => p.id === phaseId);
+      if (phase) {
+        return phase.description;
+      }
+    }
+    return "Description non disponible";
   };
 
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" style={{ marginLeft: '290px' }}>
         <div className="p-6">
           <div className="tasks-container">
             {/* Main Content */}
@@ -197,10 +232,21 @@ const StartupTasksPage = () => {
               {/* Header */}
               <header className="tasks-header">
                 <div>
-                  <h1>Tâches du programme</h1>
-                  <p className="subtitle">Gérez vos actions et priorités</p>
+                  <h1>Tâches - {selectedProgram?.name || 'Programme'}</h1>
+                  <p className="subtitle">Gérez vos actions et priorités par phase</p>
                 </div>
               </header>
+
+              {/* Phases Navigation */}
+              <section className="phases-section">
+                <ProgramPhaseTimeline
+                  phases={selectedProgram?.phases || []}
+                  selectedPhase={activePhase}
+                  onPhaseChange={handlePhaseChange}
+                  title="Chronologie des phases"
+                  description={getPhaseDescription(activePhase)}
+                />
+              </section>
 
               {/* View toggle and filters */}
               <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
@@ -238,7 +284,7 @@ const StartupTasksPage = () => {
                   <div className="relative flex-1">
                     <FaSearch className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     <input
-                      placeholder="Rechercher des tâches..."
+                      placeholder={`Rechercher des tâches pour la phase ${activePhase}...`}
                       className="pl-8 w-full h-10 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -263,44 +309,6 @@ const StartupTasksPage = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Phase selection */}
-              <Card className="mb-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Chronologie des phases du programme</CardTitle>
-                  <CardDescription>Cliquez sur une phase pour filtrer les tâches</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col space-y-2">
-                    {/* Phase Timeline Bar */}
-                    <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
-                      {phases.map((phase) => {
-                        // Calculate width based on phase duration (for actual implementation, use date calculation)
-                        const width = `${100 / phases.length}%`;
-
-                        return (
-                          <div
-                            key={phase.id}
-                            className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
-                              ${activePhase === phase.id ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
-                            `}
-                            style={{
-                              width,
-                              backgroundColor: phase.color,
-                              opacity: phase.status === 'not_started' ? 0.5 : 1
-                            }}
-                            onClick={() => handlePhaseChange(phase.id)}
-                          >
-                            <span className="text-white font-medium text-sm">
-                              {phase.name}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Filters */}
               {showFilters ? (
@@ -365,19 +373,28 @@ const StartupTasksPage = () => {
               {/* Recommended Tasks */}
               <section className="recommended-tasks">
                 <div className="recommended-card">
-                  <h2>Tâches recommandées pour la Phase {activePhase}:</h2>
-                  <ul>
-                    {recommendedTasks[activePhase].map((task: string, index: number) => (
-                      <li key={index}>{task}</li>
-                    ))}
-                  </ul>
+                  <h2>Tâches recommandées pour la Phase {activePhase}</h2>
+                  {selectedProgram?.phases?.find(p => p.id === activePhase)?.recommendedTasks ? (
+                    <ul>
+                      {selectedProgram.phases.find(p => p.id === activePhase)?.recommendedTasks.map((task: string, index: number) => (
+                        <li key={index} className="flex items-center gap-2">
+                          <FaRegCircle className="h-3 w-3 text-gray-400" />
+                          {task}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 italic">
+                      Aucune tâche recommandée pour cette phase.
+                    </p>
+                  )}
                 </div>
               </section>
 
               {/* Task content */}
               <Tabs defaultValue="all" onValueChange={setActiveTab}>
                 <TabsList className="mb-6">
-                  <TabsTrigger value="all">Toutes les tâches</TabsTrigger>
+                  <TabsTrigger value="all">Toutes les tâches - Phase {activePhase}</TabsTrigger>
                   <TabsTrigger value="my-tasks">Mes tâches</TabsTrigger>
                   <TabsTrigger value="overdue">En retard</TabsTrigger>
                 </TabsList>
@@ -388,7 +405,7 @@ const StartupTasksPage = () => {
                       <FaExclamationTriangle className="mx-auto h-12 w-12 text-gray-400" />
                       <h3 className="mt-2 text-lg font-medium text-gray-900">Aucune tâche trouvée</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Essayez d'ajuster votre recherche ou vos filtres pour trouver ce que vous cherchez.
+                        Aucune tâche disponible pour la phase {activePhase}. Essayez d'ajuster votre recherche ou vos filtres.
                       </p>
                     </div>
                   ) : activeView === "kanban" ? (
@@ -506,7 +523,7 @@ const StartupTasksPage = () => {
                       <FaCheckCircle className="mx-auto h-12 w-12 text-green-500" />
                       <h3 className="mt-2 text-lg font-medium text-gray-900">Aucune tâche en retard</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Toutes les tâches sont à jour. Excellent travail !
+                        Toutes les tâches de la phase {activePhase} sont à jour. Excellent travail !
                       </p>
                     </div>
                   ) : (
@@ -562,8 +579,6 @@ const StartupTasksPage = () => {
                 </TabsContent>
               </Tabs>
             </main>
-
-
 
             {/* CSS Styles */}
             <style>{`
