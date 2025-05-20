@@ -62,7 +62,7 @@ const getTeamContacts = (): Contact[] => {
 
       return {
         id: teamId,
-        name: startup.name,
+        name: startup.name || `Équipe ${teamId}`,
         role: 'Équipe',
         avatar: startup.logo,
         lastMessage: lastMessage ? lastMessage.content : '',
@@ -133,8 +133,8 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
   }, [open]);
 
   const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.role.toLowerCase().includes(searchQuery.toLowerCase())
+    (contact.name ? contact.name.toLowerCase().includes(searchQuery.toLowerCase()) : false) ||
+    (contact.role ? contact.role.toLowerCase().includes(searchQuery.toLowerCase()) : false)
   );
 
   const handleSendMessage = () => {
@@ -305,7 +305,7 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
                         <Avatar className="h-10 w-10 mr-3">
                           <AvatarImage src={contact.avatar} />
                           <AvatarFallback className="bg-primary-100 text-primary-800">
-                            {contact.name.split(' ').map(n => n[0]).join('')}
+                            {contact.name ? contact.name.split(' ').map(n => n[0]).join('') : 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -345,7 +345,7 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
                   <Avatar className="h-10 w-10 mr-3">
                     <AvatarImage src={selectedContact.avatar} />
                     <AvatarFallback className="bg-primary-100 text-primary-800">
-                      {selectedContact.name.split(' ').map(n => n[0]).join('')}
+                      {selectedContact.name ? selectedContact.name.split(' ').map(n => n[0]).join('') : 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div>

@@ -32,12 +32,19 @@ export interface Deliverable {
  */
 export const getTeamDeliverableSubmissions = async (candidatureId: string): Promise<DeliverableSubmission[]> => {
   try {
+    console.log('🟠🟠🟠 GETTEAMDELIVERABLESUBMISSIONS CALLED 🟠🟠🟠');
     console.log('getTeamDeliverableSubmissions - candidatureId:', candidatureId);
 
     // Ensure candidatureId is valid
     if (!candidatureId) {
       console.error('Invalid candidatureId:', candidatureId);
       return [];
+    }
+
+    // Validate candidatureId is a number
+    if (isNaN(Number(candidatureId))) {
+      console.error('candidatureId is not a valid number:', candidatureId);
+      throw new Error('ID d\'équipe invalide. L\'ID doit être un nombre.');
     }
 
     // Construct the API URL
@@ -121,7 +128,27 @@ export const getTeamDeliverableSubmissions = async (candidatureId: string): Prom
  */
 export const getLivrableSubmissions = async (livrableId: string): Promise<DeliverableSubmission[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/livrable-soumissions/livrable/${livrableId}`, {
+    console.log('getLivrableSubmissions - livrableId:', livrableId);
+
+    // Ensure livrableId is valid
+    if (!livrableId) {
+      console.error('Invalid livrableId:', livrableId);
+      return [];
+    }
+
+    // Validate livrableId is a number
+    if (isNaN(Number(livrableId))) {
+      console.error('livrableId is not a valid number:', livrableId);
+      throw new Error('ID de livrable invalide. L\'ID doit être un nombre.');
+    }
+
+    // Construct the API URL
+    const apiUrl = `${API_BASE_URL}/livrable-soumissions/livrable/${livrableId}`;
+    console.log('API URL:', apiUrl);
+
+    // Make the API request
+    console.log('Making API request to fetch livrable submissions');
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
@@ -129,15 +156,60 @@ export const getLivrableSubmissions = async (livrableId: string): Promise<Delive
       credentials: 'include'
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response content-type:', response.headers.get('content-type'));
+
+    // Handle error responses
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(errorData.error || `HTTP Error: ${response.status}`);
+      let errorMessage = `HTTP Error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        console.error('Error response data:', errorData);
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        console.error('Error parsing error response:', parseError);
+        errorMessage = response.statusText || errorMessage;
+      }
+      console.error('Error response:', errorMessage);
+      throw new Error(errorMessage);
     }
 
-    return await response.json();
+    // Parse the response data
+    console.log('Parsing response data');
+    const data = await response.json();
+    console.log('Response data (detailed):', JSON.stringify(data, null, 2));
+
+    // Check if data is an array
+    if (!Array.isArray(data)) {
+      console.error('Expected array but got:', typeof data);
+      return [];
+    }
+
+    // Map the data to match the expected DeliverableSubmission interface
+    console.log('Mapping response data to DeliverableSubmission interface');
+    const submissions = data.map((item: any) => {
+      return {
+        id: item.id,
+        livrable_id: item.livrable_id,
+        candidature_id: item.candidature_id,
+        nom_fichier: item.nom_fichier,
+        chemin_fichier: item.chemin_fichier,
+        date_soumission: item.date_soumission,
+        statut: item.statut || 'en attente',
+        // Include additional properties if they exist in the response
+        nom_livrable: item.nom_livrable,
+        description_livrable: item.description_livrable,
+        date_echeance: item.date_echeance,
+        nom_equipe: item.nom_equipe
+      };
+    });
+
+    console.log('Mapped submissions:', submissions);
+    return submissions;
   } catch (error) {
     console.error('Error fetching livrable submissions:', error);
-    throw error;
+    // Return empty array instead of throwing to prevent component crashes
+    return [];
   }
 };
 
@@ -146,8 +218,28 @@ export const getLivrableSubmissions = async (livrableId: string): Promise<Delive
  * @param soumissionId ID de la soumission
  */
 export const downloadSubmissionFile = (soumissionId: string): void => {
+  console.log('downloadSubmissionFile - soumissionId:', soumissionId);
+
+  // Validate soumissionId
+  if (!soumissionId) {
+    console.error('Invalid soumissionId:', soumissionId);
+    alert('ID de soumission invalide ou manquant.');
+    return;
+  }
+
+  // Validate soumissionId is a number
+  if (isNaN(Number(soumissionId))) {
+    console.error('soumissionId is not a valid number:', soumissionId);
+    alert('ID de soumission invalide. L\'ID doit être un nombre.');
+    return;
+  }
+
+  // Construct the API URL
+  const apiUrl = `${API_BASE_URL}/livrable-soumissions/telecharger/${soumissionId}`;
+  console.log('Download URL:', apiUrl);
+
   // Ouvrir une nouvelle fenêtre pour télécharger le fichier
-  window.open(`${API_BASE_URL}/livrable-soumissions/telecharger/${soumissionId}`, '_blank');
+  window.open(apiUrl, '_blank');
 };
 
 /**
@@ -161,7 +253,31 @@ export const updateSubmissionStatus = async (
   statut: 'en attente' | 'valide' | 'rejete'
 ): Promise<DeliverableSubmission> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/livrable-soumissions/statut/${soumissionId}`, {
+    console.log('updateSubmissionStatus - soumissionId:', soumissionId, 'statut:', statut);
+
+    // Validate soumissionId
+    if (!soumissionId) {
+      console.error('Invalid soumissionId:', soumissionId);
+      throw new Error('ID de soumission invalide ou manquant.');
+    }
+
+    // Validate soumissionId is a number
+    if (isNaN(Number(soumissionId))) {
+      console.error('soumissionId is not a valid number:', soumissionId);
+      throw new Error('ID de soumission invalide. L\'ID doit être un nombre.');
+    }
+
+    // Validate statut
+    if (!statut || !['en attente', 'valide', 'rejete'].includes(statut)) {
+      console.error('Invalid statut:', statut);
+      throw new Error('Statut invalide. Les valeurs possibles sont: en attente, valide, rejete');
+    }
+
+    // Construct the API URL
+    const apiUrl = `${API_BASE_URL}/livrable-soumissions/statut/${soumissionId}`;
+    console.log('API URL:', apiUrl);
+
+    const response = await fetch(apiUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -216,12 +332,19 @@ export const submitDeliverable = async (formData: FormData): Promise<any> => {
  */
 export const getPhaseDeliverables = async (phaseId: string): Promise<Deliverable[]> => {
   try {
+    console.log('🟠🟠🟠 GETPHASEDELIVERABLES CALLED 🟠🟠🟠');
     console.log('getPhaseDeliverables - phaseId:', phaseId);
     console.log('API URL:', `${API_BASE_URL}/liverable/get/${phaseId}`);
 
     if (!phaseId) {
       console.error('Phase ID is undefined or empty');
       return [];
+    }
+
+    // Validate phaseId is a number
+    if (isNaN(Number(phaseId))) {
+      console.error('Phase ID is not a valid number:', phaseId);
+      throw new Error('ID de phase invalide. L\'ID doit être un nombre.');
     }
 
     const response = await fetch(`${API_BASE_URL}/liverable/get/${phaseId}`, {

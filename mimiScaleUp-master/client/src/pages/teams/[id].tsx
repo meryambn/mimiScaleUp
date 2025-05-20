@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasPhase, checkIfTeamIsWinner } from '@/services/teamService';
 import { moveToPhase } from '@/services/phaseService';
 import { getPhases, getEvaluationCriteriaByPhaseName } from '@/services/programService';
 import { declareWinner } from '@/services/winnerService';
+
 import TeamDeliverableSubmissions from '@/components/deliverables/TeamDeliverableSubmissions';
+
 
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +64,7 @@ const StartupDetailPage = () => {
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
   const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
+  const queryClient = useQueryClient(); // Initialize queryClient
 
   // Check localStorage for teams first
   const [localStartup, setLocalStartup] = useState<any>(null);
@@ -348,7 +351,71 @@ const StartupDetailPage = () => {
   React.useEffect(() => {
     console.log(`Selected phase changed to: ${selectedPhase}`);
     // When selectedPhase changes, we should refetch the criteria
-  }, [selectedPhase]);
+
+    // Add a direct API call to check if the API is working
+    const effectiveTeamId = id; // Use the id from useParams
+    if (effectiveTeamId && selectedPhase && selectedProgramId) {
+      console.log('Making direct API calls to check if the API is working...');
+
+      // Check if the team exists
+      fetch(`/api/equipe/${effectiveTeamId}`)
+        .then(response => {
+          console.log('Team API response status:', response.status);
+          return response.ok ? response.json() : null;
+        })
+        .then(data => {
+          console.log('Team API response data:', data);
+        })
+        .catch(error => {
+          console.error('Error fetching team:', error);
+        });
+
+      // Check if the phase exists
+      fetch(`/api/phase/programme/${selectedProgramId}`)
+        .then(response => {
+          console.log('Phases API response status:', response.status);
+          return response.ok ? response.json() : null;
+        })
+        .then(data => {
+          console.log('Phases API response data:', data);
+
+          // Find the phase ID for the selected phase
+          const matchingPhase = data?.find((p: any) => p.nom === selectedPhase);
+          console.log('Matching phase:', matchingPhase);
+
+          if (matchingPhase) {
+            // Check if the phase has deliverables
+            fetch(`/api/liverable/get/${matchingPhase.id}`)
+              .then(response => {
+                console.log('Deliverables API response status:', response.status);
+                return response.ok ? response.json() : null;
+              })
+              .then(data => {
+                console.log('Deliverables API response data:', data);
+              })
+              .catch(error => {
+                console.error('Error fetching deliverables:', error);
+              });
+
+            // Check if the team has submissions for this phase
+            fetch(`/api/livrable-soumissions/equipe/${effectiveTeamId}`)
+              .then(response => {
+                console.log('Submissions API response status:', response.status);
+                return response.ok ? response.json() : null;
+              })
+              .then(data => {
+                console.log('Submissions API response data:', data);
+              })
+              .catch(error => {
+                console.error('Error fetching submissions:', error);
+              });
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching phases:', error);
+        });
+    }
+  }, [selectedPhase, id, selectedProgramId]);
 
   // Écouter les événements de changement de phase
   React.useEffect(() => {
@@ -1133,7 +1200,7 @@ const StartupDetailPage = () => {
         </CardHeader>
       </Card>
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="deliverables">
         <TabsList className="mb-6">
           <TabsTrigger value="overview">Aperçu</TabsTrigger>
           <TabsTrigger value="deliverables">Livrables</TabsTrigger>
@@ -1257,6 +1324,7 @@ const StartupDetailPage = () => {
         </TabsContent>
 
         <TabsContent value="deliverables">
+          {/* Deliverables tab content */}
           <div className="mb-4 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
             <p className="text-sm text-gray-700">
               Livrables pour la phase: <span className="font-medium">{selectedPhase}</span>
@@ -1272,11 +1340,17 @@ const StartupDetailPage = () => {
                   setSelectedPhase(e.target.value);
                 }}
               >
-                {selectedProgram?.phases.map((phase, index) => (
+                {selectedProgram?.phases ? selectedProgram.phases.map((phase, index) => (
                   <option key={index} value={phase.name}>
-                    {phase.name} {phase.name === startup.currentPhase ? '(Actuelle)' : ''}
+                    {phase.name} {phase.name === startup?.currentPhase ? '(Actuelle)' : ''}
                   </option>
-                ))}
+                )) : (
+                  // Fallback options if selectedProgram is null
+                  <>
+                    <option value="Candidature">Candidature</option>
+                    <option value="New Phase">New Phase</option>
+                  </>
+                )}
               </select>
               {userSelectedPhase && selectedPhase !== startup?.currentPhase && (
                 <button
@@ -1303,49 +1377,76 @@ const StartupDetailPage = () => {
             </CardHeader>
             <CardContent>
               {/* Utiliser le composant TeamDeliverableSubmissions */}
-              {teamDetailsData && selectedProgram ? (
-                <>
-                  {/* Debug info */}
-                  <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
-                    <p>Debug: Team ID: {id}</p>
-                    <p>Selected Phase: {selectedPhase}</p>
-                    <p>Phase ID: {selectedProgram.phases.find(p => p.name === selectedPhase)?.id || 'Not found'}</p>
-                    <p>teamDetailsData ID: {teamDetailsData?.id}</p>
-                    <p>teamDetailsData: {JSON.stringify(teamDetailsData)}</p>
-                    <p>selectedProgram phases: {JSON.stringify(selectedProgram.phases)}</p>
-                    <button
-                      className="mt-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
-                      onClick={() => {
-                        console.log('Debug - teamDetailsData:', teamDetailsData);
-                        console.log('Debug - selectedProgram:', selectedProgram);
-                        console.log('Debug - id from URL:', id);
-                      }}
-                    >
-                      Log Debug Info
-                    </button>
+              {/* Main component */}
+              <div>
+                  {/* Main TeamDeliverableSubmissions component */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium mb-2">Livrables soumis pour cette phase</h3>
+                    <p className="text-sm mb-4">Visualisez et gérez les livrables soumis par l'équipe pour la phase <span className="font-bold">{selectedPhase}</span>.</p>
+
+                    {/* DYNAMIC APPROACH WITH PROPER PHASE HANDLING */}
+                    {(() => {
+                      // Get the phase ID from the selectedProgram or use hardcoded values
+                      let phaseId = '';
+
+                      // Try to get the phase ID from the selectedProgram if available
+                      if (selectedProgram?.phases) {
+                        const matchingPhase = selectedProgram.phases.find(p => p.name === selectedPhase);
+                        if (matchingPhase?.id) {
+                          phaseId = matchingPhase.id.toString();
+                        }
+                      }
+
+                      // If we couldn't find the phase ID, use hardcoded values based on phase name
+                      if (!phaseId) {
+                        if (selectedPhase === "Candidature") {
+                          phaseId = "109";
+                        } else if (selectedPhase === "New Phase") {
+                          phaseId = "110";
+                        }
+                      }
+
+                      const teamIdToUse = teamDetailsData?.id?.toString() || id || '';
+
+                      // Determine the correct phase ID based on the selected phase name
+                      let phaseIdToUse = '';
+
+                      // Always use the real phase ID if available
+                      if (phaseId) {
+                        phaseIdToUse = phaseId;
+                      }
+                      // Only use hardcoded values as a last resort
+                      else if (selectedPhase === "Candidature") {
+                        phaseIdToUse = "109";
+                      } else if (selectedPhase === "New Phase") {
+                        phaseIdToUse = "110";
+                      } else {
+                        // Fallback
+                        return (
+                          <div className="p-4 bg-yellow-50 text-yellow-800 rounded-md">
+                            <p className="font-medium">Phase non prise en charge</p>
+                            <p className="text-sm">La phase sélectionnée "{selectedPhase}" n'est pas encore configurée pour afficher des livrables.</p>
+                            <p className="text-sm mt-2">Phases prises en charge : Candidature, New Phase</p>
+                          </div>
+                        );
+                      }
+
+                      // Generate a unique key that changes when the phase changes
+                      const componentKey = `phase-${phaseIdToUse}-${Date.now()}`;
+
+                      return (
+                        <div key={componentKey}>
+                          {/* The actual component with the correct phase ID */}
+                          <TeamDeliverableSubmissions
+                            key={componentKey}
+                            teamId={(id || teamIdToUse || "40").toString()} // Ensure it's a string
+                            phaseId={phaseIdToUse}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
-
-                  {console.log('Rendering TeamDeliverableSubmissions with:', {
-                    teamId: id,
-                    phaseId: selectedProgram.phases.find(p => p.name === selectedPhase)?.id,
-                    selectedPhase
-                  })}
-
-                  {/* The teamId is used as candidatureId in the backend */}
-                  <TeamDeliverableSubmissions
-                    teamId={teamDetailsData?.id?.toString() || id || ''}
-                    phaseId={selectedProgram.phases.find(p => p.name === selectedPhase)?.id?.toString() || ''}
-                  />
-                </>
-              ) : (
-                <div className="text-center py-12 bg-red-50 rounded-lg">
-                  <p className="text-red-500 font-medium">Impossible d'afficher les livrables</p>
-                  <p className="text-sm text-red-400">
-                    {!teamDetailsData ? "Données de l'équipe non disponibles" : ""}
-                    {!selectedProgram ? "Programme non sélectionné" : ""}
-                  </p>
                 </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1421,11 +1522,17 @@ const StartupDetailPage = () => {
                       setSelectedPhase(e.target.value);
                     }}
                   >
-                    {selectedProgram?.phases.map((phase, index) => (
+                    {selectedProgram?.phases ? selectedProgram.phases.map((phase, index) => (
                       <option key={index} value={phase.name}>
-                        {phase.name} {phase.name === startup.currentPhase ? '(Actuelle)' : ''}
+                        {phase.name} {phase.name === startup?.currentPhase ? '(Actuelle)' : ''}
                       </option>
-                    ))}
+                    )) : (
+                      // Fallback options if selectedProgram is null
+                      <>
+                        <option value="Candidature">Candidature</option>
+                        <option value="New Phase">New Phase</option>
+                      </>
+                    )}
                   </select>
                   {userSelectedPhase && selectedPhase !== startup?.currentPhase && (
                     <button

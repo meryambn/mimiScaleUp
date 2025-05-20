@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Download, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
 import { DeliverableSubmission, downloadSubmissionFile, updateSubmissionStatus } from '@/services/deliverableService';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useLocation } from 'wouter';
 
 interface DeliverableSubmissionCardProps {
   submission: DeliverableSubmission;
@@ -23,6 +24,7 @@ export const DeliverableSubmissionCard: React.FC<DeliverableSubmissionCardProps>
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation(); // For navigation
 
   // Debug the submission data
   console.log('DeliverableSubmissionCard - submission:', submission);
@@ -110,6 +112,40 @@ export const DeliverableSubmissionCard: React.FC<DeliverableSubmissionCardProps>
           </div>
 
           <div className="flex flex-wrap gap-2 mt-2">
+            {/* View Details Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                // Get the current path to determine if we're in admin, mentor, or regular view
+                const currentPath = window.location.pathname;
+                let basePath = '';
+
+                // Determine the base path based on the current URL
+                if (currentPath.includes('/admin/')) {
+                  basePath = '/admin/teams';
+                } else if (currentPath.includes('/mentors/')) {
+                  basePath = '/mentors/teams';
+                } else {
+                  basePath = '/teams';
+                }
+
+                // Navigate to the deliverable details page
+                const detailsPath = `${basePath}/${submission.candidature_id}/deliverables/${submission.id}`;
+                console.log('Navigating to:', detailsPath);
+                setLocation(detailsPath);
+
+                toast({
+                  title: "Navigation",
+                  description: "Chargement des détails du livrable...",
+                });
+              }}
+              className="flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
+            >
+              <Eye className="h-4 w-4" />
+              Voir les détails
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
