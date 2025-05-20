@@ -1,25 +1,55 @@
 import React from 'react';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTasks } from '@/context/TasksContext';
 import { useProgramContext } from '@/context/ProgramContext';
 
-const OverallTasksWidget: React.FC = () => {
-  const { filteredTasks, priorityColors, statusIcons } = useTasks();
+interface OverallTasksWidgetProps {
+  programId?: number | string;
+  currentPhase?: number | string;
+  tasks?: any[];
+}
+
+const OverallTasksWidget: React.FC<OverallTasksWidgetProps> = ({
+  programId,
+  currentPhase,
+  tasks = []
+}) => {
+  const { filteredTasks: contextTasks, priorityColors: contextPriorityColors, statusIcons: contextStatusIcons } = useTasks();
   const { selectedPhaseId } = useProgramContext();
 
+  // Use tasks prop if provided, otherwise use context
+  const allTasks = tasks.length > 0 ? tasks : contextTasks;
+
+  // Define status icons if not available from context
+  const statusIcons = contextStatusIcons || {
+    'todo': <AlertCircle className="h-4 w-4 text-yellow-500" />,
+    'in_progress': <Clock className="h-4 w-4 text-blue-500" />,
+    'completed': <CheckCircle className="h-4 w-4 text-green-500" />
+  };
+
+  // Define priority colors if not available from context
+  const priorityColors = contextPriorityColors || {
+    'low': 'bg-green-100 text-green-800',
+    'medium': 'bg-blue-100 text-blue-800',
+    'high': 'bg-red-100 text-red-800'
+  };
+
   // Filter tasks by selected phase if applicable
-  const phaseFilteredTasks = selectedPhaseId
-    ? filteredTasks.filter(task => {
+  // If currentPhase is null, undefined, or 0, show all tasks
+  const phaseFilteredTasks = currentPhase && Number(currentPhase) > 0
+    ? allTasks.filter(task => {
         // If task has phaseId property, filter by it
         if (task.phaseId) {
-          return task.phaseId === selectedPhaseId;
+          return String(task.phaseId) === String(currentPhase);
         }
         // Otherwise, include all tasks
         return true;
       })
-    : filteredTasks;
+    : allTasks; // Show all tasks when no phase is selected
+
+  console.log('OverallTasksWidget - Filtered tasks:', phaseFilteredTasks);
 
   // Get counts for each status
   const todoCount = phaseFilteredTasks.filter(t => t.status === 'todo').length;

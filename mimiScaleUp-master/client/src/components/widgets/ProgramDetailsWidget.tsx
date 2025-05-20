@@ -18,7 +18,7 @@ const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
   const { selectedProgram } = useProgramContext();
 
   // Priority: 1. submissionProgram (passed from Dashboard), 2. selectedProgram (from context), 3. default program
-  const programToDisplay = submissionProgram || selectedProgram || {
+  let programToDisplay = submissionProgram || selectedProgram || {
     name: "Programme ScaleUp 2024",
     description: "Programme d'accélération pour les startups innovantes dans le domaine de la technologie",
     startDate: "2024-01-15",
@@ -31,10 +31,54 @@ const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
     ]
   };
 
+  // Format date function to get only the date part
+  const formatDateString = (dateStr) => {
+    if (!dateStr) return new Date().toISOString().split('T')[0];
+    // If it's already just a date (YYYY-MM-DD), return it
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    // Otherwise, extract the date part from the timestamp
+    return dateStr.split('T')[0];
+  };
+
+  // Handle case where program data might have different property names (nom instead of name)
+  if (programToDisplay) {
+    programToDisplay = {
+      ...programToDisplay,
+      name: programToDisplay.nom || programToDisplay.name || 'Programme sans nom',
+      description: programToDisplay.description || '',
+      startDate: formatDateString(programToDisplay.date_debut || programToDisplay.startDate),
+      endDate: formatDateString(programToDisplay.date_fin || programToDisplay.endDate)
+    };
+  }
+
   // Log the program data for debugging
-  console.log('ProgramDetailsWidget - submissionProgram:', submissionProgram);
-  console.log('ProgramDetailsWidget - selectedProgram:', selectedProgram);
-  console.log('ProgramDetailsWidget - programToDisplay:', programToDisplay);
+  console.log('ProgramDetailsWidget - submissionProgram:', submissionProgram ? {
+    id: submissionProgram.id,
+    name: submissionProgram.name,
+    description: submissionProgram.description,
+    startDate: submissionProgram.startDate,
+    endDate: submissionProgram.endDate,
+    phasesCount: submissionProgram.phases ? submissionProgram.phases.length : 0,
+    resourcesCount: submissionProgram.resources ? submissionProgram.resources.length : 0
+  } : null);
+
+  console.log('ProgramDetailsWidget - selectedProgram:', selectedProgram ? {
+    id: selectedProgram.id,
+    name: selectedProgram.name,
+    description: selectedProgram.description,
+    startDate: selectedProgram.startDate,
+    endDate: selectedProgram.endDate,
+    phasesCount: selectedProgram.phases ? selectedProgram.phases.length : 0
+  } : null);
+
+  console.log('ProgramDetailsWidget - programToDisplay:', {
+    id: programToDisplay.id,
+    name: programToDisplay.name,
+    description: programToDisplay.description,
+    startDate: programToDisplay.startDate,
+    endDate: programToDisplay.endDate,
+    phasesCount: programToDisplay.phases ? programToDisplay.phases.length : 0
+  });
 
   if (!programToDisplay && !isStartupInterface) {
     return (
@@ -91,14 +135,21 @@ const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
           <div className="mt-4">
             <p className="text-sm font-medium text-gray-500 mb-2">Phases</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {programToDisplay.phases.map((phase) => (
-                <div key={phase.id} className="text-sm">
-                  <span className="font-medium">{phase.name}</span>
-                  <span className="text-gray-500 ml-2">
-                    {new Date(phase.startDate).toLocaleDateString()} - {new Date(phase.endDate).toLocaleDateString()}
-                  </span>
-                </div>
-              ))}
+              {programToDisplay.phases.map((phase) => {
+                // Handle case where phase data might have different property names (nom instead of name)
+                const phaseName = phase.name || phase.nom || 'Phase sans nom';
+                const phaseStartDate = formatDateString(phase.startDate || phase.date_debut);
+                const phaseEndDate = formatDateString(phase.endDate || phase.date_fin);
+
+                return (
+                  <div key={phase.id} className="text-sm">
+                    <span className="font-medium">{phaseName}</span>
+                    <span className="text-gray-500 ml-2">
+                      {new Date(phaseStartDate).toLocaleDateString()} - {new Date(phaseEndDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

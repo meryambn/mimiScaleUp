@@ -49,17 +49,17 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
 
   // Determine if we're using external or internal state for selected phase
   const selectedPhaseValue = externalSelectedPhase !== undefined ? externalSelectedPhase : selectedPhaseId;
-  
+
   // Notify parent component when phase is selected
   const handlePhaseSelect = (phaseId: number | string | null) => {
     // Update internal state
     setInternalSelectedPhase(phaseId);
-    
+
     // Update context if we're using it
     if (setSelectedPhaseId && externalSelectedPhase === undefined) {
       setSelectedPhaseId(phaseId);
     }
-    
+
     // Notify parent component
     if (phaseId !== null && onPhaseSelect) {
       onPhaseSelect(phaseId);
@@ -72,18 +72,36 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
   };
 
   useEffect(() => {
+    // Add debugging for phases
+    console.log('DynamicProgramTimeline - externalPhases:', externalPhases ? `${externalPhases.length} phases` : 'none');
+    console.log('DynamicProgramTimeline - selectedProgram phases:',
+      selectedProgram && selectedProgram.phases ? `${selectedProgram.phases.length} phases` : 'none');
+
     // If external phases are provided, use them
     if (externalPhases && externalPhases.length > 0) {
-      setPhases(externalPhases);
-    } 
-    // Otherwise, use phases from the selected program in context
-    else if (selectedProgram && selectedProgram.phases && selectedProgram.phases.length > 0) {
-      // Convert program phases to timeline phases
-      const timelinePhases = selectedProgram.phases.map(phase => {
+      console.log('DynamicProgramTimeline - Using external phases:', externalPhases);
+
+      // Process external phases to ensure they have the correct property names
+      const processedPhases = externalPhases.map(phase => {
+        // Handle case where phase data might have different property names (nom instead of name)
+        const phaseName = phase.name || phase.nom || 'Phase sans nom';
+        const phaseDescription = phase.description || '';
+        // Get the date part only from timestamps
+        const formatDateString = (dateStr) => {
+          if (!dateStr) return new Date().toISOString().split('T')[0];
+          // If it's already just a date (YYYY-MM-DD), return it
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+          // Otherwise, extract the date part from the timestamp
+          return dateStr.split('T')[0];
+        };
+
+        const phaseStartDate = formatDateString(phase.startDate || phase.date_debut);
+        const phaseEndDate = formatDateString(phase.endDate || phase.date_fin);
+
         // Calculate progress based on dates
         const now = new Date();
-        const startDate = new Date(phase.startDate);
-        const endDate = new Date(phase.endDate);
+        const startDate = new Date(phaseStartDate);
+        const endDate = new Date(phaseEndDate);
         const totalDuration = endDate.getTime() - startDate.getTime();
         const elapsedDuration = now.getTime() - startDate.getTime();
         let progress = 0;
@@ -104,12 +122,68 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
 
         return {
           id: phase.id,
-          name: phase.name,
-          startDate: phase.startDate,
-          endDate: phase.endDate,
+          name: phaseName,
+          startDate: phaseStartDate,
+          endDate: phaseEndDate,
           progress,
           status,
-          description: phase.description,
+          description: phaseDescription,
+          color: phase.color || getStatusColor(status)
+        };
+      });
+
+      setPhases(processedPhases);
+    }
+    // Otherwise, use phases from the selected program in context
+    else if (selectedProgram && selectedProgram.phases && selectedProgram.phases.length > 0) {
+      console.log('DynamicProgramTimeline - Using phases from selectedProgram:', selectedProgram.phases);
+      // Convert program phases to timeline phases
+      const timelinePhases = selectedProgram.phases.map(phase => {
+        // Handle case where phase data might have different property names (nom instead of name)
+        const phaseName = phase.name || phase.nom || 'Phase sans nom';
+        const phaseDescription = phase.description || '';
+        // Get the date part only from timestamps
+        const formatDateString = (dateStr) => {
+          if (!dateStr) return new Date().toISOString().split('T')[0];
+          // If it's already just a date (YYYY-MM-DD), return it
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+          // Otherwise, extract the date part from the timestamp
+          return dateStr.split('T')[0];
+        };
+
+        const phaseStartDate = formatDateString(phase.startDate || phase.date_debut);
+        const phaseEndDate = formatDateString(phase.endDate || phase.date_fin);
+
+        // Calculate progress based on dates
+        const now = new Date();
+        const startDate = new Date(phaseStartDate);
+        const endDate = new Date(phaseEndDate);
+        const totalDuration = endDate.getTime() - startDate.getTime();
+        const elapsedDuration = now.getTime() - startDate.getTime();
+        let progress = 0;
+
+        if (now > endDate) {
+          progress = 100;
+        } else if (now >= startDate && now <= endDate) {
+          progress = Math.min(Math.round((elapsedDuration / totalDuration) * 100), 100);
+        }
+
+        // Determine status based on dates
+        let status: 'completed' | 'in-progress' | 'upcoming' = 'upcoming';
+        if (now > endDate) {
+          status = 'completed';
+        } else if (now >= startDate && now <= endDate) {
+          status = 'in-progress';
+        }
+
+        return {
+          id: phase.id,
+          name: phaseName,
+          startDate: phaseStartDate,
+          endDate: phaseEndDate,
+          progress,
+          status,
+          description: phaseDescription,
           color: phase.color || getStatusColor(status)
         };
       });
@@ -201,7 +275,7 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
   // Selected phase indicator component
   const SelectedPhaseIndicator = () => {
     if (!selectedPhaseValue || !getSelectedPhase()) return null;
-    
+
     return (
       <div className="mt-2 p-3 bg-blue-50 rounded-md flex items-center">
         <div
@@ -348,8 +422,8 @@ const DynamicProgramTimeline: React.FC<DynamicProgramTimelineProps> = ({
   };
 
   // Render the appropriate timeline based on viewType
-  const timelineContent = viewType === 'vertical' 
-    ? <VerticalTimelineContent /> 
+  const timelineContent = viewType === 'vertical'
+    ? <VerticalTimelineContent />
     : <HorizontalTimelineContent />;
 
   // If showCard is true, wrap in a Card component

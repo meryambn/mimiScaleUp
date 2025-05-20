@@ -6,25 +6,56 @@ import { Badge } from '@/components/ui/badge';
 import { useMeetings } from '@/context/MeetingsContext';
 import { useProgramContext } from '@/context/ProgramContext';
 
-const UpcomingMeetingsWidget: React.FC = () => {
+interface UpcomingMeetingsWidgetProps {
+  programId?: number | string;
+  currentPhase?: number | string;
+  meetings?: any[];
+}
+
+const UpcomingMeetingsWidget: React.FC<UpcomingMeetingsWidgetProps> = ({
+  programId,
+  currentPhase,
+  meetings = []
+}) => {
   const {
-    upcomingMeetings,
+    upcomingMeetings: contextMeetings,
     formatDate,
     formatTime
   } = useMeetings();
   const { selectedPhaseId } = useProgramContext();
 
+  // Use meetings prop if provided, otherwise use context
+  const upcomingMeetings = meetings.length > 0 ? meetings : contextMeetings;
+
+  // Format date function
+  const formatMeetingDate = (date: string, time?: string) => {
+    try {
+      return new Date(date).toLocaleDateString('fr-FR');
+    } catch (error) {
+      return 'Date invalide';
+    }
+  };
+
+  // Format time function
+  const formatMeetingTime = (time?: string) => {
+    if (!time) return '00:00';
+    return time;
+  };
+
   // Filter meetings by selected phase if applicable
-  const phaseFilteredMeetings = selectedPhaseId
+  // If currentPhase is null, undefined, or 0, show all meetings
+  const phaseFilteredMeetings = currentPhase && Number(currentPhase) > 0
     ? upcomingMeetings.filter(meeting => {
         // If meeting has phaseId property, filter by it
         if (meeting.phaseId) {
-          return meeting.phaseId === selectedPhaseId;
+          return String(meeting.phaseId) === String(currentPhase);
         }
         // Otherwise, include all meetings
         return true;
       })
-    : upcomingMeetings;
+    : upcomingMeetings; // Show all meetings when no phase is selected
+
+  console.log('UpcomingMeetingsWidget - Filtered meetings:', phaseFilteredMeetings);
 
   // Get only the first 4 upcoming meetings
   const displayMeetings = phaseFilteredMeetings.slice(0, 4);
@@ -63,7 +94,7 @@ const UpcomingMeetingsWidget: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Clock className="h-4 w-4" />
                     <span>
-                      {formatDate(meeting.date, meeting.time)}, {formatTime(meeting.time)}
+                      {formatMeetingDate(meeting.date, meeting.time)}, {formatMeetingTime(meeting.time)}
                     </span>
                   </div>
 

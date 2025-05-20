@@ -6,18 +6,41 @@ import { format, isBefore, isToday } from 'date-fns';
 import { useDeliverables, Deliverable } from '@/context/DeliverablesContext';
 import { useProgramContext } from '@/context/ProgramContext';
 
-const DeliverablesWidget: React.FC = () => {
+interface DeliverablesWidgetProps {
+  programId?: number | string;
+  currentPhase?: number | string;
+  deliverables?: any[];
+}
+
+const DeliverablesWidget: React.FC<DeliverablesWidgetProps> = ({
+  programId,
+  currentPhase,
+  deliverables: propDeliverables = []
+}) => {
   // Use the context data directly - this is the same data used by the main page
   const {
-    upcomingDeliverables,
+    upcomingDeliverables: contextDeliverables,
     getStatusBadgeClass,
     getStatusText,
     getSubmissionTypeIcon,
-    deliverables
+    deliverables: allContextDeliverables
   } = useDeliverables();
 
   const { selectedProgram, selectedPhaseId } = useProgramContext();
   const [isLoading, setIsLoading] = useState(true);
+
+  // Use deliverables prop if provided, otherwise use context
+  const upcomingDeliverables = propDeliverables.length > 0 ? propDeliverables : contextDeliverables;
+
+  // Helper function to get status text
+  const getDeliverableStatusText = (status: string, dueDate: string) => {
+    const today = new Date();
+    const deliverableDate = new Date(dueDate);
+
+    if (status === 'submitted') return 'Soumis';
+    if (isBefore(deliverableDate, today) && !isToday(deliverableDate)) return 'En retard';
+    return 'À venir';
+  };
 
   // Set loading to false when deliverables are loaded
   useEffect(() => {
@@ -26,11 +49,12 @@ const DeliverablesWidget: React.FC = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [deliverables]);
+  }, [propDeliverables, contextDeliverables]);
 
   // Filter deliverables by selected phase if applicable
   const phaseFilteredDeliverables = React.useMemo(() => {
-    if (!selectedPhaseId) {
+    // If currentPhase is null, undefined, or 0, show all deliverables
+    if (!currentPhase || Number(currentPhase) <= 0) {
       return upcomingDeliverables;
     }
 
@@ -38,30 +62,15 @@ const DeliverablesWidget: React.FC = () => {
     return upcomingDeliverables.filter(deliverable => {
       // If deliverable has phaseId property, filter by it
       if (deliverable.phaseId) {
-        return deliverable.phaseId === selectedPhaseId ||
-               String(deliverable.phaseId) === String(selectedPhaseId);
-      }
-
-      // If we have the selected program, check if the deliverable is in the selected phase
-      if (selectedProgram && selectedProgram.phases) {
-        const selectedPhase = selectedProgram.phases.find(phase =>
-          phase.id === selectedPhaseId ||
-          String(phase.id) === String(selectedPhaseId)
-        );
-
-        if (selectedPhase && selectedPhase.deliverables) {
-          // Check if this deliverable is in the selected phase's deliverables
-          return selectedPhase.deliverables.some(d =>
-            d.id === deliverable.id ||
-            String(d.id) === String(deliverable.id)
-          );
-        }
+        return String(deliverable.phaseId) === String(currentPhase);
       }
 
       // If we can't determine the phase, include the deliverable
       return true;
     });
-  }, [upcomingDeliverables, selectedPhaseId, selectedProgram]);
+  }, [upcomingDeliverables, currentPhase]);
+
+  console.log('DeliverablesWidget - Filtered deliverables:', phaseFilteredDeliverables);
 
   // Get only the first 5 deliverables for display
   const displayDeliverables = phaseFilteredDeliverables.slice(0, 5);
@@ -129,7 +138,7 @@ const DeliverablesWidget: React.FC = () => {
                         deliverable.status === 'submitted' ? "text-green-600" :
                         "text-amber-600"
                       )}>
-                        {getStatusText(deliverable.status, deliverable.dueDate)}
+                        {getStatusText ? getStatusText(deliverable.status, deliverable.dueDate) : getDeliverableStatusText(deliverable.status, deliverable.dueDate)}
                       </span>
                     </div>
                   </div>

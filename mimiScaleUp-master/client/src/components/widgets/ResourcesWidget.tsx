@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusCircle, Download, Loader2 } from 'lucide-react';
+import { PlusCircle, Download, Loader2, FileText, Video, File, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -18,38 +18,112 @@ interface WidgetResource {
   is_external?: boolean;
 }
 
-const ResourcesWidget: React.FC = () => {
+interface ResourcesWidgetProps {
+  programId?: number | string;
+  resources?: any[];
+}
+
+const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
+  programId,
+  resources: propResources = []
+}) => {
   const {
-    getResourceTypeIcon,
-    getCategoryColor
+    getResourceTypeIcon: contextGetResourceTypeIcon,
+    getCategoryColor: contextGetCategoryColor
   } = useResources();
 
   const { selectedProgram } = useProgramContext();
   const [isLoading, setIsLoading] = useState(true);
   const [widgetResources, setWidgetResources] = useState<WidgetResource[]>([]);
 
-  // Get resources from the selected program or fetch from API
+  // Define resource type icons if not available from context
+  const getResourceTypeIcon = (type: string) => {
+    if (contextGetResourceTypeIcon) return contextGetResourceTypeIcon(type);
+
+    // Fallback implementation
+    switch (type?.toLowerCase()) {
+      case 'document':
+        return <FileText className="h-5 w-5 text-blue-500" />;
+      case 'video':
+        return <Video className="h-5 w-5 text-red-500" />;
+      case 'spreadsheet':
+        return <File className="h-5 w-5 text-green-500" />;
+      case 'presentation':
+        return <File className="h-5 w-5 text-orange-500" />;
+      case 'link':
+        return <ExternalLink className="h-5 w-5 text-purple-500" />;
+      default:
+        return <FileText className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  // Define category colors if not available from context
+  const getCategoryColor = (category: string) => {
+    if (contextGetCategoryColor) return contextGetCategoryColor(category);
+
+    // Fallback implementation
+    switch (category.toLowerCase()) {
+      case 'documentation':
+        return 'bg-blue-100 text-blue-800';
+      case 'tutorial':
+        return 'bg-green-100 text-green-800';
+      case 'template':
+        return 'bg-purple-100 text-purple-800';
+      case 'guide':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Get resources from props, selected program, or fetch from API
   useEffect(() => {
     const fetchResources = async () => {
-      if (!selectedProgram?.id) {
-        setIsLoading(false);
-        return;
-      }
-
       setIsLoading(true);
+
+      console.log("ResourcesWidget: fetchResources called with:", {
+        propResourcesLength: propResources ? propResources.length : 'null/undefined',
+        programId: programId,
+        selectedProgramId: selectedProgram?.id
+      });
+
       try {
-        // First check if the selected program already has resources in its object
-        if (selectedProgram.resources && selectedProgram.resources.length > 0) {
+        // First check if resources were passed as props
+        if (propResources && propResources.length > 0) {
+          console.log("ResourcesWidget: Using resources from props:", propResources);
+
+          // Convert prop resources to widget resources
+          const formattedResources: WidgetResource[] = propResources.map((r: any) => ({
+            id: String(r.id || Math.random().toString(36).substring(7)),
+            title: r.title || r.nom || 'Ressource sans titre',
+            description: r.description || '',
+            type: typeof r.type === 'string' ? r.type.toLowerCase() : 'document',
+            url: r.url || `/api/resources/download/${r.id}`,
+            createdAt: r.created_at || r.createdAt || new Date().toISOString(),
+            category: r.category || '',
+            is_external: r.is_external || false
+          }));
+
+          console.log("ResourcesWidget: Formatted resources from props:", formattedResources);
+          setWidgetResources(formattedResources);
+          setIsLoading(false);
+          return;
+        } else {
+          console.log("ResourcesWidget: No resources in props");
+        }
+
+        // Next check if the selected program already has resources in its object
+        if (selectedProgram?.resources && selectedProgram.resources.length > 0) {
           console.log("ResourcesWidget: Using resources from selected program:", selectedProgram.resources);
 
           // Convert program resources to widget resources
           const formattedResources: WidgetResource[] = selectedProgram.resources.map((r: any) => ({
             id: String(r.id),
-            title: r.title,
+            title: r.title || r.nom || 'Ressource sans titre',
             description: r.description || '',
             type: typeof r.type === 'string' ? r.type.toLowerCase() : 'document',
             url: r.url || `/api/resources/download/${r.id}`,
-            createdAt: r.created_at || new Date().toISOString(),
+            createdAt: r.created_at || r.createdAt || new Date().toISOString(),
             category: r.category || '',
             is_external: r.is_external || false
           }));
@@ -59,9 +133,19 @@ const ResourcesWidget: React.FC = () => {
           return;
         }
 
-        // If no resources in the program object, call the API
-        console.log("ResourcesWidget: Fetching resources from API for program:", selectedProgram.id);
-        const result = await getProgramResources(selectedProgram.id);
+        // If no resources in props or program object, call the API
+        const effectiveProgramId = programId || (selectedProgram?.id);
+
+        if (!effectiveProgramId) {
+          console.log("ResourcesWidget: No program ID available, cannot fetch resources");
+          setWidgetResources([]);
+          setIsLoading(false);
+          return;
+        }
+
+        console.log("ResourcesWidget: Fetching resources from API for program:", effectiveProgramId);
+        const result = await getProgramResources(effectiveProgramId);
+        console.log("ResourcesWidget: API returned resources:", result);
 
         // Convert API resources to widget resources
         const formattedResources: WidgetResource[] = [
@@ -89,13 +173,14 @@ const ResourcesWidget: React.FC = () => {
         setWidgetResources(formattedResources);
       } catch (error) {
         console.error('Error fetching resources:', error);
+        setWidgetResources([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchResources();
-  }, [selectedProgram]);
+  }, [propResources, selectedProgram, programId]);
 
   // Get only the first 4 resources for display
   const displayResources = widgetResources.slice(0, 4);
