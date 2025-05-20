@@ -926,36 +926,73 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
           const uniquePrograms = Array.from(programsMap.values());
           console.log(`Found ${uniquePrograms.length} unique programs`);
 
-          // Combine backend programs with example programs
-          console.log('Combining backend programs with example programs');
-          const combinedPrograms = [...uniquePrograms, ...examplePrograms];
+          // Use only real programs from the backend when available
+          console.log('Using real programs from the backend');
 
-          // Deduplicate the combined programs by ID
-          const combinedProgramsMap = new Map();
-          combinedPrograms.forEach(program => {
-            // If a program with this ID already exists in the map, prefer the backend version
-            if (!combinedProgramsMap.has(program.id)) {
-              combinedProgramsMap.set(program.id, program);
-            }
-          });
+          // Check if we're in the startup interface
+          const isStartupInterface = user?.role === 'startup';
 
-          // Convert map back to array
-          const finalPrograms = Array.from(combinedProgramsMap.values());
-          console.log(`Combined ${uniquePrograms.length} backend programs with ${examplePrograms.length} example programs for a total of ${finalPrograms.length} unique programs`);
+          if (isStartupInterface) {
+            // For startup interface, only use real programs from the backend
+            console.log('Startup interface detected - using only real programs from backend');
+            setPrograms(uniquePrograms);
+            console.log(`Using ${uniquePrograms.length} real programs from the backend`);
+          } else {
+            // For admin interface, combine backend programs with example programs
+            console.log('Admin interface detected - combining backend and example programs');
+            const combinedPrograms = [...uniquePrograms, ...examplePrograms];
 
-          // Set the combined programs
-          setPrograms(finalPrograms);
+            // Deduplicate the combined programs by ID
+            const combinedProgramsMap = new Map();
+            combinedPrograms.forEach(program => {
+              // If a program with this ID already exists in the map, prefer the backend version
+              if (!combinedProgramsMap.has(program.id)) {
+                combinedProgramsMap.set(program.id, program);
+              }
+            });
+
+            // Convert map back to array
+            const finalPrograms = Array.from(combinedProgramsMap.values());
+            console.log(`Combined ${uniquePrograms.length} backend programs with ${examplePrograms.length} example programs for a total of ${finalPrograms.length} unique programs`);
+
+            // Set the combined programs
+            setPrograms(finalPrograms);
+          }
         } else {
           // Fallback to example programs if no programs found
           console.log('No programs found in backend, using example programs');
-          setPrograms(examplePrograms);
+
+          // Check if we're in the startup interface
+          const isStartupInterface = user?.role === 'startup';
+
+          if (isStartupInterface) {
+            // For startup interface, show an empty array to avoid showing mock data
+            console.log('Startup interface detected - using empty program array');
+            setPrograms([]);
+          } else {
+            // For admin interface, use example programs
+            console.log('Admin interface detected - using example programs');
+            setPrograms(examplePrograms);
+          }
         }
 
       } catch (error) {
         console.error('Error loading programs:', error);
         // Fallback to example programs
-        console.log('Error occurred, using example programs');
-        setPrograms(examplePrograms);
+        console.log('Error occurred, determining fallback behavior');
+
+        // Check if we're in the startup interface
+        const isStartupInterface = user?.role === 'startup';
+
+        if (isStartupInterface) {
+          // For startup interface, show an empty array to avoid showing mock data
+          console.log('Startup interface detected - using empty program array');
+          setPrograms([]);
+        } else {
+          // For admin interface, use example programs
+          console.log('Admin interface detected - using example programs');
+          setPrograms(examplePrograms);
+        }
       } finally {
         setIsLoading(false);
       }

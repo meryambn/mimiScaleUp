@@ -5,16 +5,20 @@ import { useProgramContext } from '@/context/ProgramContext';
 interface ProgramDetailsWidgetProps {
   standalone?: boolean;
   isStartupInterface?: boolean;
+  submissionProgram?: any;
+  programId?: string | number;
 }
 
 const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
   standalone = false,
-  isStartupInterface = false
+  isStartupInterface = false,
+  submissionProgram = null,
+  programId = null
 }) => {
   const { selectedProgram } = useProgramContext();
 
-  // For startup interface, use the selected program if available, otherwise use a default program
-  const programToDisplay = selectedProgram || {
+  // Priority: 1. submissionProgram (passed from Dashboard), 2. selectedProgram (from context), 3. default program
+  const programToDisplay = submissionProgram || selectedProgram || {
     name: "Programme ScaleUp 2024",
     description: "Programme d'accélération pour les startups innovantes dans le domaine de la technologie",
     startDate: "2024-01-15",
@@ -26,6 +30,11 @@ const ProgramDetailsWidget: React.FC<ProgramDetailsWidgetProps> = ({
       { id: "4", name: "Phase 4", startDate: "2024-09-16", endDate: "2024-12-15" }
     ]
   };
+
+  // Log the program data for debugging
+  console.log('ProgramDetailsWidget - submissionProgram:', submissionProgram);
+  console.log('ProgramDetailsWidget - selectedProgram:', selectedProgram);
+  console.log('ProgramDetailsWidget - programToDisplay:', programToDisplay);
 
   if (!programToDisplay && !isStartupInterface) {
     return (
