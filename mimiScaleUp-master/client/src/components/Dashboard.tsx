@@ -20,7 +20,7 @@ import UpcomingMeetingsWidget from '@/components/widgets/UpcomingMeetingsWidget'
 import OverallTasksWidget from '@/components/widgets/OverallTasksWidget';
 import ResourcesWidget from '@/components/widgets/ResourcesWidget';
 import DeliverablesWidget from '@/components/widgets/DeliverablesWidget';
-import EvaluationCriteriaWidget from '@/components/widgets/EvaluationCriteriaWidget';
+import StartupEvaluationWidget from '@/components/widgets/StartupEvaluationWidget';
 import EligibilityCriteriaWidget from '@/components/widgets/EligibilityCriteriaWidget';
 import { useAuth } from '@/context/AuthContext';
 import { checkSubmissionAccepted } from '@/services/teamService';
@@ -31,9 +31,9 @@ import {
   getPhases,
   getTasks,
   getReunions,
-  getLivrables,
-  getResources
+  getLivrables
 } from '@/services/programService';
+import { getProgramResources } from '@/services/resourceService';
 import { useProgramContext } from '@/context/ProgramContext';
 import './Dashboard.css';
 
@@ -77,7 +77,8 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
-  const [activePhase, setActivePhase] = useState<number | string>(1);
+  // Default to 0 (no phase selected) to show all data
+  const [activePhase, setActivePhase] = useState<number | string>(0);
   const [sidebarActive, setSidebarActive] = useState(false);
   const { user } = useAuth() as { user: User };
   const [lastCheckedSubmissionId, setLastCheckedSubmissionId] = useState<string | null>(null);
@@ -194,21 +195,100 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
               console.log(`Processed ${phasesWithDetails.length} phases with details:`, phasesWithDetails);
 
               // Fetch resources for this program
-              console.log(`Fetching resources for program ${programDetails.id}...`);
+              console.log(`DASHBOARD: About to fetch resources for program ${programDetails.id}...`);
               let resources = [];
               try {
-                // Note: You'll need to implement or import the getResources function
-                // resources = await getResources(programDetails.id);
-                console.log(`Fetched ${resources.length} resources for program ${programDetails.id}:`, resources);
+                // Log the function we're about to call
+                console.log(`DASHBOARD: Calling getProgramResources(${programDetails.id})`);
+
+                // Try a direct fetch to the API endpoint first to check if it's working
+                try {
+                  console.log(`DASHBOARD: Trying direct fetch to /api/resources/program/${programDetails.id}`);
+                  const directResponse = await fetch(`/api/resources/program/${programDetails.id}`, {
+                    method: 'GET',
+                    headers: {
+                      'Accept': 'application/json'
+                    },
+                    credentials: 'include'
+                  });
+
+                  console.log(`DASHBOARD: Direct fetch response status:`, directResponse.status);
+                  if (directResponse.ok) {
+                    const directResult = await directResponse.json();
+                    console.log(`DASHBOARD: Direct fetch result:`, directResult);
+                  } else {
+                    console.error(`DASHBOARD: Direct fetch failed with status ${directResponse.status}`);
+                    const errorText = await directResponse.text();
+                    console.error(`DASHBOARD: Direct fetch error text:`, errorText);
+                  }
+                } catch (directFetchError) {
+                  console.error(`DASHBOARD: Direct fetch threw an error:`, directFetchError);
+                }
+
+                // Call the function with explicit error handling
+                let resourcesResult;
+                try {
+                  resourcesResult = await getProgramResources(programDetails.id);
+                  console.log(`DASHBOARD: getProgramResources returned:`, resourcesResult);
+                } catch (fetchError) {
+                  console.error(`DASHBOARD: getProgramResources threw an error:`, fetchError);
+                  throw fetchError;
+                }
+
+                // Check if we got a valid result
+                if (!resourcesResult) {
+                  console.warn(`DASHBOARD: getProgramResources returned null or undefined`);
+                  resourcesResult = { resources: [], externalResources: [] };
+                }
+
+                // Check if the result has the expected properties
+                if (!Array.isArray(resourcesResult.resources)) {
+                  console.warn(`DASHBOARD: resourcesResult.resources is not an array:`, resourcesResult.resources);
+                  resourcesResult.resources = [];
+                }
+
+                if (!Array.isArray(resourcesResult.externalResources)) {
+                  console.warn(`DASHBOARD: resourcesResult.externalResources is not an array:`, resourcesResult.externalResources);
+                  resourcesResult.externalResources = [];
+                }
+
+                console.log(`DASHBOARD: Fetched resources for program ${programDetails.id}:`, {
+                  resources: resourcesResult.resources.length,
+                  externalResources: resourcesResult.externalResources.length
+                });
+
+                // Combine both types of resources
+                resources = [
+                  ...resourcesResult.resources,
+                  ...resourcesResult.externalResources.map(r => ({
+                    ...r,
+                    type: 'link',
+                    is_external: true
+                  }))
+                ];
+
+                console.log(`DASHBOARD: Combined ${resources.length} resources for program ${programDetails.id}`);
               } catch (error) {
-                console.error(`Error fetching resources for program ${programDetails.id}:`, error);
+                console.error(`DASHBOARD: Error fetching resources for program ${programDetails.id}:`, error);
+                resources = [];
+              } finally {
+                console.log(`DASHBOARD: Final resources array:`, resources);
               }
+
+              // Format date function to get only the date part
+              const formatDateString = (dateStr) => {
+                if (!dateStr) return new Date().toISOString().split('T')[0];
+                // If it's already just a date (YYYY-MM-DD), return it
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+                // Otherwise, extract the date part from the timestamp
+                return dateStr.split('T')[0];
+              };
 
               // Vérifier et formater les dates si nécessaire
               const formattedProgram = {
                 ...programDetails,
-                startDate: programDetails.startDate || new Date().toISOString(),
-                endDate: programDetails.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                startDate: formatDateString(programDetails.startDate || programDetails.date_debut || new Date().toISOString()),
+                endDate: formatDateString(programDetails.endDate || programDetails.date_fin || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()),
                 // Ensure we have a name property that matches what the UI expects
                 name: programDetails.nom || programDetails.name || "Programme sans nom",
                 // Ensure we have a description property
@@ -218,6 +298,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
                 // Add resources
                 resources: resources
               };
+
+              // Log the resources in the formatted program
+              console.log('DASHBOARD: Resources in formattedProgram:', {
+                resourcesArray: resources,
+                resourcesLength: resources.length,
+                resourcesInProgram: formattedProgram.resources,
+                resourcesInProgramLength: formattedProgram.resources ? formattedProgram.resources.length : 'undefined'
+              });
               console.log('Programme formaté avec phases et ressources:', formattedProgram);
 
               // Add additional debugging
@@ -382,8 +470,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
               </button>
             )}
             <div className="date-range">
-              <span>Phase {activePhase} en cours</span>
-              <span>{getPhaseDescription(activePhase)}</span>
+              {activePhase && Number(activePhase) > 0 ? (
+                <>
+                  <span>Phase {activePhase} en cours</span>
+                  <span>{getPhaseDescription(activePhase)}</span>
+                </>
+              ) : (
+                <span>Toutes les phases</span>
+              )}
             </div>
           </div>
         </header>
@@ -401,6 +495,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
 
           {/* Widget de la timeline */}
           <div className="widget-card">
+            {/* Add debugging for phases */}
+            {console.log('Dashboard - Phases being passed to DynamicProgramTimeline:',
+              submissionProgram.phases ?
+                `${submissionProgram.phases.length} phases: ${JSON.stringify(submissionProgram.phases.map(p => ({ id: p.id, name: p.name })))}` :
+                'No phases'
+            )}
             <DynamicProgramTimeline
               onPhaseSelect={(phaseId) => setActivePhase(Number(phaseId))}
               viewType="vertical"
@@ -413,22 +513,65 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
 
           {/* Widget des réunions à venir */}
           <div className="widget-card">
+            {console.log('Dashboard - Meetings being passed to UpcomingMeetingsWidget:',
+              submissionProgram.phases ?
+                submissionProgram.phases.flatMap(phase => phase.meetings || []) :
+                'No meetings'
+            )}
             <UpcomingMeetingsWidget
               programId={submissionProgram.id}
               currentPhase={activePhase}
+              meetings={submissionProgram.phases ?
+                submissionProgram.phases.flatMap(phase =>
+                  (phase.meetings || []).map(meeting => ({
+                    ...meeting,
+                    phaseId: phase.id,
+                    title: meeting.nom_reunion || meeting.title || 'Réunion sans titre',
+                    date: meeting.date || new Date().toISOString(),
+                    time: meeting.heure || '09:00',
+                    location: meeting.lieu || 'À déterminer',
+                    isOnline: meeting.is_online || false
+                  }))
+                ) : []
+              }
             />
           </div>
 
           {/* Widget des tâches globales */}
           <div className="widget-card">
+            {console.log('Dashboard - Tasks being passed to OverallTasksWidget:',
+              submissionProgram.phases ?
+                submissionProgram.phases.flatMap(phase => phase.tasks || []) :
+                'No tasks'
+            )}
             <OverallTasksWidget
               programId={submissionProgram.id}
               currentPhase={activePhase}
+              tasks={submissionProgram.phases ?
+                submissionProgram.phases.flatMap(phase =>
+                  (phase.tasks || []).map(task => ({
+                    ...task,
+                    phaseId: phase.id,
+                    title: task.nom || task.title || 'Tâche sans titre',
+                    description: task.description || '',
+                    status: task.status || 'todo',
+                    priority: task.priority || 'medium',
+                    dueDate: task.date_echeance || task.dueDate || new Date().toISOString(),
+                    assignee: task.assignee || 'Non assigné'
+                  }))
+                ) : []
+              }
             />
           </div>
 
           {/* Widget des ressources */}
           <div className="widget-card">
+            {console.log('Dashboard - Resources being passed to ResourcesWidget:',
+              submissionProgram.resources ?
+                `${submissionProgram.resources.length} resources` :
+                'No resources'
+            )}
+            {console.log('Dashboard - Resources details:', submissionProgram.resources)}
             <ResourcesWidget
               programId={submissionProgram.id}
               resources={submissionProgram.resources || []}
@@ -437,18 +580,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
 
           {/* Widget des livrables */}
           <div className="widget-card">
+            {console.log('Dashboard - Deliverables being passed to DeliverablesWidget:',
+              submissionProgram.phases ?
+                submissionProgram.phases.flatMap(phase => phase.deliverables || []) :
+                'No deliverables'
+            )}
             <DeliverablesWidget
               programId={submissionProgram.id}
               currentPhase={activePhase}
+              deliverables={submissionProgram.phases ?
+                submissionProgram.phases.flatMap(phase =>
+                  (phase.deliverables || []).map(deliverable => ({
+                    ...deliverable,
+                    phaseId: phase.id,
+                    name: deliverable.nom || deliverable.name || 'Livrable sans titre',
+                    description: deliverable.description || '',
+                    status: deliverable.status || 'pending',
+                    dueDate: deliverable.date_echeance || deliverable.dueDate || new Date().toISOString()
+                  }))
+                ) : []
+              }
             />
           </div>
 
           {/* Widget des critères d'évaluation */}
           <div className="widget-card full-width">
-            <EvaluationCriteriaWidget
-              programId={submissionProgram.id}
-              criteria={submissionProgram.evaluationCriteria || []}
-            />
+            <StartupEvaluationWidget />
           </div>
 
           {/* Widget des critères d'éligibilité */}
