@@ -21,6 +21,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProgramContext } from '@/context/ProgramContext';
+import { useAuth } from '@/context/AuthContext';
+import { getAllPrograms, getProgram, getPhases, getTasks, updateProgramStatus } from '@/services/programService';
+import { getSubmissionsByProgram } from '@/services/formService';
+import { checkSubmissionAccepted } from '@/services/teamService';
+import { FrontendStatus } from '@/utils/statusMapping';
 
 // Define types
 interface Task {
@@ -33,9 +38,29 @@ interface Task {
   isOverdue?: boolean;
 }
 
+interface Phase {
+  id: string | number;
+  name: string;
+  description: string;
+  status: string;
+  color: string;
+  tasks: Task[];
+  recommendedTasks?: string[];
+}
+
+interface ProgramPhase {
+  id: number;
+  name: string;
+  description: string;
+  color: string;
+  status: string;
+  recommendedTasks?: string[];
+}
+
 const StartupTasksPage = () => {
-  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
-  const [activePhase, setActivePhase] = useState(selectedPhaseId || 1);
+  const { selectedProgram, selectedPhaseId, setSelectedPhaseId, setSelectedProgram } = useProgramContext();
+  const { user } = useAuth();
+  const [activePhase, setActivePhase] = useState<number>(Number(selectedPhaseId) || 1);
   const [activeView, setActiveView] = useState<"list" | "kanban">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -44,11 +69,158 @@ const StartupTasksPage = () => {
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
   const [tasks, setTasks] = useState<Record<number, Task[]>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch submission program info and details
+  useEffect(() => {
+    const fetchSubmissionProgramInfo = async () => {
+      if (!user?.id) {
+        console.log('Pas d\'utilisateur connecté');
+        setError('Vous devez être connecté pour accéder aux tâches');
+        setIsLoading(false);
+        return;
+      }
+
+      if (user.role !== 'startup') {
+        console.log('Utilisateur n\'est pas une startup');
+        setError('Cette page est réservée aux startups');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        console.log('Récupération du dernier programme...');
+        const programs = await getAllPrograms();
+        console.log('Programmes récupérés:', programs);
+
+        if (!programs || programs.length === 0) {
+          console.log('Aucun programme trouvé');
+          setError('Aucun programme disponible');
+          return;
+        }
+
+        const lastProgram = programs[0];
+        console.log('Dernier programme:', lastProgram);
+
+        const result = await getSubmissionsByProgram(lastProgram.id);
+        console.log('Résultat complet des soumissions:', result);
+
+        if (result.submissions && result.submissions.length > 0) {
+          const userSubmission = result.submissions[0];
+          console.log('Soumission trouvée:', userSubmission);
+
+          const submissionId = userSubmission.id;
+          const acceptanceResult = await checkSubmissionAccepted(submissionId, lastProgram.id);
+          console.log('Résultat de la vérification d\'acceptation:', acceptanceResult);
+
+          if (acceptanceResult.accepted) {
+            const programDetails = await getProgram(lastProgram.id);
+            console.log('Détails du programme récupérés:', programDetails);
+
+            if (programDetails) {
+              // Fetch phases for this program
+              console.log(`Fetching phases for program ${programDetails.id}...`);
+              const phases = await getPhases(programDetails.id);
+              console.log(`Fetched ${phases ? phases.length : 0} phases for program ${programDetails.id}:`, phases);
+
+              // Fetch tasks for all phases
+              const allTasks: Record<number, Task[]> = {};
+              const phasesWithDetails = await Promise.all(
+                (phases || []).map(async (phase) => {
+                  try {
+                    // Update program status to active
+                    await updateProgramStatus(programDetails.id, 'active' as FrontendStatus);
+
+                    // Fetch tasks for this phase
+                    console.log(`Fetching tasks for phase ${phase.id}...`);
+                    const tasks = await getTasks(phase.id);
+                    console.log(`Fetched ${tasks ? tasks.length : 0} tasks for phase ${phase.id}:`, tasks);
+
+                    // Format tasks for this phase
+                    const formattedTasks = (tasks || []).map(task => ({
+                      id: String(task.id),
+                      title: task.nom || task.title || 'Tâche sans titre',
+                      completed: task.completed || false,
+                      priority: task.priority || 'medium',
+                      dueDate: task.date_echeance || task.dueDate || new Date().toISOString(),
+                      status: task.status || (task.completed ? 'completed' : 'todo'),
+                      isOverdue: task.date_echeance && new Date(task.date_echeance) < new Date() && !task.completed
+                    }));
+
+                    // Add to all tasks
+                    allTasks[Number(phase.id)] = formattedTasks;
+
+                    return {
+                      ...phase,
+                      id: String(phase.id),
+                      name: phase.nom || phase.name || `Phase ${phase.id}`,
+                      description: phase.description || '',
+                      status: phase.status === 'completed' ? 'completed' : 
+                             phase.status === 'in_progress' ? 'in-progress' : 
+                             phase.status === 'not_started' ? 'not_started' : 'upcoming',
+                      color: phase.color || '#818cf8',
+                      tasks: formattedTasks
+                    };
+                  } catch (error) {
+                    console.error(`Error fetching details for phase ${phase.id}:`, error);
+                    return {
+                      ...phase,
+                      id: String(phase.id),
+                      name: phase.nom || phase.name || `Phase ${phase.id}`,
+                      description: phase.description || '',
+                      status: 'active',
+                      color: '#818cf8',
+                      tasks: []
+                    };
+                  }
+                })
+              );
+
+              console.log('All tasks:', allTasks);
+              setTasks(allTasks);
+
+              // Format the program with phases and tasks
+              const formattedProgram = {
+                ...programDetails,
+                id: String(programDetails.id),
+                name: programDetails.nom || programDetails.name || "Programme sans nom",
+                description: programDetails.description || "Aucune description disponible",
+                phases: phasesWithDetails
+              };
+
+              console.log('Programme formaté avec phases et tâches:', formattedProgram);
+              setSelectedProgram(formattedProgram);
+
+              // Set the first phase as active by default if not already set
+              if (phasesWithDetails.length > 0 && !selectedPhaseId) {
+                const firstPhaseId = phasesWithDetails[0].id;
+                setActivePhase(Number(firstPhaseId));
+                setSelectedPhaseId(Number(firstPhaseId));
+              }
+            }
+          } else {
+            setError('Votre soumission est en cours d\'examen');
+          }
+        } else {
+          setError('Aucune soumission trouvée pour ce programme');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des informations du programme:', error);
+        setError('Une erreur est survenue lors du chargement des données');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubmissionProgramInfo();
+  }, [user?.id, user?.role, setSelectedProgram, selectedPhaseId, setSelectedPhaseId]);
 
   // Update active phase when selectedPhaseId changes
   useEffect(() => {
     if (selectedPhaseId) {
-      setActivePhase(selectedPhaseId);
+      setActivePhase(Number(selectedPhaseId));
     }
   }, [selectedPhaseId]);
 
@@ -120,13 +292,13 @@ const StartupTasksPage = () => {
       
       setTasks(prevTasks => ({
         ...prevTasks,
-        [activePhase]: prevTasks[activePhase].map((task: Task) =>
+        [activePhase]: prevTasks[activePhase]?.map((task: Task) =>
           task.id === id ? {
             ...task,
             completed: !task.completed,
             status: !task.completed ? 'completed' as const : 'todo' as const
           } : task
-        )
+        ) || []
       }));
     } catch (error) {
       console.error('Error toggling task:', error);
@@ -146,13 +318,13 @@ const StartupTasksPage = () => {
 
       setTasks(prevTasks => ({
         ...prevTasks,
-        [activePhase]: prevTasks[activePhase].map((task: Task) =>
+        [activePhase]: prevTasks[activePhase]?.map((task: Task) =>
           task.id === taskId ? {
             ...task,
             status: newStatus,
             completed: newStatus === 'completed'
           } : task
-        )
+        ) || []
       }));
     } catch (error) {
       console.error('Error updating task status:', error);
@@ -168,7 +340,7 @@ const StartupTasksPage = () => {
 
       setTasks(prevTasks => ({
         ...prevTasks,
-        [activePhase]: prevTasks[activePhase].filter((task: Task) => task.id !== id)
+        [activePhase]: prevTasks[activePhase]?.filter((task: Task) => task.id !== id) || []
       }));
     } catch (error) {
       console.error('Error deleting task:', error);
@@ -177,7 +349,7 @@ const StartupTasksPage = () => {
 
   const handlePhaseChange = (phase: number) => {
     setActivePhase(phase);
-    setSelectedPhaseId(phase); // Update program context when phase changes
+    setSelectedPhaseId(phase);
     setSearchQuery('');
     setActiveTab('all');
   };
@@ -213,7 +385,7 @@ const StartupTasksPage = () => {
   // Get phase description
   const getPhaseDescription = (phaseId: number) => {
     if (selectedProgram && selectedProgram.phases) {
-      const phase = selectedProgram.phases.find(p => p.id === phaseId);
+      const phase = selectedProgram.phases.find(p => Number(p.id) === phaseId);
       if (phase) {
         return phase.description;
       }
@@ -240,7 +412,13 @@ const StartupTasksPage = () => {
               {/* Phases Navigation */}
               <section className="phases-section">
                 <ProgramPhaseTimeline
-                  phases={selectedProgram?.phases || []}
+                  phases={selectedProgram?.phases?.map(phase => ({
+                    id: Number(phase.id),
+                    name: phase.name || `Phase ${phase.id}`,
+                    description: phase.description || '',
+                    color: phase.color || '#818cf8',
+                    status: phase.status
+                  })) || []}
                   selectedPhase={activePhase}
                   onPhaseChange={handlePhaseChange}
                   title="Chronologie des phases"
@@ -374,9 +552,9 @@ const StartupTasksPage = () => {
               <section className="recommended-tasks">
                 <div className="recommended-card">
                   <h2>Tâches recommandées pour la Phase {activePhase}</h2>
-                  {selectedProgram?.phases?.find(p => p.id === activePhase)?.recommendedTasks ? (
+                  {selectedProgram?.phases?.find(p => Number(p.id) === activePhase)?.recommendedTasks ? (
                     <ul>
-                      {selectedProgram.phases.find(p => p.id === activePhase)?.recommendedTasks.map((task: string, index: number) => (
+                      {selectedProgram.phases.find(p => Number(p.id) === activePhase)?.recommendedTasks?.map((task: string, index: number) => (
                         <li key={index} className="flex items-center gap-2">
                           <FaRegCircle className="h-3 w-3 text-gray-400" />
                           {task}

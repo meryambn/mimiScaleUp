@@ -22,6 +22,7 @@ import ResourcesWidget from '@/components/widgets/ResourcesWidget';
 import DeliverablesWidget from '@/components/widgets/DeliverablesWidget';
 import StartupEvaluationWidget from '@/components/widgets/StartupEvaluationWidget';
 import EligibilityCriteriaWidget from '@/components/widgets/EligibilityCriteriaWidget';
+import TeamWidget from '@/components/widgets/TeamWidget';
 import { useAuth } from '@/context/AuthContext';
 import { checkSubmissionAccepted } from '@/services/teamService';
 import { getSubmissionsByProgram } from '@/services/formService';
@@ -472,7 +473,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
             <div className="date-range">
               {activePhase && Number(activePhase) > 0 ? (
                 <>
-                  <span>Phase {activePhase} en cours</span>
+                 
                   <span>{getPhaseDescription(activePhase)}</span>
                 </>
               ) : (
@@ -493,8 +494,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
             />
           </div>
 
+          {/* Widget des équipes et startups */}
+         
+
           {/* Widget de la timeline */}
-          <div className="widget-card">
+            <div className="widget-card">
             {/* Add debugging for phases */}
             {console.log('Dashboard - Phases being passed to DynamicProgramTimeline:',
               submissionProgram.phases ?
@@ -601,6 +605,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
                 ) : []
               }
             />
+          </div>
+         < div className="widget-card">
+            <TeamWidget programId={submissionProgram?.id} />
           </div>
 
           {/* Widget des critères d'évaluation */}

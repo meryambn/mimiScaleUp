@@ -1,0 +1,316 @@
+import React, { useState, useEffect } from 'react';
+import { Users, Mail, Building, ChevronRight, Award, Clock, User, Info } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/context/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from '@/hooks/use-toast';
+import TeamInvitationNotification from '@/components/application/TeamInvitationNotification';
+import {
+  getProgramTeams,
+  getTeamDetails,
+  getTeamCurrentPhase,
+  checkIfTeamIsWinner,
+  BackendTeam,
+  BackendStartup,
+  ProgramTeamsResponse,
+  TeamPhaseResponse,
+  TeamDetailsResponse
+} from '@/services/teamService';
+
+interface TeamWidgetProps {
+  programId?: string | number;
+}
+
+interface TeamWithDetails extends BackendTeam {
+  phase?: TeamPhaseResponse | null;
+  isWinner?: boolean;
+  description?: string;
+  members?: any[];
+  programme_nom?: string;
+}
+
+const TeamWidget: React.FC<TeamWidgetProps> = ({ programId }) => {
+  const [teams, setTeams] = useState<TeamWithDetails[]>([]);
+  const [individualStartups, setIndividualStartups] = useState<BackendStartup[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showTeamDialog, setShowTeamDialog] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamWithDetails | null>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchTeamsData = async () => {
+      if (!programId) {
+        console.log('No program ID provided');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Fetching teams for program:', programId);
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await getProgramTeams(programId, true);
+        console.log('Fetched program teams result:', result);
+
+        if (!result) {
+          console.log('No result from getProgramTeams');
+          setTeams([]);
+          setIndividualStartups([]);
+          return;
+        }
+
+        const teamsWithDetails = await Promise.all(
+          (result.equipes || []).map(async (team) => {
+            try {
+              const phase = await getTeamCurrentPhase(team.id);
+              const isWinner = await checkIfTeamIsWinner(team.id, programId);
+              const teamDetails = await getTeamDetails(team.id);
+              console.log(`Team ${team.id} details:`, { phase, isWinner, teamDetails });
+              return {
+                ...team,
+                phase,
+                isWinner,
+                description: teamDetails?.description,
+                members: teamDetails?.membres || [],
+                programme_nom: teamDetails?.programme_nom
+              };
+            } catch (error) {
+              console.error(`Error fetching details for team ${team.id}:`, error);
+              return {
+                ...team,
+                phase: null,
+                isWinner: false,
+                description: '',
+                members: [],
+                programme_nom: ''
+              };
+            }
+          })
+        );
+
+        console.log('Processed teams with details:', teamsWithDetails);
+        setTeams(teamsWithDetails);
+        setIndividualStartups(result.startups_individuelles || []);
+      } catch (err) {
+        console.error('Error fetching teams data:', err);
+        setError('Erreur lors du chargement des données');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeamsData();
+  }, [programId]);
+
+  const handleTeamClick = async (team: TeamWithDetails) => {
+    try {
+      const teamDetails = await getTeamDetails(team.id);
+      if (teamDetails) {
+        setSelectedTeam({
+          ...team,
+          description: teamDetails.description,
+          members: teamDetails.membres || []
+        });
+        setShowTeamDialog(true);
+      }
+    } catch (err) {
+      console.error('Error fetching team details:', err);
+    }
+  };
+
+  const getPhaseColor = (phaseName: string) => {
+    const colors: { [key: string]: string } = {
+      'Phase Initiale': 'bg-blue-100 text-blue-800',
+      'Phase Intermédiaire': 'bg-yellow-100 text-yellow-800',
+      'Phase Finale': 'bg-purple-100 text-purple-800',
+      'Non assigné': 'bg-gray-100 text-gray-800'
+    };
+    return colors[phaseName] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-4">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
+
+  if (!teams.length && !individualStartups.length) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-gray-500">Aucune équipe ou startup disponible</p>
+        <p className="text-sm text-gray-400 mt-2">Programme ID: {programId}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+            <Users className="h-4 w-4" />
+          </div>
+          <h3 className="text-lg font-semibold">Équipes & Startups</h3>
+        </div>
+      </div>
+
+      {/* Teams Section */}
+      {teams.length > 0 && (
+        <div className="mb-6">
+          <h4 className="font-medium text-gray-900 mb-3">Équipes ({teams.length})</h4>
+          <ScrollArea className="h-[600px]">
+            <div className="space-y-4">
+              {teams.map((team) => (
+                <div
+                  key={team.id}
+                  onClick={() => handleTeamClick(team)}
+                  className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                >
+                  {/* Header with Avatar */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(team.nom_equipe)}&background=random`} />
+                      <AvatarFallback>{getInitials(team.nom_equipe)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold text-lg">{team.nom_equipe}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className={`text-xs ${getPhaseColor(team.phase?.nom || 'Non assigné')}`}>
+                          {team.phase?.nom || 'Non assigné'}
+                        </Badge>
+                        {team.isWinner && (
+                          <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                            Gagnant
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {team.description && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                        <Info className="h-4 w-4" />
+                        <span>Description</span>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-md">
+                        <p className="text-sm text-gray-600">{team.description}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Members */}
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                      <Users className="h-4 w-4" />
+                      <span>Membres ({team.members?.length || 0})</span>
+                    </div>
+                    {team.members && team.members.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {team.members.map((member, index) => (
+                          <div key={index} className="flex items-center gap-2 bg-gray-50 p-2 rounded-md">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(member.nom || '')}&background=random`} />
+                              <AvatarFallback>{getInitials(member.nom || '')}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium">{member.nom || `Membre ${index + 1}`}</p>
+                              {member.role && (
+                                <p className="text-xs text-gray-500">{member.role}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Aucun membre</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Individual Startups Section */}
+      {individualStartups.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="font-medium text-gray-900">Startups Individuelles ({individualStartups.length})</h4>
+          <ScrollArea className="h-[300px]">
+            <div className="space-y-3">
+              {individualStartups.map((startup) => (
+                <div
+                  key={startup.id}
+                  className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Building className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-base">{startup.nom}</h3>
+                      <Badge variant="secondary" className="text-xs">Individuel</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Team Details Modal */}
+      <TeamInvitationNotification
+        open={showTeamDialog}
+        onOpenChange={setShowTeamDialog}
+        teamName={selectedTeam?.nom_equipe || 'Équipe'}
+        teamDescription={selectedTeam?.description || 'Description de l\'équipe'}
+        programName={selectedTeam?.programme_nom || 'Programme'}
+        programId={selectedTeam?.phase?.programme?.id}
+        teamMembers={selectedTeam?.members || []}
+        teamReason={selectedTeam?.description || ''}
+        onViewProgram={() => {
+          toast({
+            title: "Navigation vers le programme",
+            description: `Redirection vers le programme "${selectedTeam?.programme_nom}"`,
+          });
+          setShowTeamDialog(false);
+        }}
+      />
+    </div>
+  );
+};
+
+export default TeamWidget; 

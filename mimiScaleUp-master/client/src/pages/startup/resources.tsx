@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FaFilePdf,
   FaFileWord,
@@ -14,45 +14,166 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Plus, FileText, Video, Download, ExternalLink, X } from "lucide-react";
 import { useResources } from '@/context/ResourcesContext';
 import { useProgramContext } from '@/context/ProgramContext';
+import { useAuth } from '@/context/AuthContext';
+import { getAllPrograms, getProgram, getPhases, updateProgramStatus } from '@/services/programService';
+import { getProgramResources } from '@/services/resourceService';
+import { getSubmissionsByProgram } from '@/services/formService';
+import { checkSubmissionAccepted } from '@/services/teamService';
+import { FrontendStatus } from '@/utils/statusMapping';
+import { Resource, Program } from '@/types/program';
+
+interface ExternalResource {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  url: string;
+  nom: string;
+}
 
 const StartupResourcePage = () => {
-  const { selectedProgram } = useProgramContext();
+  const { selectedProgram, setSelectedProgram } = useProgramContext();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const {
-    resources,
-    externalResources,
-    filteredResources,
-    filteredExternalResources,
-    searchQuery,
-    setSearchQuery,
-    getResourceTypeIcon,
-    isLoading,
-    error
-  } = useResources();
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [externalResources, setExternalResources] = useState<ExternalResource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch submission program info and details
+  useEffect(() => {
+    const fetchSubmissionProgramInfo = async () => {
+      if (!user?.id) {
+        console.log('Pas d\'utilisateur connecté');
+        setError('Vous devez être connecté pour accéder aux ressources');
+        setIsLoading(false);
+        return;
+      }
+
+      if (user.role !== 'startup') {
+        console.log('Utilisateur n\'est pas une startup');
+        setError('Cette page est réservée aux startups');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        console.log('Récupération du dernier programme...');
+        const programs = await getAllPrograms();
+        console.log('Programmes récupérés:', programs);
+
+        if (!programs || programs.length === 0) {
+          console.log('Aucun programme trouvé');
+          setError('Aucun programme disponible');
+          return;
+        }
+
+        const lastProgram = programs[0];
+        console.log('Dernier programme:', lastProgram);
+
+        const result = await getSubmissionsByProgram(lastProgram.id);
+        console.log('Résultat complet des soumissions:', result);
+
+        if (result.submissions && result.submissions.length > 0) {
+          const userSubmission = result.submissions[0];
+          console.log('Soumission trouvée:', userSubmission);
+
+          const submissionId = userSubmission.id;
+          const acceptanceResult = await checkSubmissionAccepted(submissionId, lastProgram.id);
+          console.log('Résultat de la vérification d\'acceptation:', acceptanceResult);
+
+          if (acceptanceResult.accepted) {
+            const programDetails = await getProgram(lastProgram.id);
+            console.log('Détails du programme récupérés:', programDetails);
+
+            if (programDetails) {
+              // Fetch phases for this program
+              console.log(`Fetching phases for program ${programDetails.id}...`);
+              const phases = await getPhases(programDetails.id);
+              console.log(`Fetched ${phases ? phases.length : 0} phases for program ${programDetails.id}:`, phases);
+
+              // Update program status to active
+              await updateProgramStatus(programDetails.id, 'active' as FrontendStatus);
+
+              // Fetch resources for the program
+              console.log(`Fetching resources for program ${programDetails.id}...`);
+              const resourcesResult = await getProgramResources(programDetails.id);
+              console.log('Resources retrieved:', resourcesResult);
+
+              // Format resources
+              const formattedResources: Resource[] = resourcesResult.resources.map(resource => ({
+                id: String(resource.id),
+                title: resource.title || 'Ressource sans titre',
+                description: resource.description || '',
+                type: resource.type || 'document',
+                url: resource.url || '',
+                is_external: false,
+                created_at: resource.created_at || new Date().toISOString(),
+                program_id: Number(programDetails.id),
+                category: resource.type
+              }));
+
+              // Format external resources
+              const formattedExternalResources: ExternalResource[] = resourcesResult.externalResources.map(resource => ({
+                id: String(resource.id),
+                title: resource.title || 'Ressource externe sans titre',
+                description: resource.description || '',
+                type: 'external',
+                url: resource.url || '',
+                nom: resource.nom || resource.title
+              }));
+
+              console.log('Formatted resources:', formattedResources);
+              console.log('Formatted external resources:', formattedExternalResources);
+              setResources(formattedResources);
+              setExternalResources(formattedExternalResources);
+
+              // Format the program
+              const formattedProgram: Program = {
+                ...programDetails,
+                id: String(programDetails.id),
+                name: programDetails.nom || programDetails.name || "Programme sans nom",
+                description: programDetails.description || "Aucune description disponible",
+                phases: phases
+              };
+
+              console.log('Programme formaté:', formattedProgram);
+              setSelectedProgram(formattedProgram);
+            }
+          } else {
+            setError('Votre soumission est en cours d\'examen');
+          }
+        } else {
+          setError('Aucune soumission trouvée pour ce programme');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des informations du programme:', error);
+        setError('Une erreur est survenue lors du chargement des données');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubmissionProgramInfo();
+  }, [user?.id, user?.role, setSelectedProgram]);
 
   // Filter resources based on search and active filter
-  const localFilteredResources = resources.filter(resource => {
+  const filteredResources = resources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          resource.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = activeFilter === 'all' || resource.type === activeFilter;
     return matchesSearch && matchesFilter;
   });
 
-  const localFilteredExternalResources = externalResources.filter(resource => {
+  const filteredExternalResources = externalResources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
-  // Use either API resources or local filtered resources
-  const displayResources = filteredResources.length > 0 ? filteredResources : localFilteredResources;
-  const displayExternalResources = filteredExternalResources.length > 0 ? filteredExternalResources : localFilteredExternalResources;
-
-  const getFileIcon = (type) => {
-    if (getResourceTypeIcon) {
-      return getResourceTypeIcon(type);
-    }
-
+  const getFileIcon = (type: string) => {
     switch(type) {
       case 'document':
       case 'pdf':
@@ -72,7 +193,7 @@ const StartupResourcePage = () => {
   };
 
   // Format date
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
       year: 'numeric',
       month: 'short',
@@ -170,7 +291,7 @@ const StartupResourcePage = () => {
             {/* Program Resources */}
             <div className="mb-8">
               <h2 className="text-xl font-medium mb-4">Matériels du Programme</h2>
-              {displayResources.length === 0 ? (
+              {filteredResources.length === 0 ? (
                 <Card>
                   <CardContent className="py-6 text-center text-gray-500">
                     Aucun matériel disponible pour ce programme.
@@ -178,7 +299,7 @@ const StartupResourcePage = () => {
                 </Card>
               ) : (
                 <div className="resources-list">
-                  {displayResources.map(resource => (
+                  {filteredResources.map(resource => (
                     <motion.div
                       key={resource.id}
                       className="resource-card"
@@ -187,30 +308,31 @@ const StartupResourcePage = () => {
                       transition={{ duration: 0.3 }}
                       whileHover={{ y: -5 }}
                     >
-                      <div className="file-type">
+                      <div className="resource-icon">
                         {getFileIcon(resource.type)}
                       </div>
-                      <div className="file-info">
+                      <div className="resource-info">
                         <h3>{resource.title}</h3>
-                        <p className="file-description">{resource.description}</p>
-                        <div className="file-meta">
-                          {resource.size && <span className="file-size">{resource.size}</span>}
+                        <p>{resource.description}</p>
+                        <div className="resource-meta">
                           <span className="file-format">{resource.type.toUpperCase()}</span>
-                          {resource.createdAt && (
-                            <span className="file-date">Ajouté le {formatDate(resource.createdAt)}</span>
+                          {resource.created_at && (
+                            <span className="file-date">Ajouté le {formatDate(resource.created_at)}</span>
                           )}
                         </div>
                       </div>
-                      <div className="download-btn">
-                        <motion.a
-                          href={resource.url}
-                          download
-                          className="download-link"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Download className="h-4 w-4" /> Télécharger
-                        </motion.a>
+                      <div className="resource-actions">
+                        {resource.is_external ? (
+                          <a href={resource.url} target="_blank" rel="noopener noreferrer" className="action-button">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Accéder
+                          </a>
+                        ) : (
+                          <a href={resource.url} download className="action-button">
+                            <Download className="w-4 h-4 mr-2" />
+                            Télécharger
+                          </a>
+                        )}
                       </div>
                     </motion.div>
                   ))}
@@ -223,13 +345,13 @@ const StartupResourcePage = () => {
               <h2 className="text-xl font-medium mb-4">Ressources Externes</h2>
               <Card>
                 <CardContent className="pt-6">
-                  {displayExternalResources.length === 0 ? (
+                  {filteredExternalResources.length === 0 ? (
                     <div className="text-center text-gray-500 py-4">
                       Aucune ressource externe disponible pour ce programme.
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {displayExternalResources.map((resource) => (
+                      {filteredExternalResources.map((resource) => (
                         <div key={resource.id} className="flex items-center justify-between p-3 border rounded-md">
                           <div className="font-medium">{resource.title}</div>
                           <a
@@ -382,61 +504,41 @@ const StartupResourcePage = () => {
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        .file-type {
+        .resource-icon {
           font-size: 2rem;
           display: flex;
           align-items: center;
         }
 
-        .file-icon {
-          color: #6b7280;
-        }
-
-        .file-icon.pdf {
-          color: #e43e32;
-        }
-
-        .file-icon.word {
-          color: #2b579a;
-        }
-
-        .file-icon.excel {
-          color: #217346;
-        }
-
-        .file-icon.powerpoint {
-          color: #d24726;
-        }
-
-        .file-info {
+        .resource-info {
           flex: 1;
         }
 
-        .file-info h3 {
+        .resource-info h3 {
           font-size: 1.1rem;
           color: #111827;
           margin-bottom: 0.5rem;
         }
 
-        .file-description {
+        .resource-info p {
           color: #6b7280;
           font-size: 0.9rem;
           margin-bottom: 0.8rem;
         }
 
-        .file-meta {
+        .resource-meta {
           display: flex;
           gap: 1rem;
           font-size: 0.8rem;
           color: #9ca3af;
         }
 
-        .download-btn {
+        .resource-actions {
           display: flex;
           align-items: center;
         }
 
-        .download-link {
+        .action-button {
           display: flex;
           align-items: center;
           gap: 0.3rem;
@@ -449,7 +551,7 @@ const StartupResourcePage = () => {
           transition: all 0.2s ease;
         }
 
-        .download-link:hover {
+        .action-button:hover {
           background: var(--gradient);
           opacity: 0.9;
         }

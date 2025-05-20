@@ -16,64 +16,140 @@ import Sidebar from '@/components/sidebar';
 import ProgramPhaseTimeline from '@/components/widgets/ProgramPhaseTimeline';
 import { useProgramContext } from '@/context/ProgramContext';
 import { useDeliverables } from '@/context/DeliverablesContext';
+import { useAuth } from '@/context/AuthContext';
+import { getPhaseDeliverables } from '@/services/deliverableService';
 
-const StartupDeliverablesPage = () => {
+interface ProgramPhase {
+  id: number;
+  name: string;
+  description: string;
+}
+
+const Deliverables: React.FC = () => {
+  const { user } = useAuth();
   const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
   const { deliverables, filteredDeliverables, getStatusText, getSubmissionTypeIcon } = useDeliverables();
-  const [activePhase, setActivePhase] = useState(selectedPhaseId || 1);
-  const [activeTab, setActiveTab] = useState('pending');
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Update active phase when selectedPhaseId changes
+  const [activePhase, setActivePhase] = useState<number>(Number(selectedPhaseId) || 1);
+  const [activeTab, setActiveTab] = useState('pending');
+  const [showForm, setShowForm] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [formData, setFormData] = useState({
+    nom: '',
+    description: '',
+    date_echeance: '',
+    types_fichiers: ''
+  });
+
+  // Fetch deliverables when phase changes
+  useEffect(() => {
+    const fetchDeliverables = async () => {
+      try {
+        const data = await getPhaseDeliverables(String(activePhase));
+        console.log('Fetched deliverables:', data);
+      } catch (error) {
+        console.error('Error fetching deliverables:', error);
+      }
+    };
+
+    fetchDeliverables();
+  }, [activePhase]);
+
   useEffect(() => {
     if (selectedPhaseId) {
-      setActivePhase(selectedPhaseId);
+      setActivePhase(Number(selectedPhaseId));
     }
   }, [selectedPhaseId]);
 
-  // Simulate loading state
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [deliverables]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedFile) {
-      try {
-        // TODO: Replace with actual API call
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        formData.append('phaseId', activePhase.toString());
+    
+    // Validate form data
+    if (!formData.nom || !formData.description || !formData.date_echeance) {
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
 
-        const response = await fetch('/api/deliverables', {
+    if (!selectedFile) {
+      alert('Veuillez sélectionner un fichier');
+      return;
+    }
+
+    // Get file extension
+    const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
+    if (!fileExtension) {
+      alert('Extension de fichier invalide');
+      return;
+    }
+
+    try {
+      // First, create the deliverable
+      const deliverableData = {
+        nom: formData.nom,
+        description: formData.description,
+        date_echeance: formData.date_echeance,
+        types_fichiers: `.${fileExtension}`
+      };
+
+      console.log('Sending deliverable data:', deliverableData);
+
+      const response = await fetch(`/api/liverable/create/${activePhase}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(deliverableData),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la création du livrable');
+      }
+
+      const data = await response.json();
+      console.log('Livrable créé avec succès:', data);
+
+      // Now upload the file if deliverable was created successfully
+      if (data.id) {
+        const fileFormData = new FormData();
+        fileFormData.append('fichier', selectedFile);
+        fileFormData.append('livrable_id', data.id);
+
+        const fileResponse = await fetch(`/api/liverable/upload/${data.id}`, {
           method: 'POST',
-          body: formData
+          body: fileFormData,
+          credentials: 'include'
         });
 
-        if (response.ok) {
-          setSelectedFile(null);
-          setShowUploadModal(false);
+        if (!fileResponse.ok) {
+          throw new Error('Erreur lors du téléchargement du fichier');
         }
-      } catch (error) {
-        console.error('Error uploading deliverable:', error);
       }
+
+      // Fetch updated deliverables
+      const updatedDeliverables = await getPhaseDeliverables(String(activePhase));
+      console.log('Updated deliverables:', updatedDeliverables);
+
+      // Réinitialiser le formulaire
+      setFormData({
+        nom: '',
+        description: '',
+        date_echeance: '',
+        types_fichiers: ''
+      });
+      setSelectedFile(null);
+      setShowForm(false);
+    } catch (error) {
+      console.error('Erreur lors de la création du livrable:', error);
+      alert(error instanceof Error ? error.message : 'Une erreur est survenue lors de la création du livrable');
     }
   };
 
   const handlePhaseChange = (phase: number) => {
     setActivePhase(phase);
-    setSelectedPhaseId(phase); // Update program context when phase changes
+    setSelectedPhaseId(phase);
     setActiveTab('pending');
   };
 
@@ -113,7 +189,7 @@ const StartupDeliverablesPage = () => {
   // Get phase description
   const getPhaseDescription = (phaseId: number) => {
     if (selectedProgram && selectedProgram.phases) {
-      const phase = selectedProgram.phases.find(p => p.id === phaseId);
+      const phase = selectedProgram.phases.find(p => Number(p.id) === phaseId);
       if (phase) {
         return phase.description;
       }
@@ -123,7 +199,7 @@ const StartupDeliverablesPage = () => {
 
   // Filter deliverables by active phase and tab
   const phaseDeliverables = filteredDeliverables.filter(d => 
-    String(d.phaseId) === String(activePhase)
+    Number(d.phaseId) === activePhase
   );
 
   const requiredDeliverables = phaseDeliverables.filter(d => d.required);
@@ -143,7 +219,7 @@ const StartupDeliverablesPage = () => {
           </div>
           <motion.button
             className="primary-btn"
-            onClick={() => setShowUploadModal(true)}
+            onClick={() => setShowForm(true)}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -154,51 +230,16 @@ const StartupDeliverablesPage = () => {
         {/* Phases Navigation */}
         <section className="phases-section">
           <ProgramPhaseTimeline
-            phases={selectedProgram?.phases || []}
+            phases={(selectedProgram?.phases || []).map(phase => ({
+              id: Number(phase.id),
+              name: phase.name,
+              description: phase.description
+            }))}
             selectedPhase={activePhase}
             onPhaseChange={handlePhaseChange}
             title="Chronologie des phases"
             description={getPhaseDescription(activePhase)}
           />
-        </section>
-
-        {/* Required Documents Section */}
-        <section className="required-docs-section">
-          <div className="required-docs-card">
-            <div className="card-header">
-              <div className="file-info">
-                <FaFileUpload className="file-icon" />
-                <div>
-                  <h3 className="file-name">Documents requis pour la Phase {activePhase}</h3>
-                  <p className="file-meta">
-                    {requiredDeliverables.length} document(s) requis
-                  </p>
-                </div>
-              </div>
-            </div>
-            {requiredDeliverables.length > 0 ? (
-              <div className="card-content">
-                <ul className="documents-list">
-                  {requiredDeliverables.map((deliverable) => (
-                    <li key={deliverable.id} className="document-item">
-                      {getSubmissionTypeIcon(deliverable.submissionType)}
-                      <span>{deliverable.name}</span>
-                      <span className="status-text">
-                        {getStatusText(deliverable.status, deliverable.dueDate)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="card-content empty-state">
-                <FaFileUpload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                <p className="text-gray-500">
-                  Aucun document requis pour cette phase.
-                </p>
-              </div>
-            )}
-          </div>
         </section>
 
         {/* Status Tabs Section */}
@@ -234,11 +275,7 @@ const StartupDeliverablesPage = () => {
         {/* Deliverables List */}
         <section className="deliverables-list">
           <AnimatePresence>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              </div>
-            ) : phaseDeliverables.length === 0 ? (
+            {phaseDeliverables.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg">
                 <FaFileUpload className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-lg font-medium text-gray-900">Aucun livrable</h3>
@@ -270,7 +307,6 @@ const StartupDeliverablesPage = () => {
                         </div>
                       </div>
                       <div className="file-status">
-                        {getStatusIcon(deliverable.status)}
                         <span className={`status-text ${deliverable.status}`}>
                           {getStatusText(deliverable.status, deliverable.dueDate)}
                         </span>
@@ -278,19 +314,9 @@ const StartupDeliverablesPage = () => {
                     </div>
 
                     <div className="card-actions">
-                      {deliverable.status === 'submitted' && (
-                        <button className="action-btn download">
-                          Télécharger
-                        </button>
-                      )}
                       {deliverable.status === 'pending' && (
                         <button className="action-btn delete">
                           <FaTrash /> Supprimer
-                        </button>
-                      )}
-                      {(deliverable.status === 'rejected' || deliverable.status === 'not-submitted') && (
-                        <button className="action-btn resubmit">
-                          {deliverable.status === 'rejected' ? 'Resoumettre' : 'Soumettre'}
                         </button>
                       )}
                     </div>
@@ -303,13 +329,13 @@ const StartupDeliverablesPage = () => {
 
       {/* Upload Modal */}
       <AnimatePresence>
-        {showUploadModal && (
+        {showForm && (
           <motion.div
             className="modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowUploadModal(false)}
+            onClick={() => setShowForm(false)}
           >
             <motion.div
               className="modal-content"
@@ -320,51 +346,66 @@ const StartupDeliverablesPage = () => {
             >
               <button
                 className="close-btn"
-                onClick={() => setShowUploadModal(false)}
+                onClick={() => setShowForm(false)}
               >
                 &times;
               </button>
 
-              <h2>Soumettre un nouveau livrable (Phase {activePhase})</h2>
-
+              <h2>Ajouter un livrable</h2>
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label>Nom du document</label>
+                  <label>Nom</label>
                   <input
                     type="text"
                     required
-                    value={selectedFile?.name || ''}
-                    onChange={(e) => setSelectedFile(prev => prev ? new File([prev], e.target.value) : null)}
+                    value={formData.nom}
+                    onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
                   />
                 </div>
 
-                <div className="file-upload-container">
-                  <label className="file-upload-label">
-                    <FaFileUpload className="upload-icon" />
-                    <span>{selectedFile ? selectedFile.name : 'Choisir un fichier'}</span>
-                    <input
-                      type="file"
-                      className="file-input"
-                      onChange={handleFileChange}
-                      required
-                    />
-                  </label>
-                  {selectedFile && (
-                    <div className="file-preview">
-                      {getFileIcon(selectedFile.type.split('/')[1])}
-                      <div>
-                        <p>{selectedFile.name}</p>
-                        <p className="file-size">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
-                      </div>
-                    </div>
-                  )}
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    required
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Date d'échéance</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date_echeance}
+                    onChange={(e) => setFormData(prev => ({ ...prev, date_echeance: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Types de fichiers</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.types_fichiers}
+                    onChange={(e) => setFormData(prev => ({ ...prev, types_fichiers: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Fichier</label>
+                  <input
+                    type="file"
+                    required
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  />
                 </div>
 
                 <div className="form-actions">
                   <motion.button
                     type="button"
                     className="secondary-btn"
-                    onClick={() => setShowUploadModal(false)}
+                    onClick={() => setShowForm(false)}
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -397,7 +438,7 @@ const StartupDeliverablesPage = () => {
         .main-content {
           flex: 1;
           padding: 2rem;
-          padding-top: 100px; /* Add padding to account for the navbar height */
+          padding-top: 100px;
           margin-left: 280px;
           min-height: 100vh;
         }
@@ -768,67 +809,13 @@ const StartupDeliverablesPage = () => {
           font-weight: 500;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group textarea {
           width: 100%;
           padding: 0.75rem;
           border: 1px solid #d1d5db;
           border-radius: 6px;
           font-size: 1rem;
-        }
-
-        .file-upload-container {
-          margin-bottom: 1.5rem;
-        }
-
-        .file-upload-label {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-          border: 2px dashed #d1d5db;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.3s;
-          text-align: center;
-        }
-
-        .file-upload-label:hover {
-          border-color: #e43e32;
-          background: rgba(228, 62, 50, 0.05);
-        }
-
-        .upload-icon {
-          font-size: 2rem;
-          color: #e43e32;
-          margin-bottom: 0.5rem;
-        }
-
-        .file-input {
-          display: none;
-        }
-
-        .file-preview {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          margin-top: 1rem;
-          padding: 1rem;
-          background: #f3f4f6;
-          border-radius: 6px;
-        }
-
-        .file-preview .file-icon {
-          font-size: 1.5rem;
-        }
-
-        .file-preview p {
-          margin: 0;
-        }
-
-        .file-size {
-          color: #6b7280;
-          font-size: 0.85rem;
         }
 
         .form-actions {
@@ -862,13 +849,17 @@ const StartupDeliverablesPage = () => {
           .main-content {
             margin-left: 0;
             padding: 1rem;
-            padding-top: 100px; /* Maintain padding for navbar on mobile */
+            padding-top: 100px;
           }
 
           .deliverables-header {
             flex-direction: column;
             align-items: flex-start;
             gap: 1rem;
+          }
+
+          .primary-btn {
+            width: 100%;
           }
 
           .card-actions {
@@ -888,4 +879,4 @@ const StartupDeliverablesPage = () => {
   );
 };
 
-export default StartupDeliverablesPage;
+export default Deliverables;

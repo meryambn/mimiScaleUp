@@ -28,10 +28,24 @@ import {
   List,
 } from "lucide-react";
 import { useProgramContext } from '@/context/ProgramContext';
-import { useMeetings } from '@/context/MeetingsContext';
+import { useMeetings, Meeting } from '@/context/MeetingsContext';
+import { useAuth } from '@/context/AuthContext';
+import { getAllPrograms, getProgram, getPhases, getReunions, updateProgramStatus } from '@/services/programService';
+import { getSubmissionsByProgram } from '@/services/formService';
+import { checkSubmissionAccepted } from '@/services/teamService';
+import { FrontendStatus } from '@/utils/statusMapping';
+
+// Interface spécifique pour les phases de la timeline
+interface TimelinePhase {
+  id: number | string;
+  name: string;
+  color: string;
+  status: 'completed' | 'in-progress' | 'upcoming' | 'not_started';
+}
 
 const StartupMeetingsPage = () => {
-  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
+  const { selectedProgram, selectedPhaseId, setSelectedPhaseId, setSelectedProgram } = useProgramContext();
+  const { user } = useAuth();
   const {
     upcomingMeetings,
     pastMeetings,
@@ -41,79 +55,241 @@ const StartupMeetingsPage = () => {
     formatTime,
     formatAttendees
   } = useMeetings();
-  const [activePhase, setActivePhase] = useState(selectedPhaseId || 1);
+  const [activePhase, setActivePhase] = useState<string>(selectedPhaseId ? String(selectedPhaseId) : '1');
   const [activeView, setActiveView] = useState<"list" | "calendar">("list");
   const [viewTab, setViewTab] = useState<"upcoming" | "past">("upcoming");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
 
-  // Filter meetings based on availability and phase
-  const filterMeetingsByPhase = (meetings: any[]) => {
-    return meetings.filter(meeting => meeting.phaseId === activePhase);
+  // Fetch submission program info and details
+  useEffect(() => {
+    const fetchSubmissionProgramInfo = async () => {
+      if (!user?.id) {
+        console.log('Pas d\'utilisateur connecté');
+        setError('Vous devez être connecté pour accéder aux réunions');
+        setIsLoading(false);
+        return;
+      }
+
+      if (user.role !== 'startup') {
+        console.log('Utilisateur n\'est pas une startup');
+        setError('Cette page est réservée aux startups');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        console.log('Récupération du dernier programme...');
+        const programs = await getAllPrograms();
+        console.log('Programmes récupérés:', programs);
+
+        if (!programs || programs.length === 0) {
+          console.log('Aucun programme trouvé');
+          setError('Aucun programme disponible');
+          return;
+        }
+
+        const lastProgram = programs[0];
+        console.log('Dernier programme:', lastProgram);
+
+        const result = await getSubmissionsByProgram(lastProgram.id);
+        console.log('Résultat complet des soumissions:', result);
+
+        if (result.submissions && result.submissions.length > 0) {
+          const userSubmission = result.submissions[0];
+          console.log('Soumission trouvée:', userSubmission);
+
+          const submissionId = userSubmission.id;
+          const acceptanceResult = await checkSubmissionAccepted(submissionId, lastProgram.id);
+          console.log('Résultat de la vérification d\'acceptation:', acceptanceResult);
+
+          if (acceptanceResult.accepted) {
+            const programDetails = await getProgram(lastProgram.id);
+            console.log('Détails du programme récupérés:', programDetails);
+
+            if (programDetails) {
+              // Fetch phases for this program
+              console.log(`Fetching phases for program ${programDetails.id}...`);
+              const phases = await getPhases(programDetails.id);
+              console.log(`Fetched ${phases ? phases.length : 0} phases for program ${programDetails.id}:`, phases);
+
+              // Fetch meetings for all phases
+              const allMeetings: Meeting[] = [];
+              const phasesWithDetails = await Promise.all(
+                (phases || []).map(async (phase) => {
+                  try {
+                    // Update program status to active
+                    await updateProgramStatus(programDetails.id, 'active' as FrontendStatus);
+
+                    // Fetch meetings (reunions) for this phase
+                    console.log(`Fetching meetings for phase ${phase.id}...`);
+                    const meetings = await getReunions(phase.id);
+                    console.log(`Fetched ${meetings ? meetings.length : 0} meetings for phase ${phase.id}:`, meetings);
+
+                    // Format meetings for this phase
+                    const formattedMeetings = (meetings || []).map(meeting => ({
+                      id: String(meeting.id),
+                      title: meeting.nom_reunion || meeting.title || 'Réunion sans titre',
+                      date: meeting.date || new Date().toISOString(),
+                      time: meeting.heure || '09:00',
+                      duration: meeting.duration || 60,
+                      type: meeting.type || 'group',
+                      location: meeting.lieu || meeting.location || 'À déterminer',
+                      attendees: meeting.attendees || [],
+                      phaseId: String(phase.id),
+                      description: meeting.description || '',
+                      isCompleted: new Date(meeting.date) < new Date(),
+                      hasNotes: false,
+                      isOnline: (meeting.lieu?.toLowerCase().includes('online') || meeting.lieu?.toLowerCase().includes('zoom')) || false,
+                      programId: String(programDetails.id)
+                    }));
+
+                    // Add to all meetings
+                    allMeetings.push(...formattedMeetings);
+
+                    return {
+                      ...phase,
+                      id: String(phase.id),
+                      name: phase.nom || phase.name || `Phase ${phase.id}`,
+                      description: phase.description || '',
+                      status: phase.status === 'completed' ? 'completed' : 
+                             phase.status === 'in_progress' ? 'in-progress' : 
+                             phase.status === 'not_started' ? 'not_started' : 'upcoming',
+                      color: phase.color || '#818cf8',
+                      meetings: formattedMeetings
+                    };
+                  } catch (error) {
+                    console.error(`Error fetching details for phase ${phase.id}:`, error);
+                    return {
+                      ...phase,
+                      id: String(phase.id),
+                      name: phase.nom || phase.name || `Phase ${phase.id}`,
+                      description: phase.description || '',
+                      status: 'active',
+                      color: '#818cf8',
+                      meetings: []
+                    };
+                  }
+                })
+              );
+
+              console.log('All meetings:', allMeetings);
+              setMeetings(allMeetings);
+
+              // Format the program with phases and meetings
+              const formattedProgram = {
+                ...programDetails,
+                id: String(programDetails.id),
+                name: programDetails.nom || programDetails.name || "Programme sans nom",
+                description: programDetails.description || "Aucune description disponible",
+                phases: phasesWithDetails
+              };
+
+              console.log('Programme formaté avec phases et réunions:', formattedProgram);
+              setSelectedProgram(formattedProgram);
+
+              // Set the first phase as active by default if not already set
+              if (phasesWithDetails.length > 0 && !selectedPhaseId) {
+                const firstPhaseId = phasesWithDetails[0].id;
+                setActivePhase(firstPhaseId);
+                setSelectedPhaseId(Number(firstPhaseId));
+              }
+            }
+          } else {
+            setError('Votre soumission est en cours d\'examen');
+          }
+        } else {
+          setError('Aucune soumission trouvée pour ce programme');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des informations du programme:', error);
+        setError('Une erreur est survenue lors du chargement des données');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubmissionProgramInfo();
+  }, [user?.id, user?.role, setSelectedProgram, selectedPhaseId, setSelectedPhaseId]);
+
+  // Filter meetings by active phase and search query
+  const filterMeetings = (meetingsList: Meeting[]) => {
+    return meetingsList.filter(meeting => {
+      const matchesPhase = activePhase === 'all' || String(meeting.phaseId) === String(activePhase);
+      const matchesSearch =
+        searchQuery.trim() === '' ||
+        meeting.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (meeting.description && meeting.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesPhase && matchesSearch;
+    });
   };
 
-  const availableMeetings = filterMeetingsByPhase(upcomingMeetings.filter(meeting => meeting.isOnline));
-  const unavailableMeetings = filterMeetingsByPhase(upcomingMeetings.filter(meeting => !meeting.isOnline));
-  const allPastMeetings = filterMeetingsByPhase([...pastMeetings, ...unavailableMeetings]);
+  // Separate upcoming and past meetings
+  const now = new Date();
+  const allFilteredMeetings = filterMeetings(meetings);
+  const availableMeetings = allFilteredMeetings.filter(m => new Date(m.date) >= now);
+  const allPastMeetings = allFilteredMeetings.filter(m => new Date(m.date) < now);
 
   // Update active phase when selectedPhaseId changes
   useEffect(() => {
     if (selectedPhaseId) {
-      setActivePhase(selectedPhaseId);
+      setActivePhase(String(selectedPhaseId));
     }
   }, [selectedPhaseId]);
 
-  // Simulate loading state
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [availableMeetings, allPastMeetings]);
-
-  const [showNewMeetingModal, setShowNewMeetingModal] = useState(false);
-  const [selectedMeeting, setSelectedMeeting] = useState<any>(null);
-  const [sidebarActive, setSidebarActive] = useState(false);
-  const [newMeeting, setNewMeeting] = useState({
-    title: '',
-    date: '',
-    time: '10:00',
-    duration: '60',
-    participants: [] as string[]
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setNewMeeting(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleCreateMeeting = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Logique pour créer la réunion
-    setShowNewMeetingModal(false);
-    setNewMeeting({
-      title: '',
-      date: '',
-      time: '10:00',
-      duration: '60',
-      participants: []
-    });
-  };
-
-  const handlePhaseChange = (phase: number) => {
-    setActivePhase(phase);
-    setSelectedPhaseId(phase); // Update program context when phase changes
+  const handlePhaseChange = (phase: number | string | null) => {
+    if (phase === null) {
+      setActivePhase('all');
+      setSelectedPhaseId(null);
+    } else {
+      setActivePhase(String(phase));
+      setSelectedPhaseId(Number(phase));
+    }
   };
 
   // Get phase description
-  const getPhaseDescription = (phaseId: number) => {
+  const getPhaseDescription = (phaseId: number | string) => {
     if (selectedProgram && selectedProgram.phases) {
-      const phase = selectedProgram.phases.find(p => p.id === phaseId);
-      if (phase) {
+      const phase = selectedProgram.phases.find((p: any) => String(p.id) === String(phaseId));
+      if (phase && phase.description && phase.description.trim() !== '') {
         return phase.description;
       }
     }
     return "Description non disponible";
   };
+
+  // Format date helper
+  const formatMeetingDate = (dateString: string) => {
+    try {
+      if (!dateString) return 'Date non définie';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Date non définie';
+      
+      return date.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Date non définie';
+    }
+  };
+
+  // Format time helper
+  const formatMeetingTime = (timeString: string) => {
+    if (!timeString) return '--:--';
+    return timeString.substring(0, 5); // Just get HH:MM
+  };
+
+  // Add debugging useEffect
+  useEffect(() => {
+    console.log('Selected Program:', selectedProgram);
+    console.log('Program Phases:', selectedProgram?.phases);
+  }, [selectedProgram]);
 
   return (
     <div className="meetings-container">
@@ -131,36 +307,18 @@ const StartupMeetingsPage = () => {
             <div className="flex bg-muted rounded-md p-1">
               <button
                 onClick={() => setActiveView("list")}
-                className="rounded-sm"
-                style={{
-                  backgroundColor: activeView === "list" ? '#0c4c80' : 'transparent',
-                  color: activeView === "list" ? 'white' : '#0c4c80',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                className={`rounded-sm flex items-center gap-2 px-3 py-1 ${
+                  activeView === "list" ? 'bg-primary text-white' : 'text-primary'
+                }`}
               >
                 <List className="h-4 w-4" />
                 Liste
               </button>
               <button
                 onClick={() => setActiveView("calendar")}
-                className="rounded-sm"
-                style={{
-                  backgroundColor: activeView === "calendar" ? '#0c4c80' : 'transparent',
-                  color: activeView === "calendar" ? 'white' : '#0c4c80',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                className={`rounded-sm flex items-center gap-2 px-3 py-1 ${
+                  activeView === "calendar" ? 'bg-primary text-white' : 'text-primary'
+                }`}
               >
                 <CalendarDays className="h-4 w-4" />
                 Calendrier
@@ -172,11 +330,20 @@ const StartupMeetingsPage = () => {
         {/* Phases Navigation */}
         <section className="phases-section">
           <ProgramPhaseTimeline
-            phases={selectedProgram?.phases || []}
-            selectedPhase={activePhase}
+            phases={selectedProgram?.phases?.map(phase => ({
+              id: Number(phase.id),
+              name: phase.name || `Phase ${phase.id}`,
+              color: phase.color || '#818cf8',
+              status: phase.status === 'completed' ? 'completed' : 
+                     phase.status === 'in_progress' ? 'in-progress' : 
+                     phase.status === 'not_started' ? 'not_started' : 'upcoming'
+            })) || []}
+            selectedPhase={activePhase === 'all' ? null : Number(activePhase)}
             onPhaseChange={handlePhaseChange}
             title="Chronologie des phases"
-            description={getPhaseDescription(activePhase)}
+            description={activePhase === 'all' 
+              ? "Toutes les phases du programme" 
+              : getPhaseDescription(activePhase)}
           />
         </section>
 
@@ -185,7 +352,7 @@ const StartupMeetingsPage = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
-              placeholder={`Rechercher des réunions pour la phase ${activePhase}...`}
+              placeholder={`Rechercher des réunions ${activePhase === 'all' ? 'dans toutes les phases' : `pour la phase ${activePhase}`}...`}
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -193,399 +360,206 @@ const StartupMeetingsPage = () => {
           </div>
           <div className="flex gap-2">
             <button
-              style={{
-                backgroundColor: 'white',
-                color: '#0c4c80',
-                border: '1px solid #e5e7eb',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center'
-              }}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
             >
-              <ListFilter className="h-4 w-4 mr-2" />
+              <ListFilter className="h-4 w-4" />
               Filtrer
             </button>
           </div>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Chargement...</span>
+              </div>
+              <p className="mt-2 text-gray-600">Chargement des réunions...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <strong className="font-bold">Erreur!</strong>
+            <span className="block sm:inline"> {error}</span>
+          </div>
+        )}
+
         {/* Meeting Content */}
-        {activeView === "calendar" ? (
-          <CalendarView
-            meetings={[...availableMeetings, ...allPastMeetings]}
-            getPhaseById={(phaseId) => selectedProgram?.phases?.find(p => p.id === Number(phaseId))}
-          />
-        ) : (
-          <Tabs defaultValue="upcoming" onValueChange={(value) => setViewTab(value as "upcoming" | "past")}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="upcoming">
-                Réunions à venir - Phase {activePhase} ({availableMeetings.length})
-              </TabsTrigger>
-              <TabsTrigger value="past">
-                Réunions passées - Phase {activePhase} ({allPastMeetings.length})
-              </TabsTrigger>
-            </TabsList>
+        {!isLoading && !error && (
+          activeView === "calendar" ? (
+            <CalendarView
+              meetings={meetings}
+              getPhaseById={(phaseId) => selectedProgram?.phases?.find(p => String(p.id) === String(phaseId))}
+            />
+          ) : (
+            <Tabs defaultValue="upcoming" onValueChange={(value) => setViewTab(value as "upcoming" | "past")}>
+              <TabsList className="mb-6">
+                <TabsTrigger value="upcoming">
+                  Réunions à venir {activePhase !== 'all' && `- Phase ${activePhase}`} ({availableMeetings.length})
+                </TabsTrigger>
+                <TabsTrigger value="past">
+                  Réunions passées {activePhase !== 'all' && `- Phase ${activePhase}`} ({allPastMeetings.length})
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="upcoming">
-              <section className="meetings-list">
-                <AnimatePresence>
-                  {isLoading ? (
-                    <div className="flex justify-center items-center h-40">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div>
-                  ) : availableMeetings.length > 0 ? (
-                    availableMeetings.map(meeting => (
-                      <motion.div
-                        key={meeting.id}
-                        className="meeting-card"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        whileHover={{ y: -5 }}
-                      >
-                        <div className="card-header">
-                          <h3 className="meeting-title">{meeting.title}</h3>
-                          <div className="card-actions">
-                            <button className="icon-btn">
-                              <FaBell />
-                            </button>
-                            <button className="icon-btn">
-                              <FaEllipsisV />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="meeting-details">
-                          <div className="detail">
-                            <FaCalendarAlt className="icon" />
-                            <span>{formatDate(meeting.date)}</span>
+              <TabsContent value="upcoming">
+                <section className="meetings-list">
+                  <AnimatePresence>
+                    {availableMeetings.length > 0 ? (
+                      availableMeetings.map(meeting => (
+                        <motion.div
+                          key={meeting.id}
+                          className="meeting-card"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                          whileHover={{ y: -5 }}
+                        >
+                          <div className="card-header">
+                            <h3 className="meeting-title">{meeting.title}</h3>
+                            <div className="card-actions">
+                              <button className="icon-btn">
+                                <FaBell />
+                              </button>
+                              <button className="icon-btn">
+                                <FaEllipsisV />
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="detail">
-                            <FaClock className="icon" />
-                            <span>{formatTime(meeting.time)}</span>
+                          <div className="meeting-details">
+                            <div className="detail">
+                              <FaCalendarAlt className="icon" />
+                              <span>{formatMeetingDate(meeting.date)}</span>
+                            </div>
+
+                            <div className="detail">
+                              <FaClock className="icon" />
+                              <span>{formatMeetingTime(meeting.time)}</span>
+                            </div>
+
+                            <div className="detail">
+                              <FaUserFriends className="icon" />
+                              <span>{meeting.attendees?.length || 0} participants</span>
+                            </div>
                           </div>
 
-                          <div className="detail">
-                            <FaUserFriends className="icon" />
-                            <span>{formatAttendees(meeting.attendees)}</span>
+                          <div className="card-footer">
+                            <motion.button
+                              className="secondary-btn"
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                            >
+                              Détails <FaChevronRight />
+                            </motion.button>
+                            <motion.button
+                              className="primary-btn"
+                              whileHover={{ scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" }}
+                              whileTap={{ scale: 0.97 }}
+                              disabled={!meeting.isOnline}
+                            >
+                              <FaVideo /> {meeting.isOnline ? 'Rejoindre' : 'En présentiel'}
+                            </motion.button>
                           </div>
-                        </div>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <div className="empty-state">
+                        <p>Aucune réunion à venir {activePhase !== 'all' && `pour la phase ${activePhase}`}</p>
+                        <motion.button
+                          className="primary-btn"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <FaPlus /> Planifier une réunion
+                        </motion.button>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </section>
+              </TabsContent>
 
-                        <div className="card-footer">
-                          <motion.button
-                            className="secondary-btn"
-                            onClick={() => setSelectedMeeting(meeting)}
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                          >
-                            Détails <FaChevronRight />
-                          </motion.button>
-                          <motion.button
-                            className="primary-btn"
-                            whileHover={{ scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" }}
-                            whileTap={{ scale: 0.97 }}
-                          >
-                            <FaVideo /> Rejoindre
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <div className="empty-state">
-                      <p>Aucune réunion disponible pour cette phase</p>
-                      <motion.button
-                        className="primary-btn"
-                        onClick={() => setShowNewMeetingModal(true)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <FaPlus /> Planifier une réunion
-                      </motion.button>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </section>
-            </TabsContent>
-
-            <TabsContent value="past">
-              <section className="meetings-list">
-                <AnimatePresence>
-                  {isLoading ? (
-                    <div className="flex justify-center items-center h-40">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div>
-                  ) : allPastMeetings.length > 0 ? (
-                    allPastMeetings.map(meeting => (
-                      <motion.div
-                        key={meeting.id}
-                        className="meeting-card"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        whileHover={{ y: -5 }}
-                      >
-                        <div className="card-header">
-                          <h3 className="meeting-title">{meeting.title}</h3>
-                          <div className="card-actions">
-                            <button className="icon-btn">
-                              <FaBell />
-                            </button>
-                            <button className="icon-btn">
-                              <FaEllipsisV />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="meeting-details">
-                          <div className="detail">
-                            <FaCalendarAlt className="icon" />
-                            <span>{formatDate(meeting.date)}</span>
+              <TabsContent value="past">
+                <section className="meetings-list">
+                  <AnimatePresence>
+                    {allPastMeetings.length > 0 ? (
+                      allPastMeetings.map(meeting => (
+                        <motion.div
+                          key={meeting.id}
+                          className="meeting-card"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                          whileHover={{ y: -5 }}
+                        >
+                          <div className="card-header">
+                            <h3 className="meeting-title">{meeting.title}</h3>
+                            <div className="card-actions">
+                              <button className="icon-btn">
+                                <FaBell />
+                              </button>
+                              <button className="icon-btn">
+                                <FaEllipsisV />
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="detail">
-                            <FaClock className="icon" />
-                            <span>{formatTime(meeting.time)}</span>
+                          <div className="meeting-details">
+                            <div className="detail">
+                              <FaCalendarAlt className="icon" />
+                              <span>{formatMeetingDate(meeting.date)}</span>
+                            </div>
+
+                            <div className="detail">
+                              <FaClock className="icon" />
+                              <span>{formatMeetingTime(meeting.time)}</span>
+                            </div>
+
+                            <div className="detail">
+                              <FaUserFriends className="icon" />
+                              <span>{meeting.attendees?.length || 0} participants</span>
+                            </div>
                           </div>
 
-                          <div className="detail">
-                            <FaUserFriends className="icon" />
-                            <span>{formatAttendees(meeting.attendees)}</span>
+                          <div className="card-footer">
+                            <motion.button
+                              className="secondary-btn"
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                            >
+                              Détails <FaChevronRight />
+                            </motion.button>
+                            <motion.button
+                              className="primary-btn"
+                              disabled={true}
+                              style={{ backgroundColor: '#9ca3af', cursor: 'not-allowed' }}
+                            >
+                              <FaVideo /> {meeting.isOnline ? 'Terminée' : 'Indisponible'}
+                            </motion.button>
                           </div>
-                        </div>
-
-                        <div className="card-footer">
-                          <motion.button
-                            className="secondary-btn"
-                            onClick={() => setSelectedMeeting(meeting)}
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                          >
-                            Détails <FaChevronRight />
-                          </motion.button>
-                          <motion.button
-                            className="primary-btn"
-                            disabled={true}
-                            style={{ backgroundColor: '#9ca3af', cursor: 'not-allowed' }}
-                          >
-                            <FaVideo /> {meeting.isOnline ? 'Terminée' : 'Indisponible'}
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <div className="empty-state">
-                      <p>Aucune réunion passée pour cette phase</p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Les réunions passées et indisponibles apparaîtront ici.
-                      </p>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </section>
-            </TabsContent>
-          </Tabs>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <div className="empty-state">
+                        <p>Aucune réunion passée {activePhase !== 'all' && `pour la phase ${activePhase}`}</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Les réunions passées apparaîtront ici.
+                        </p>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </section>
+              </TabsContent>
+            </Tabs>
+          )
         )}
       </main>
-
-      {/* New Meeting Modal */}
-      <AnimatePresence>
-        {showNewMeetingModal && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowNewMeetingModal(false)}
-          >
-            <motion.div
-              className="modal-content"
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="close-btn"
-                onClick={() => setShowNewMeetingModal(false)}
-              >
-                <FaTimes />
-              </button>
-
-              <h2>Nouvelle réunion (Phase {activePhase})</h2>
-
-              <form onSubmit={handleCreateMeeting}>
-                <div className="form-group">
-                  <label>Titre de la réunion</label>
-                  <input
-                    type="text"
-                    name="title"
-                    value={newMeeting.title}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Date</label>
-                    <input
-                      type="date"
-                      name="date"
-                      value={newMeeting.date}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Heure</label>
-                    <input
-                      type="time"
-                      name="time"
-                      value={newMeeting.time}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Durée (minutes)</label>
-                  <select
-                    name="duration"
-                    value={newMeeting.duration}
-                    onChange={handleInputChange}
-                  >
-                    <option value="30">30 minutes</option>
-                    <option value="60">1 heure</option>
-                    <option value="90">1 heure 30</option>
-                    <option value="120">2 heures</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Participants (séparés par des virgules)</label>
-                  <input
-                    type="text"
-                    name="participants"
-                    value={newMeeting.participants.join(', ')}
-                    onChange={(e) => setNewMeeting(prev => ({
-                      ...prev,
-                      participants: e.target.value.split(',').map(p => p.trim())
-                    }))}
-                  />
-                </div>
-
-                <div className="form-actions">
-                  <motion.button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => setShowNewMeetingModal(false)}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    Annuler
-                  </motion.button>
-                  <motion.button
-                    type="submit"
-                    className="primary-btn"
-                    whileHover={{ scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    Créer la réunion
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Meeting Detail Modal */}
-      <AnimatePresence>
-        {selectedMeeting && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedMeeting(null)}
-          >
-            <motion.div
-              className="modal-content"
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="close-btn"
-                onClick={() => setSelectedMeeting(null)}
-              >
-                <FaTimes />
-              </button>
-
-              <div className="modal-header">
-                <span className={`meeting-type ${selectedMeeting.type.toLowerCase()}`}>
-                  {selectedMeeting.type}
-                </span>
-                <h2>{selectedMeeting.title}</h2>
-                <p>Phase {activePhase}</p>
-              </div>
-
-              <div className="modal-body">
-                <div className="detail-group">
-                  <FaCalendarAlt className="icon" />
-                  <div>
-                    <h4>Date</h4>
-                    <p>{formatDate(selectedMeeting.date)}</p>
-                  </div>
-                </div>
-
-                <div className="detail-group">
-                  <FaClock className="icon" />
-                  <div>
-                    <h4>Heure</h4>
-                    <p>{formatTime(selectedMeeting.time)}</p>
-                  </div>
-                </div>
-
-                <div className="detail-group">
-                  <FaUserFriends className="icon" />
-                  <div>
-                    <h4>Participants</h4>
-                    <p>{formatAttendees(selectedMeeting.attendees)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <motion.button
-                  className="secondary-btn"
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  Modifier
-                </motion.button>
-                <motion.button
-                  className="primary-btn"
-                  disabled={!selectedMeeting.isOnline}
-                  whileHover={selectedMeeting.isOnline ? {
-                    scale: 1.03,
-                    boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)"
-                  } : {}}
-                  whileTap={selectedMeeting.isOnline ? { scale: 0.97 } : {}}
-                >
-                  <FaVideo /> {selectedMeeting.isOnline ? 'Rejoindre' : 'Indisponible'}
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* CSS Styles */}
       <style jsx>{`
@@ -599,7 +573,7 @@ const StartupMeetingsPage = () => {
         .main-content {
           flex: 1;
           padding: 2rem;
-          padding-top: 100px; /* Add padding to account for the navbar height */
+          padding-top: 100px;
           margin-left: 280px;
           min-height: 100vh;
         }
@@ -614,7 +588,7 @@ const StartupMeetingsPage = () => {
         }
 
         .meetings-header h1 {
-          font-size: 1.3rem;
+          font-size: 1.5rem;
           color: #111827;
           margin-bottom: 0.25rem;
         }
@@ -626,7 +600,7 @@ const StartupMeetingsPage = () => {
         }
 
         .primary-btn {
-          background: var(--gradient);
+          background: #0c4c80;
           color: white;
           border: none;
           padding: 0.75rem 1.5rem;
@@ -640,8 +614,7 @@ const StartupMeetingsPage = () => {
         }
 
         .primary-btn:hover {
-          background: var(--gradient);
-          opacity: 0.9;
+          background: #0a3d66;
         }
 
         .primary-btn:disabled {
@@ -677,10 +650,10 @@ const StartupMeetingsPage = () => {
         .meeting-card {
           background: white;
           border-radius: 8px;
-          padding: 0.5rem;
+          padding: 1.5rem;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           transition: all 0.3s ease;
-          border-left: 4px solid #e43e32;
+          border-left: 4px solid #0c4c80;
         }
 
         .meeting-card:hover {
@@ -693,37 +666,10 @@ const StartupMeetingsPage = () => {
           margin-bottom: 1rem;
         }
 
-        .meeting-type {
-          display: inline-block;
-          padding: 0.25rem 0.75rem;
-          border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 500;
-        }
-
-        .meeting-type.équipe {
-          background: rgba(228, 62, 50, 0.1);
-          color: #e43e32;
-        }
-
-        .meeting-type.client {
-          background: rgba(59, 130, 246, 0.1);
-          color: #3b82f6;
-        }
-
-        .meeting-type.développement {
-          background: rgba(16, 185, 129, 0.1);
-          color: #10b981;
-        }
-
-        .meeting-type.validation {
-          background: rgba(139, 92, 246, 0.1);
-          color: #8b5cf6;
-        }
-
-        .meeting-type.clôture {
-          background: rgba(245, 158, 11, 0.1);
-          color: #f59e0b;
+        .meeting-title {
+          font-size: 1.25rem;
+          color: #111827;
+          margin: 0;
         }
 
         .card-actions {
@@ -738,12 +684,6 @@ const StartupMeetingsPage = () => {
           cursor: pointer;
           padding: 0.25rem;
           font-size: 1rem;
-        }
-
-        .meeting-title {
-          font-size: 1.25rem;
-          color: #111827;
-          margin: 0 0 1rem 0;
         }
 
         .meeting-details {
@@ -773,8 +713,8 @@ const StartupMeetingsPage = () => {
 
         .secondary-btn {
           background: none;
-          color: #e43e32;
-          border: 1px solid #e43e32;
+          color: #0c4c80;
+          border: 1px solid #0c4c80;
           padding: 0.75rem 1.5rem;
           border-radius: 6px;
           font-weight: 500;
@@ -786,144 +726,14 @@ const StartupMeetingsPage = () => {
         }
 
         .secondary-btn:hover {
-          background: rgba(228, 62, 50, 0.1);
-        }
-
-        /* Modal Styles */
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          backdrop-filter: blur(2px);
-        }
-
-        .modal-content {
-          background: white;
-          border-radius: 12px;
-          padding: 2rem;
-          width: 90%;
-          max-width: 500px;
-          position: relative;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-
-        .close-btn {
-          position: absolute;
-          top: 1rem;
-          right: 1rem;
-          background: none;
-          border: none;
-          font-size: 1.5rem;
-          cursor: pointer;
-          color: #6b7280;
-          padding: 0.25rem;
-        }
-
-        .modal-content h2 {
-          margin-top: 0;
-          color: #111827;
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group {
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
-          color: #4b5563;
-          font-weight: 100;
-        }
-
-        .form-group input,
-        .form-group select {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-size: 1rem;
-        }
-
-        .form-row {
-          display: flex;
-          gap: 1rem;
-        }
-
-        .form-row .form-group {
-          flex: 1;
-        }
-
-        .form-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 1rem;
-          margin-top: 2rem;
-        }
-
-        /* Detail Modal Styles */
-        .modal-header {
-          margin-bottom: 1.5rem;
-        }
-
-        .modal-header h2 {
-          margin-bottom: 0.5rem;
-        }
-
-        .modal-header p {
-          color: #6b7280;
-          margin: 0;
-          font-size: 0.9rem;
-        }
-
-        .modal-body {
-          margin: 2rem 0;
-        }
-
-        .detail-group {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 1.5rem;
-          align-items: flex-start;
-        }
-
-        .detail-group .icon {
-          font-size: 1.25rem;
-          margin-top: 0.25rem;
-        }
-
-        .detail-group h4 {
-          margin: 0 0 0.25rem 0;
-          color: #4b5563;
-          font-size: 0.9rem;
-        }
-
-        .detail-group p {
-          margin: 0;
-          color: #111827;
-          font-size: 1rem;
-        }
-
-        .modal-footer {
-          display: flex;
-          justify-content: flex-end;
-          gap: 1rem;
-          padding-top: 1.5rem;
-          border-top: 1px solid #e5e7eb;
+          background: rgba(12, 76, 128, 0.1);
         }
 
         @media (max-width: 768px) {
           .main-content {
             margin-left: 0;
             padding: 1rem;
-            padding-top: 100px; /* Maintain padding for navbar on mobile */
+            padding-top: 100px;
           }
 
           .meetings-header {
@@ -939,11 +749,6 @@ const StartupMeetingsPage = () => {
           .primary-btn, .secondary-btn {
             width: 100%;
             justify-content: center;
-          }
-
-          .form-row {
-            flex-direction: column;
-            gap: 0;
           }
         }
       `}</style>
