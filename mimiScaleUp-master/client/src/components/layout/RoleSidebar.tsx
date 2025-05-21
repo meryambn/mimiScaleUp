@@ -158,7 +158,6 @@ const RoleSidebar: React.FC = () => {
         { name: "Ressources", path: "/admin/resources", icon: <BookOpen className="h-5 w-5" /> },
         { name: "Paramètres", path: "/admin/settings", icon: <Settings className="h-5 w-5" /> },
         { name: "Aide", path: "/admin/help", icon: <HelpCircle className="h-5 w-5" /> },
-        { name: "Créer Équipe Test", path: "/admin/test/create-team", icon: <TestTube className="h-5 w-5" /> },
       ];
     } else if (role === 'mentor') {
       return [

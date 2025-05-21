@@ -55,6 +55,15 @@ const Deliverables: React.FC = () => {
     fetchDeliverables();
   }, [activePhase]);
 
+  // Log when component mounts to check if program data is loaded
+  useEffect(() => {
+    console.log('Deliverables component mounted');
+    console.log('User:', user);
+    console.log('Selected Program ID:', selectedProgram?.id);
+    console.log('Selected Program Name:', selectedProgram?.name);
+    console.log('Selected Program Phases:', selectedProgram?.phases);
+  }, []);
+
   useEffect(() => {
     if (selectedPhaseId) {
       setActivePhase(Number(selectedPhaseId));
@@ -63,7 +72,7 @@ const Deliverables: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate form data
     if (!formData.nom || !formData.description || !formData.date_echeance) {
       alert('Veuillez remplir tous les champs obligatoires');
@@ -147,9 +156,14 @@ const Deliverables: React.FC = () => {
     }
   };
 
-  const handlePhaseChange = (phase: number) => {
-    setActivePhase(phase);
-    setSelectedPhaseId(phase);
+  const handlePhaseChange = (phase: number | string | null) => {
+    if (phase === null) {
+      setActivePhase(0); // Use 0 to represent "all phases"
+      setSelectedPhaseId(null);
+    } else {
+      setActivePhase(Number(phase));
+      setSelectedPhaseId(Number(phase));
+    }
     setActiveTab('pending');
   };
 
@@ -178,10 +192,10 @@ const Deliverables: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Non soumis";
-    const options: Intl.DateTimeFormatOptions = { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
     };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
@@ -197,8 +211,24 @@ const Deliverables: React.FC = () => {
     return "Description non disponible";
   };
 
+  // Add debugging useEffect
+  useEffect(() => {
+    console.log('Selected Program:', selectedProgram);
+    console.log('Program Phases:', selectedProgram?.phases);
+
+    console.log('Phases for timeline:', (selectedProgram?.phases || []).map(phase => ({
+      id: Number(phase.id),
+      name: phase.name,
+      description: phase.description,
+      color: phase.color || '#818cf8',
+      status: phase.status === 'completed' ? 'completed' :
+             phase.status === 'in_progress' ? 'in-progress' :
+             phase.status === 'not_started' ? 'not_started' : 'upcoming'
+    })));
+  }, [selectedProgram]);
+
   // Filter deliverables by active phase and tab
-  const phaseDeliverables = filteredDeliverables.filter(d => 
+  const phaseDeliverables = filteredDeliverables.filter(d =>
     Number(d.phaseId) === activePhase
   );
 
@@ -230,15 +260,20 @@ const Deliverables: React.FC = () => {
         {/* Phases Navigation */}
         <section className="phases-section">
           <ProgramPhaseTimeline
-            phases={(selectedProgram?.phases || []).map(phase => ({
+            phases={selectedProgram?.phases?.map(phase => ({
               id: Number(phase.id),
-              name: phase.name,
-              description: phase.description
-            }))}
-            selectedPhase={activePhase}
+              name: phase.name || `Phase ${phase.id}`,
+              color: phase.color || '#818cf8',
+              status: phase.status === 'completed' ? 'completed' :
+                     phase.status === 'in_progress' ? 'in-progress' :
+                     phase.status === 'not_started' ? 'not_started' : 'upcoming'
+            })) || []}
+            selectedPhase={activePhase === 0 ? null : Number(activePhase)}
             onPhaseChange={handlePhaseChange}
             title="Chronologie des phases"
-            description={getPhaseDescription(activePhase)}
+            description={activePhase === 0
+              ? "Toutes les phases du programme"
+              : getPhaseDescription(activePhase)}
           />
         </section>
 

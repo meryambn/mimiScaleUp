@@ -63,6 +63,12 @@ const StartupDetailPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const isMentor = user?.role === 'mentor';
+
+  // Debug user role
+  React.useEffect(() => {
+    console.log('User role:', user?.role);
+    console.log('isMentor:', isMentor);
+  }, [user, isMentor]);
   const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
   const queryClient = useQueryClient(); // Initialize queryClient
 
@@ -486,12 +492,30 @@ const StartupDetailPage = () => {
   // This is used in the UI to determine if the "Select as Winner" button should be shown
   const isInLastPhase = React.useMemo(() => {
     if (!selectedProgram || !startup) return false;
+    if (!selectedProgram.phases || selectedProgram.phases.length === 0) return false;
+    if (!startup.currentPhase) return false;
 
     // Obtenir la dernière phase du programme
     const lastPhase = selectedProgram.phases[selectedProgram.phases.length - 1];
+    if (!lastPhase || !lastPhase.name) return false;
 
-    // Vérifier si l'équipe est dans la dernière phase
-    return startup.currentPhase.toLowerCase().includes(lastPhase.name.toLowerCase());
+    // Vérifier si l'équipe est dans la dernière phase (méthode améliorée)
+    const currentPhaseLower = startup.currentPhase.toLowerCase();
+    const lastPhaseLower = lastPhase.name.toLowerCase();
+
+    // Log for debugging
+    console.log('Checking if team is in last phase:', {
+      currentPhase: startup.currentPhase,
+      lastPhase: lastPhase.name,
+      isMatch: currentPhaseLower.includes(lastPhaseLower) ||
+               lastPhaseLower.includes(currentPhaseLower) ||
+               currentPhaseLower === lastPhaseLower
+    });
+
+    // Vérifier par inclusion ou correspondance exacte
+    return currentPhaseLower.includes(lastPhaseLower) ||
+           lastPhaseLower.includes(currentPhaseLower) ||
+           currentPhaseLower === lastPhaseLower;
   }, [selectedProgram, startup]);
 
   // Effet pour afficher les données de débogage et mettre à jour le nom de l'équipe
@@ -1162,40 +1186,57 @@ const StartupDetailPage = () => {
               teamName={programTeamData?.nom_equipe || teamDetailsData?.nom_equipe || startup.name || "Équipe"}
               teamMembers={startup.team || startup.members || []}
             />
-            {!isMentor && (
-              <>
-                {isInLastPhase && !isWinner ? (
-                  <button
-                    style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
-                    onClick={handleSelectWinner}
-                  >
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Sélectionner comme gagnant
-                  </button>
-                ) : isWinner ? (
-                  <button
-                    style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #22c55e', padding: '4px 8px', borderRadius: '4px', cursor: 'not-allowed', display: 'flex', alignItems: 'center', fontSize: '0.875rem', opacity: '0.7' }}
-                    disabled
-                  >
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Gagnant sélectionné
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleNextPhase}
-                    style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontSize: '0.875rem' }}
-                  >
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    Next Phase
-                  </button>
-                )}
+            <div className="flex space-x-2">
+              {/* Winner selection button - admin only */}
+              {!isMentor && isInLastPhase && !isWinner && (
+                <button
+                  style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}
+                  onClick={handleSelectWinner}
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  Sélectionner comme gagnant
+                </button>
+              )}
+
+              {/* Winner badge - visible to all */}
+              {isWinner && (
+                <button
+                  style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #22c55e', padding: '4px 8px', borderRadius: '4px', cursor: 'not-allowed', display: 'flex', alignItems: 'center', fontSize: '0.875rem', opacity: '0.7' }}
+                  disabled
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  Gagnant sélectionné
+                </button>
+              )}
+
+              {/* Next Phase button - visible to both admin and mentor when not in last phase */}
+              {!isInLastPhase && !isWinner && (
+                <button
+                  onClick={handleNextPhase}
+                  style={{ background: 'linear-gradient(135deg, #e43e32 0%, #0c4c80 100%)', color: 'white', display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontSize: '0.875rem' }}
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Phase suivante
+                </button>
+              )}
+
+              {/* Message for mentors in last phase */}
+              {isMentor && isInLastPhase && !isWinner && (
+                <div style={{ backgroundColor: '#f3f4f6', color: '#4b5563', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', fontSize: '0.875rem' }}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Dernière phase atteinte
+                </div>
+              )}
+
+              {/* Delete button - admin only */}
+              {!isMentor && (
                 <button
                   style={{ backgroundColor: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontSize: '0.875rem' }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </CardHeader>
       </Card>

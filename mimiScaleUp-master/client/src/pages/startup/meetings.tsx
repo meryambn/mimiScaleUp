@@ -61,6 +61,7 @@ const StartupMeetingsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [formattedProgram, setFormattedProgram] = useState<any>(null);
 
   // Fetch submission program info and details
   useEffect(() => {
@@ -155,8 +156,8 @@ const StartupMeetingsPage = () => {
                       id: String(phase.id),
                       name: phase.nom || phase.name || `Phase ${phase.id}`,
                       description: phase.description || '',
-                      status: phase.status === 'completed' ? 'completed' : 
-                             phase.status === 'in_progress' ? 'in-progress' : 
+                      status: phase.status === 'completed' ? 'completed' :
+                             phase.status === 'in_progress' ? 'in-progress' :
                              phase.status === 'not_started' ? 'not_started' : 'upcoming',
                       color: phase.color || '#818cf8',
                       meetings: formattedMeetings
@@ -189,6 +190,18 @@ const StartupMeetingsPage = () => {
               };
 
               console.log('Programme formaté avec phases et réunions:', formattedProgram);
+
+              // Debug check for phases
+              if (!formattedProgram.phases || formattedProgram.phases.length === 0) {
+                console.warn('No phases found in formatted program. Adding debug info.');
+                console.log('Original phases from API:', phases);
+                console.log('Phases with details:', phasesWithDetails);
+              }
+
+              // Store the formatted program in local state for direct use in the component
+              setFormattedProgram(formattedProgram);
+
+              // Also update the context
               setSelectedProgram(formattedProgram);
 
               // Set the first phase as active by default if not already set
@@ -254,8 +267,14 @@ const StartupMeetingsPage = () => {
   const getPhaseDescription = (phaseId: number | string) => {
     if (selectedProgram && selectedProgram.phases) {
       const phase = selectedProgram.phases.find((p: any) => String(p.id) === String(phaseId));
-      if (phase && phase.description && phase.description.trim() !== '') {
-        return phase.description;
+      if (phase) {
+        // Check for description
+        if (phase.description && phase.description.trim() !== '') {
+          return phase.description;
+        }
+
+        // If no description, return phase name
+        return `Phase: ${phase.nom || phase.name || `Phase ${phase.id}`}`;
       }
     }
     return "Description non disponible";
@@ -267,7 +286,7 @@ const StartupMeetingsPage = () => {
       if (!dateString) return 'Date non définie';
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return 'Date non définie';
-      
+
       return date.toLocaleDateString('fr-FR', {
         day: 'numeric',
         month: 'long',
@@ -289,6 +308,11 @@ const StartupMeetingsPage = () => {
   useEffect(() => {
     console.log('Selected Program:', selectedProgram);
     console.log('Program Phases:', selectedProgram?.phases);
+
+    // Check if we have valid phases data
+    if (selectedProgram && (!selectedProgram.phases || selectedProgram.phases.length === 0)) {
+      console.warn('No phases found in selected program. This will cause the phase timeline to use fallback phases.');
+    }
   }, [selectedProgram]);
 
   return (
@@ -329,20 +353,53 @@ const StartupMeetingsPage = () => {
 
         {/* Phases Navigation */}
         <section className="phases-section">
+          {/* Debug output */}
+          {console.log('Before mapping phases:', selectedProgram?.phases)}
+          {console.log('Is phases array?', Array.isArray(selectedProgram?.phases))}
+          {console.log('Phases length:', selectedProgram?.phases?.length)}
+
           <ProgramPhaseTimeline
-            phases={selectedProgram?.phases?.map(phase => ({
-              id: Number(phase.id),
-              name: phase.name || `Phase ${phase.id}`,
-              color: phase.color || '#818cf8',
-              status: phase.status === 'completed' ? 'completed' : 
-                     phase.status === 'in_progress' ? 'in-progress' : 
-                     phase.status === 'not_started' ? 'not_started' : 'upcoming'
-            })) || []}
+            phases={(() => {
+              // Create a debug function to trace the mapping process
+              if (!selectedProgram) {
+                console.log('No selected program');
+                return [];
+              }
+
+              if (!selectedProgram.phases) {
+                console.log('No phases in selected program');
+                return [];
+              }
+
+              console.log('Selected program phases:', selectedProgram.phases);
+
+              // Fix: Ensure we're working with an array
+              const phasesArray = Array.isArray(selectedProgram.phases) ? selectedProgram.phases : [];
+
+              const mappedPhases = phasesArray.map(phase => {
+                console.log('Mapping phase:', phase);
+                console.log('Phase ID:', phase.id);
+                console.log('Phase nom:', phase.nom);
+                console.log('Phase name:', phase.name);
+
+                return {
+                  id: Number(phase.id),
+                  name: phase.nom || phase.name || `Phase ${phase.id}`,
+                  color: phase.color || '#818cf8',
+                  status: phase.status === 'completed' ? 'completed' :
+                         phase.status === 'in_progress' ? 'in-progress' :
+                         phase.status === 'not_started' ? 'not_started' : 'upcoming'
+                };
+              });
+
+              console.log('Mapped phases result:', mappedPhases);
+              return mappedPhases;
+            })()}
             selectedPhase={activePhase === 'all' ? null : Number(activePhase)}
             onPhaseChange={handlePhaseChange}
             title="Chronologie des phases"
-            description={activePhase === 'all' 
-              ? "Toutes les phases du programme" 
+            description={activePhase === 'all'
+              ? "Toutes les phases du programme"
               : getPhaseDescription(activePhase)}
           />
         </section>

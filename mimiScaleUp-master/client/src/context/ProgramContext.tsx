@@ -1000,6 +1000,9 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
 
   // Load programs directly from the backend on mount or when user changes
   useEffect(() => {
+    console.log('ProgramContext: Loading programs from backend');
+    console.log('ProgramContext: User ID:', user?.id);
+    console.log('ProgramContext: User Role:', user?.role);
     loadProgramsFromBackend();
   }, [user?.id, user?.role]);
 
@@ -1037,6 +1040,7 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
       const fetchProgramDetails = async () => {
         try {
           console.log(`Fetching details for program ${selectedProgramId}...`);
+          console.log(`User role: ${user?.role}`);
 
           // Convert string ID to number if needed
           const programIdNumber = parseInt(selectedProgramId);

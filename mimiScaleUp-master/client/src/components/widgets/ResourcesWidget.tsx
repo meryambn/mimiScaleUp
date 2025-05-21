@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { PlusCircle, Download, Loader2, FileText, Video, File, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,10 +23,10 @@ interface ResourcesWidgetProps {
   resources?: any[];
 }
 
-const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
+const ResourcesWidget = ({
   programId,
   resources: propResources = []
-}) => {
+}: ResourcesWidgetProps) => {
   const {
     getResourceTypeIcon: contextGetResourceTypeIcon,
     getCategoryColor: contextGetCategoryColor
@@ -37,7 +37,7 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
   const [widgetResources, setWidgetResources] = useState<WidgetResource[]>([]);
 
   // Define resource type icons if not available from context
-  const getResourceTypeIcon = (type: string) => {
+  const getResourceTypeIcon = useCallback((type: string) => {
     if (contextGetResourceTypeIcon) return contextGetResourceTypeIcon(type);
 
     // Fallback implementation
@@ -55,10 +55,10 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
       default:
         return <FileText className="h-5 w-5 text-gray-500" />;
     }
-  };
+  }, [contextGetResourceTypeIcon]);
 
   // Define category colors if not available from context
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = useCallback((category: string) => {
     if (contextGetCategoryColor) return contextGetCategoryColor(category);
 
     // Fallback implementation
@@ -74,11 +74,15 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
+  }, [contextGetCategoryColor]);
 
   // Get resources from props, selected program, or fetch from API
   useEffect(() => {
+    // Create a flag to prevent setting state if the component unmounts
+    let isMounted = true;
+
     const fetchResources = async () => {
+      if (!isMounted) return;
       setIsLoading(true);
 
       console.log("ResourcesWidget: fetchResources called with:", {
@@ -105,8 +109,10 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
           }));
 
           console.log("ResourcesWidget: Formatted resources from props:", formattedResources);
-          setWidgetResources(formattedResources);
-          setIsLoading(false);
+          if (isMounted) {
+            setWidgetResources(formattedResources);
+            setIsLoading(false);
+          }
           return;
         } else {
           console.log("ResourcesWidget: No resources in props");
@@ -128,8 +134,10 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
             is_external: r.is_external || false
           }));
 
-          setWidgetResources(formattedResources);
-          setIsLoading(false);
+          if (isMounted) {
+            setWidgetResources(formattedResources);
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -138,8 +146,10 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
 
         if (!effectiveProgramId) {
           console.log("ResourcesWidget: No program ID available, cannot fetch resources");
-          setWidgetResources([]);
-          setIsLoading(false);
+          if (isMounted) {
+            setWidgetResources([]);
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -170,20 +180,36 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
           }))
         ];
 
-        setWidgetResources(formattedResources);
+        if (isMounted) {
+          setWidgetResources(formattedResources);
+        }
       } catch (error) {
         console.error('Error fetching resources:', error);
-        setWidgetResources([]);
+        if (isMounted) {
+          setWidgetResources([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchResources();
-  }, [propResources, selectedProgram, programId]);
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    // Only depend on the IDs, not the entire objects
+    propResources?.length,
+    programId,
+    selectedProgram?.id
+  ]);
 
   // Get only the first 4 resources for display
-  const displayResources = widgetResources.slice(0, 4);
+  const displayResources = useMemo(() => widgetResources.slice(0, 4), [widgetResources]);
 
   return (
     <div className="p-4">
@@ -243,4 +269,4 @@ const ResourcesWidget: React.FC<ResourcesWidgetProps> = ({
   );
 };
 
-export default ResourcesWidget;
+export default React.memo(ResourcesWidget);

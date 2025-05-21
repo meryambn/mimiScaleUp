@@ -83,9 +83,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         const newSocket = initializeSocket(user.id, normalizedRole);
         setSocket(newSocket);
 
-        // Fetch initial data
-        refreshConversations();
-        refreshContacts();
+        // We'll fetch data when needed, not on every socket initialization
+        // This prevents multiple refreshes when the component mounts
         fetchUnreadCount();
       } catch (error) {
         console.error('Error initializing chat:', error);
@@ -155,10 +154,22 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // Handle new messages
     const handleNewMessage = (message: ChatMessage) => {
+      console.log(`Received new message from ${message.sender_id} (${message.sender_role}):`, message.id);
+
       // Add message to messages state
       setMessages(prev => {
         const contactKey = getContactKeyRef(message.sender_id, message.sender_role);
         const contactMessages = prev[contactKey] || [];
+
+        // Check if this message already exists to prevent duplicates
+        const messageExists = contactMessages.some(msg => msg.id === message.id);
+
+        if (messageExists) {
+          console.log(`Message ${message.id} already exists, not adding duplicate`);
+          return prev;
+        }
+
+        console.log(`Adding new message ${message.id} to conversation with ${message.sender_id}`);
         return {
           ...prev,
           [contactKey]: [...contactMessages, message]
@@ -177,39 +188,44 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // Handle message sent confirmation
     const handleMessageSent = (message: ChatMessage) => {
-      // Add message to messages state immediately
-      if (currentUser?.id && currentUser?.role) {
-        const contactKey = getContactKeyRef(message.recipient_id, message.recipient_role);
-        setMessages(prev => {
-          const contactMessages = prev[contactKey] || [];
-          return {
-            ...prev,
-            [contactKey]: [...contactMessages, message]
-          };
-        });
-      }
+      // We don't need to add the message here because we already added a temporary message
+      // in the sendMessage function. The message-updated event will replace it with the real one.
+      console.log('Message sent confirmation received:', message.id);
     };
 
     // Handle message update (replacing temporary message with real one)
     const handleMessageUpdated = ({ tempId, message }: { tempId: number, message: ChatMessage }) => {
       if (currentUser?.id && currentUser?.role) {
+        console.log(`Replacing temporary message ${tempId} with real message ${message.id}`);
         const contactKey = getContactKeyRef(message.recipient_id, message.recipient_role);
         setMessages(prev => {
           const contactMessages = prev[contactKey] || [];
-          // Replace the temporary message with the real one
-          const updatedMessages = contactMessages.map(msg =>
-            msg.id === tempId ? message : msg
-          );
-          return {
-            ...prev,
-            [contactKey]: updatedMessages
-          };
+
+          // Check if the temporary message exists
+          const tempMessageExists = contactMessages.some(msg => msg.id === tempId);
+
+          if (tempMessageExists) {
+            // Replace the temporary message with the real one
+            const updatedMessages = contactMessages.map(msg =>
+              msg.id === tempId ? message : msg
+            );
+            return {
+              ...prev,
+              [contactKey]: updatedMessages
+            };
+          } else {
+            // If for some reason the temp message doesn't exist, don't add a duplicate
+            console.log(`Temporary message ${tempId} not found, not adding duplicate`);
+            return prev;
+          }
         });
       }
     };
 
     // Handle message read status
     const handleMessageRead = ({ messageId }: { messageId: number }) => {
+      console.log(`Message ${messageId} marked as read`);
+
       // Update message read status in messages state
       setMessages(prev => {
         const updatedMessages: Record<string, ChatMessage[]> = {};
@@ -223,10 +239,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
         return updatedMessages;
       });
+
+      // Also refresh conversations to update the UI with read status
+      setTimeout(() => {
+        refreshConversationsRef();
+      }, 500);
     };
 
     // Handle all messages read
     const handleAllMessagesRead = ({ recipientId, recipientRole }: { recipientId: number, recipientRole: string }) => {
+      console.log(`All messages marked as read by recipient ${recipientId} (${recipientRole})`);
+
       if (currentUser?.id === recipientId && currentUser?.role === recipientRole) {
         // Update all messages from the sender as read
         if (currentSelectedContact) {
@@ -238,6 +261,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               [contactKey]: updatedMessages
             };
           });
+
+          // Also refresh conversations to update the UI with read status
+          setTimeout(() => {
+            refreshConversationsRef();
+          }, 500);
         }
       }
     };
@@ -553,8 +581,27 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
       // Update UI immediately with the temporary message
       const contactKey = getContactKey(selectedContact.id, selectedContact.role);
+
+      // Add a timestamp to the temporary message ID to make it unique
+      // This helps prevent duplicate messages if the user clicks send multiple times
+      tempMessage.id = Date.now() + Math.floor(Math.random() * 1000);
+      console.log(`Created temporary message with ID: ${tempMessage.id}`);
+
       setMessages(prev => {
         const contactMessages = prev[contactKey] || [];
+
+        // Check if we already have a temporary message with similar content to prevent duplicates
+        // This can happen if the user clicks send multiple times quickly
+        const similarMessageExists = contactMessages.some(msg =>
+          msg.content === tempMessage.content &&
+          Date.now() - msg.id < 3000 // Check if a similar message was added in the last 3 seconds
+        );
+
+        if (similarMessageExists) {
+          console.log('Similar message already exists, not adding duplicate temporary message');
+          return prev;
+        }
+
         return {
           ...prev,
           [contactKey]: [...contactMessages, tempMessage]
@@ -564,10 +611,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       if (socket && socket.connected) {
         // Send message via WebSocket
         sendMessageSocket(selectedContact.id, selectedContact.role, content);
-        console.log('Message sent via WebSocket');
+        console.log('Message sent via WebSocket with temp ID:', tempMessage.id);
 
-        // The actual message update will be handled by socket event handlers
-        // (handleMessageSent and handleMessageUpdated)
+        // The message-updated event will replace the temporary message with the real one
+        // No need to add the message again in the handleMessageSent function
       } else {
         console.log('WebSocket not available, using REST API fallback');
         // Fallback to REST API if WebSocket is not available

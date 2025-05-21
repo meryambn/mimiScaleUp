@@ -12,6 +12,7 @@ import { getProgramTeams, getTeamCurrentPhase, ensureTeamHasPhase } from '@/serv
 import { moveToPhase } from '@/services/phaseService';
 import { getPhases } from '@/services/programService';
 import { declareWinner, isTeamWinner, getProgramWinner } from '@/services/winnerService';
+import { useAuth } from '@/context/AuthContext';
 
 // Types
 interface Team {
@@ -73,6 +74,9 @@ interface TeamCardProps {
 // Composant pour une carte d'équipe
 const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phasesCount, isLastPhase, hasWinner, onSelectWinner }) => {
   const [, setLocation] = useLocation(); // Add this line to use wouter's navigation
+  const { user } = useAuth();
+  const isMentor = user?.role === 'mentor';
+
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'TEAM',
     item: { id: team.id, currentPhaseIndex: phaseIndex },
@@ -181,7 +185,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, phaseIndex, onMoveTeam, phase
             </button>
           </div>
 
-          {isLastPhase && team.status !== 'completed' && (
+          {isLastPhase && team.status !== 'completed' && !isMentor && (
             <div className="mt-2 pt-2 border-t border-gray-100">
               <button
                 className="w-full h-7"

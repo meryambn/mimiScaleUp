@@ -149,6 +149,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
             const programDetails = await getProgram(lastProgram.id);
             console.log('Détails du programme récupérés:', programDetails);
 
+            // Check if program is terminated
+            if (programDetails && programDetails.status === 'Terminé') {
+              console.log('Programme terminé, accès refusé');
+              setIsProgramTerminated(true);
+              setIsLoading(false);
+              return;
+            }
+
             if (programDetails) {
               // Fetch phases for this program
               console.log(`Fetching phases for program ${programDetails.id}...`);
@@ -473,7 +481,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
             <div className="date-range">
               {activePhase && Number(activePhase) > 0 ? (
                 <>
-                 
+
                   <span>{getPhaseDescription(activePhase)}</span>
                 </>
               ) : (
@@ -495,7 +503,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onCreateTeamClick }) => {
           </div>
 
           {/* Widget des équipes et startups */}
-         
+
 
           {/* Widget de la timeline */}
             <div className="widget-card">

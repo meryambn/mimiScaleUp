@@ -322,7 +322,7 @@ const Programs: React.FC = () => {
                         phases={program.phases || []}
                         status={program.status}
                         onSelect={() => setSelectedProgramId(program.id)}
-                        onDelete={handleDeleteProgram}
+                        onDelete={isMentor ? undefined : handleDeleteProgram}
                         program={program}
                       />
                     ))}
@@ -348,7 +348,7 @@ const Programs: React.FC = () => {
                         phases={program.phases || []}
                         status={program.status}
                         onSelect={() => setSelectedProgramId(program.id)}
-                        onDelete={handleDeleteProgram}
+                        onDelete={isMentor ? undefined : handleDeleteProgram}
                         program={program}
                       />
                     ))}
@@ -378,7 +378,7 @@ const Programs: React.FC = () => {
                       phases={program.phases || []}
                       status={program.status}
                       onSelect={() => setSelectedProgramId(program.id)}
-                      onDelete={handleDeleteProgram}
+                      onDelete={isMentor ? undefined : handleDeleteProgram}
                       program={program}
                     />
                   ))}
@@ -404,7 +404,7 @@ const Programs: React.FC = () => {
                       phases={program.phases || []}
                       status={program.status}
                       onSelect={() => setSelectedProgramId(program.id)}
-                      onDelete={handleDeleteProgram}
+                      onDelete={isMentor ? undefined : handleDeleteProgram}
                       program={program}
                     />
                   ))}
@@ -430,7 +430,7 @@ const Programs: React.FC = () => {
                       phases={program.phases || []}
                       status={program.status}
                       onSelect={() => setSelectedProgramId(program.id)}
-                      onDelete={handleDeleteProgram}
+                      onDelete={isMentor ? undefined : handleDeleteProgram}
                       program={program}
                     />
                   ))}

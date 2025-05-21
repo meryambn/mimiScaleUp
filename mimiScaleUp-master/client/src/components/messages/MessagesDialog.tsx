@@ -106,28 +106,38 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
 
-  // Load contacts and conversations when dialog opens - memoized to prevent unnecessary re-renders
-  const loadInitialData = useCallback(() => {
-    if (open && user) {
+  // Track if initial data has been loaded
+  const initialDataLoadedRef = useRef(false);
+
+  // Load contacts and conversations when dialog opens - only once per open
+  useEffect(() => {
+    if (open && user && !initialDataLoadedRef.current) {
       console.log('Loading contacts for user:', user);
-      refreshContacts();
-      refreshConversations();
+      // Set the flag to prevent multiple loads
+      initialDataLoadedRef.current = true;
+
+      // Use Promise.all to load both in parallel
+      Promise.all([
+        refreshContacts(),
+        refreshConversations()
+      ]).catch(err => {
+        console.error('Error loading initial data:', err);
+      });
+    } else if (!open) {
+      // Reset the flag when dialog closes
+      initialDataLoadedRef.current = false;
     }
   }, [open, user, refreshContacts, refreshConversations]);
-
-  // Use the memoized function in useEffect
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
 
   // Use a ref to track the previous selected contact to prevent unnecessary loads
   const prevSelectedContactRef = useRef<{ id: number | null, role: string | null }>({ id: null, role: null });
 
   // Track if messages are already loaded for a contact
-  const messagesLoadedRef = useRef<Record<string, boolean>>({});
+  // Use string values to track different states: 'loading', 'loaded', 'empty'
+  const messagesLoadedRef = useRef<Record<string, string>>({});
 
-  // Load messages when a contact is selected - memoized to prevent unnecessary re-renders
-  const loadContactMessages = useCallback(() => {
+  // Load messages when a contact is selected
+  useEffect(() => {
     // Only proceed if we have a valid selected contact
     if (selectedContact && user && selectedContact.id && selectedContact.role) {
       // Check if this is a different contact than before
@@ -144,29 +154,44 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
       // Create a contact key to track if we've loaded messages for this contact
       const contactKey = `${selectedContact.id}:${selectedContact.role}`;
 
-      // Only load messages if this is a new contact or we don't have messages yet
-      if (!isSameContact || !messages[contactKey] || messages[contactKey].length === 0) {
-        // Check if we're already loading messages for this contact
-        if (!messagesLoadedRef.current[contactKey]) {
-          console.log(`Loading messages for contact: ${selectedContact.id} (${selectedContact.role})`);
-          messagesLoadedRef.current[contactKey] = true;
+      // Get the current loading state for this contact
+      const loadState = messagesLoadedRef.current[contactKey];
 
-          // Load messages and then mark as not loading
+      // Only load messages if:
+      // 1. This is a different contact than before, OR
+      // 2. We haven't loaded or attempted to load messages for this contact yet
+      const shouldLoadMessages = !isSameContact || !loadState;
+
+      if (shouldLoadMessages) {
+        // Only proceed if we're not already in the process of loading
+        if (loadState !== 'loading') {
+          console.log(`Loading messages for contact: ${selectedContact.id} (${selectedContact.role})`);
+          // Mark as loading
+          messagesLoadedRef.current[contactKey] = 'loading';
+
+          // Load messages
           loadMessages(selectedContact.id, selectedContact.role)
-            .finally(() => {
-              messagesLoadedRef.current[contactKey] = false;
+            .then(() => {
+              // Check if we got any messages back
+              if (messages[contactKey] && messages[contactKey].length > 0) {
+                // Mark as loaded with messages
+                messagesLoadedRef.current[contactKey] = 'loaded';
+              } else {
+                // Mark as loaded but empty - important to prevent infinite loops
+                messagesLoadedRef.current[contactKey] = 'empty';
+              }
+            })
+            .catch(err => {
+              console.error('Error loading messages:', err);
+              // Still mark as attempted to prevent infinite retries
+              messagesLoadedRef.current[contactKey] = 'error';
             });
         } else {
           console.log(`Already loading messages for contact: ${selectedContact.id} (${selectedContact.role})`);
         }
       }
     }
-  }, [selectedContact?.id, selectedContact?.role, user, messages, loadMessages]);
-
-  // Use the memoized function in useEffect
-  useEffect(() => {
-    loadContactMessages();
-  }, [loadContactMessages]);
+  }, [selectedContact?.id, selectedContact?.role, user, loadMessages]);
 
   // Scroll to bottom when messages change or when a new message is sent - memoized
   const scrollToBottomEffect = useCallback(() => {
@@ -181,7 +206,7 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
   // Use the memoized function in useEffect
   useEffect(() => {
     scrollToBottomEffect();
-  }, [scrollToBottomEffect, messages]);
+  }, [scrollToBottomEffect]);
 
   // Also scroll to bottom when sending a message
   const scrollToBottom = useCallback(() => {
@@ -226,22 +251,38 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
   const handleSendMessage = useCallback(() => {
     if (!newMessage.trim() || !selectedContact) return;
 
-    sendMessage(newMessage);
+    // Store message and clear input field to prevent multiple sends
+    const messageToSend = newMessage.trim();
     setNewMessage('');
 
-    // Scroll to bottom after sending a message
-    setTimeout(() => {
-      scrollToBottom();
-    }, 100);
+    // Use a flag to prevent duplicate sends
+    const sendingMessage = async () => {
+      try {
+        // Only send the message once
+        await sendMessage(messageToSend);
+
+        // Scroll to bottom after sending a message
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      } catch (error) {
+        console.error('Error sending message:', error);
+      }
+    };
+
+    sendingMessage();
   }, [newMessage, selectedContact, sendMessage, scrollToBottom]);
 
   // Handle key press (Enter to send) - memoized
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      // Only call handleSendMessage if there's a message to send
+      if (newMessage.trim()) {
+        handleSendMessage();
+      }
     }
-  }, [handleSendMessage]);
+  }, [handleSendMessage, newMessage]);
 
   // Handle typing indicators with debounce - created once
   const debouncedStartTyping = useMemo(() =>
@@ -501,11 +542,38 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
                             }`}
                           >
                             <p className="break-words">{message.content}</p>
-                            <p className={`text-xs mt-1 ${
-                              message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'
-                            }`}>
-                              {formatDate(message.created_at)}
-                            </p>
+                            <div className="flex justify-between items-center mt-1">
+                              <p className={`text-xs ${
+                                message.sender_id === user?.id ? 'text-blue-100' : 'text-gray-500'
+                              }`}>
+                                {formatDate(message.created_at)}
+                              </p>
+                              {message.sender_id === user?.id && (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className={`${message.is_read ? 'text-blue-100' : 'text-blue-200'}`}
+                                >
+                                  {message.is_read ? (
+                                    // Double check for "Vu"
+                                    <>
+                                      <path d="M18 6L7 17l-5-5" />
+                                      <path d="M22 10L11 21l-4-4" />
+                                    </>
+                                  ) : (
+                                    // Single check for "Envoyé"
+                                    <path d="M20 6L9 17l-5-5" />
+                                  )}
+                                </svg>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))
@@ -532,6 +600,67 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
                     )}
                     <div ref={messagesEndRef} />
                   </div>
+
+                  {/* Message status indicator - only show for the most recent message sent by the user */}
+                  {selectedContact && getCurrentMessages().length > 0 && (
+                    <div className="flex justify-end p-2">
+                      <div className="text-xs text-gray-500 bg-white px-2 py-1 rounded-md shadow-sm flex items-center">
+                        {(() => {
+                          // Get all messages sent by the current user
+                          const userMessages = getCurrentMessages().filter(msg =>
+                            msg.sender_id === user?.id &&
+                            msg.recipient_id === selectedContact.id
+                          );
+
+                          // Get the most recent message
+                          const lastMessage = userMessages.length > 0 ?
+                            userMessages[userMessages.length - 1] : null;
+
+                          // Check if the last message is read
+                          return lastMessage ? (
+                            lastMessage.is_read ? (
+                              <>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="mr-1"
+                                >
+                                  <path d="M18 6L7 17l-5-5" />
+                                  <path d="M22 10L11 21l-4-4" />
+                                </svg>
+                                <span>Vu</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="mr-1"
+                                >
+                                  <path d="M20 6L9 17l-5-5" />
+                                </svg>
+                                <span>Envoyé</span>
+                              </>
+                            )
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Message input */}
@@ -548,12 +677,18 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
                         debouncedStopTyping();
                       }}
                       className="flex-1 mr-3 border-gray-300"
+                      autoComplete="off" // Prevent browser autocomplete
                     />
                     <Button
-                      onClick={handleSendMessage}
+                      onClick={(e) => {
+                        e.preventDefault(); // Prevent form submission
+                        if (newMessage.trim()) {
+                          handleSendMessage();
+                        }
+                      }}
                       disabled={!newMessage.trim()}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 h-10 shadow-sm"
-                      type="submit"
+                      type="button" // Changed from submit to button to prevent form submission
                     >
                       <Send className="h-5 w-5 mr-2" />
                       <span>Envoyer</span>
@@ -575,24 +710,29 @@ const MessagesDialog: React.FC<MessagesDialogProps> = ({ open, onOpenChange }) =
     </Dialog>
     </>
   ), [
+    // Dialog state
     open,
     handleOpenChange,
-    socket,
-    user,
+
+    // User and connection state
+    socket?.connected,
+    user?.role,
+
+    // Selected contact and messages
     selectedContact,
-    contacts,
-    messages,
-    isTyping,
+    getCurrentMessages(),
+
+    // UI state
     loading,
     error,
     searchQuery,
     newMessage,
-    isInputFocused,
+
+    // Memoized values and callbacks
     filteredContacts,
     handleInputChange,
     handleKeyPress,
     handleSendMessage,
-    getCurrentMessages,
     isContactTyping
   ]);
 

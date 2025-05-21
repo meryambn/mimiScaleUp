@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Card,
   CardHeader,
@@ -23,6 +23,28 @@ interface ProgramPhaseTimelineProps {
   showCard?: boolean;
 }
 
+// Default phases to use as fallback when no phases are provided
+const defaultPhases: Phase[] = [
+  {
+    id: 1,
+    name: 'Phase 1',
+    color: '#818cf8',
+    status: 'in-progress'
+  },
+  {
+    id: 2,
+    name: 'Phase 2',
+    color: '#60a5fa',
+    status: 'upcoming'
+  },
+  {
+    id: 3,
+    name: 'Phase 3',
+    color: '#34d399',
+    status: 'upcoming'
+  }
+];
+
 const ProgramPhaseTimeline: React.FC<ProgramPhaseTimelineProps> = ({
   phases,
   selectedPhase,
@@ -31,14 +53,27 @@ const ProgramPhaseTimeline: React.FC<ProgramPhaseTimelineProps> = ({
   description = "Cliquez sur une phase pour filtrer",
   showCard = true
 }) => {
+  // Debug log
+  console.log('ProgramPhaseTimeline received phases:', phases);
+
+  // Use provided phases or fallback to default phases if empty
+  const displayPhases = phases && phases.length > 0 ? phases : defaultPhases;
+
+  // Log if we're using fallback phases
+  useEffect(() => {
+    if (!phases || phases.length === 0) {
+      console.log('Using fallback phases in ProgramPhaseTimeline');
+    }
+  }, [phases]);
+
   // Calculate width based on phase count
-  const width = `${100 / phases.length}%`;
+  const width = displayPhases.length > 0 ? `${100 / displayPhases.length}%` : '100%';
 
   const timelineContent = (
     <div className="flex flex-col space-y-2">
       {/* Phase Timeline Bar */}
       <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
-        {phases.map((phase) => (
+        {displayPhases.map((phase) => (
           <div
             key={phase.id}
             className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
@@ -65,10 +100,10 @@ const ProgramPhaseTimeline: React.FC<ProgramPhaseTimelineProps> = ({
     <div className="mt-4 p-3 bg-blue-50 rounded-md flex items-center">
       <div
         className="w-3 h-3 rounded-full mr-2"
-        style={{ backgroundColor: phases.find(p => p.id === selectedPhase)?.color }}
+        style={{ backgroundColor: displayPhases.find(p => p.id === selectedPhase)?.color }}
       ></div>
       <p className="text-sm">
-        <span className="font-medium">Filtré par:</span> {phases.find(p => p.id === selectedPhase)?.name} phase
+        <span className="font-medium">Filtré par:</span> {displayPhases.find(p => p.id === selectedPhase)?.name} phase
       </p>
       <button
         className="ml-auto"
