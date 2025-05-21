@@ -13,40 +13,193 @@ import {
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
-import ProgramPhaseTimeline from '@/components/widgets/ProgramPhaseTimeline';
 import { useProgramContext } from '@/context/ProgramContext';
 import { useDeliverables } from '@/context/DeliverablesContext';
 import { useAuth } from '@/context/AuthContext';
-import { getPhaseDeliverables } from '@/services/deliverableService';
+import { getLivrables } from '@/services/programService';
+import { getAllPrograms, getProgram, getPhases } from '@/services/programService';
+import { getSubmissionsByProgram } from '@/services/formService';
+import { checkSubmissionAccepted } from '@/services/teamService';
+import DeliverablesWidget from '@/components/widgets/DeliverablesWidget';
 
 interface ProgramPhase {
   id: number;
   name: string;
   description: string;
+  color: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface Deliverable {
+  id: number;
+  nom: string;
+  description: string;
+  date_echeance: string;
+  types_fichiers: string[];
+  phase_id: number;
+  candidature_id?: number;
 }
 
 const Deliverables: React.FC = () => {
   const { user } = useAuth();
-  const { selectedProgram, selectedPhaseId, setSelectedPhaseId } = useProgramContext();
+  const { selectedProgram } = useProgramContext();
   const { deliverables, filteredDeliverables, getStatusText, getSubmissionTypeIcon } = useDeliverables();
 
-  const [activePhase, setActivePhase] = useState<number>(Number(selectedPhaseId) || 1);
+  const [activePhase, setActivePhase] = useState<number>(1);
   const [activeTab, setActiveTab] = useState('pending');
-  const [showForm, setShowForm] = useState(false);
+  const [phases, setPhases] = useState<ProgramPhase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rawDeliverables, setRawDeliverables] = useState<Deliverable[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [formData, setFormData] = useState({
-    nom: '',
-    description: '',
-    date_echeance: '',
-    types_fichiers: ''
-  });
+  const [submissionProgram, setSubmissionProgram] = useState<any | null>(null);
+  const [currentSubmission, setCurrentSubmission] = useState<any | null>(null);
 
-  // Fetch deliverables when phase changes
+  // Fetch submission program info and details
+  useEffect(() => {
+    const fetchSubmissionProgramInfo = async () => {
+      if (!user?.id) {
+        console.log('Pas d\'utilisateur connecté');
+        setError('Vous devez être connecté pour accéder aux livrables');
+        setIsLoading(false);
+        return;
+      }
+
+      if (user.role !== 'startup') {
+        console.log('Utilisateur n\'est pas une startup');
+        setError('Cette page est réservée aux startups');
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        console.log('Récupération des programmes...');
+        const programs = await getAllPrograms();
+        console.log('Programmes récupérés:', programs);
+
+        if (!programs || programs.length === 0) {
+          console.log('Aucun programme trouvé');
+          setError('Aucun programme disponible');
+          setIsLoading(false);
+          return;
+        }
+
+        // Cherche le dernier programme où la soumission de l'utilisateur est acceptée
+        let lastAcceptedProgram = null;
+        for (const prog of programs) {
+          console.log(`Vérification du programme ${prog.id}...`);
+          const result = await getSubmissionsByProgram(prog.id);
+          if (result.submissions && result.submissions.length > 0) {
+            const userSubmission = result.submissions[0];
+            console.log(`Soumission trouvée pour le programme ${prog.id}:`, userSubmission);
+            const acceptanceResult = await checkSubmissionAccepted(userSubmission.id, prog.id);
+            console.log(`Résultat de l'acceptation pour le programme ${prog.id}:`, acceptanceResult);
+            if (acceptanceResult.accepted) {
+              lastAcceptedProgram = { program: prog, submission: userSubmission };
+              console.log(`Programme ${prog.id} accepté, on l'utilise.`);
+              setCurrentSubmission(userSubmission);
+              break;
+            }
+          }
+        }
+
+        if (!lastAcceptedProgram) {
+          console.log('Aucun programme accepté trouvé');
+          setError('Aucun programme accepté trouvé');
+          setIsLoading(false);
+          return;
+        }
+
+        const programDetails = await getProgram(lastAcceptedProgram.program.id);
+        console.log('Détails du programme récupérés:', programDetails);
+
+        if (!programDetails) {
+          console.log('Aucun détail de programme trouvé');
+          setError('Impossible de récupérer les détails du programme');
+          setIsLoading(false);
+          return;
+        }
+
+        // Fetch phases for this program
+        console.log(`Fetching phases for program ${programDetails.id}...`);
+        const phases = await getPhases(programDetails.id);
+        console.log(`Fetched ${phases ? phases.length : 0} phases for program ${programDetails.id}:`, phases);
+
+        if (!phases || phases.length === 0) {
+          console.log('Aucune phase trouvée pour ce programme');
+          setError('Aucune phase trouvée pour ce programme');
+          setIsLoading(false);
+          return;
+        }
+
+        // Format date function to get only the date part
+        const formatDateString = (dateStr: string) => {
+          if (!dateStr) return new Date().toISOString().split('T')[0];
+          // If it's already just a date (YYYY-MM-DD), return it
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+          // Otherwise, extract the date part from the timestamp
+          return dateStr.split('T')[0];
+        };
+
+        // Format phases with details
+        const phasesWithDetails = phases.map(phase => {
+          // Determine phase status based on dates
+          const now = new Date();
+          const startDate = new Date(phase.date_debut);
+          const endDate = new Date(phase.date_fin);
+
+          let phaseStatus: "not_started" | "in_progress" | "completed" = "not_started";
+          if (now > endDate) {
+            phaseStatus = "completed";
+          } else if (now >= startDate && now <= endDate) {
+            phaseStatus = "in_progress";
+          }
+
+          return {
+            ...phase,
+            id: String(phase.id),
+            name: phase.nom || phase.name || `Phase ${phase.id}`,
+            description: phase.description || '',
+            startDate: formatDateString(phase.date_debut),
+            endDate: formatDateString(phase.date_fin),
+            status: phaseStatus,
+            color: phase.color || '#818cf8'
+          };
+        });
+
+        setPhases(phasesWithDetails);
+        setSubmissionProgram(programDetails);
+        setCurrentSubmission(lastAcceptedProgram.submission);
+
+        // Set the first phase as active by default if not already set
+        if (phasesWithDetails.length > 0 && !activePhase) {
+          setActivePhase(Number(phasesWithDetails[0].id));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des informations du programme:', error);
+        setError('Une erreur est survenue lors du chargement des données');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubmissionProgramInfo();
+  }, [user?.id, user?.role]);
+
+  // Fetch deliverables
   useEffect(() => {
     const fetchDeliverables = async () => {
       try {
-        const data = await getPhaseDeliverables(String(activePhase));
-        console.log('Fetched deliverables:', data);
+        console.log('Fetching deliverables for phase:', activePhase);
+        const deliverables = await getLivrables(String(activePhase));
+        console.log('Raw deliverables:', deliverables);
+        setRawDeliverables(deliverables);
       } catch (error) {
         console.error('Error fetching deliverables:', error);
       }
@@ -55,6 +208,7 @@ const Deliverables: React.FC = () => {
     fetchDeliverables();
   }, [activePhase]);
 
+<<<<<<< Updated upstream
   // Log when component mounts to check if program data is loaded
   useEffect(() => {
     console.log('Deliverables component mounted');
@@ -164,6 +318,10 @@ const Deliverables: React.FC = () => {
       setActivePhase(Number(phase));
       setSelectedPhaseId(Number(phase));
     }
+=======
+  const handlePhaseChange = (phase: number) => {
+    setActivePhase(phase);
+>>>>>>> Stashed changes
     setActiveTab('pending');
   };
 
@@ -247,17 +405,250 @@ const Deliverables: React.FC = () => {
             <h1>Livrables - {selectedProgram?.name || 'Programme'}</h1>
             <p className="subtitle">Documents à soumettre pour votre startup</p>
           </div>
-          <motion.button
-            className="primary-btn"
-            onClick={() => setShowForm(true)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <FaPlus /> Nouveau livrable
-          </motion.button>
         </header>
+  <section className="phases-section">
+          {isLoading ? (
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-gray-600">Chargement des phases...</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">Chronologie des phases du programme</h2>
+                <p className="text-sm text-gray-500">Cliquez sur une phase pour filtrer les livrables</p>
+              </div>
+              <div className="flex flex-col space-y-2">
+                {/* Phase Timeline Bar */}
+                <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
+                  {phases.map((phase, i) => {
+                    const width = `${100 / phases.length}%`;
+                    return (
+                      <div
+                        key={phase.id}
+                        className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
+                          ${activePhase === Number(phase.id) ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
+                        `}
+                        style={{
+                          width,
+                          backgroundColor: phase.color,
+                          opacity: phase.status === 'not_started' ? 0.5 : 1,
+                          zIndex: phases.length - i
+                        }}
+                        onClick={() => handlePhaseChange(Number(phase.id))}
+                      >
+                        <span className="text-white font-medium text-xs md:text-sm truncate px-2">
+                          {phase.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Phase Details */}
+                <div className="grid grid-cols-5 gap-2">
+                  {phases.map((phase) => (
+                    <div
+                      key={`details-${phase.id}`}
+                      className={`text-xs p-2 rounded ${activePhase === Number(phase.id) ? 'bg-gray-100' : ''}`}
+                    >
+                      <div className="font-medium">{phase.name}</div>
+                      <div className="text-gray-500">
+                        {formatDate(phase.startDate)} - {formatDate(phase.endDate)}
+                      </div>
+                      <div className="mt-1 flex items-center">
+                        <FaFileUpload className="h-3 w-3 mr-1 text-gray-500" />
+                        <span>{phaseDeliverables.filter(d => Number(d.phaseId) === Number(phase.id)).length} Livrables</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+        {/* Deliverables Section */}
+        <section className="deliverables-section mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-semibold mb-4">Livrables</h2>
+            {isLoading ? (
+              <div className="flex items-center justify-center p-4">
+                <FaSpinner className="animate-spin text-gray-500" />
+                <span className="ml-2 text-gray-500">Chargement des livrables...</span>
+              </div>
+            ) : rawDeliverables.length === 0 ? (
+              <p className="text-gray-500">Aucun livrable pour cette phase.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rawDeliverables.map(deliverable => (
+                  <div key={deliverable.id} className="bg-gray-50 p-4 rounded-lg hover:shadow-md transition-shadow">
+                    <h3 className="font-medium text-gray-900">{deliverable.nom}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{deliverable.description}</p>
+                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                      <FaFileUpload className="mr-2" />
+                      <span>Date d'échéance: {formatDate(deliverable.date_echeance)}</span>
+                    </div>
+                    {deliverable.types_fichiers && deliverable.types_fichiers.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {deliverable.types_fichiers.map((type: string, index: number) => (
+                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                            {type}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={() => {
+                          setSelectedDeliverable(deliverable);
+                          setShowUploadModal(true);
+                        }}
+                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
+                      >
+                        <FaFileUpload />
+                        Soumettre
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Upload Modal */}
+        <AnimatePresence>
+          {showUploadModal && selectedDeliverable && (
+            <motion.div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowUploadModal(false)}
+            >
+              <motion.div
+                className="bg-white rounded-lg p-6 w-[400px] max-h-[80vh] overflow-y-auto"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold mb-4">
+                  Soumettre un fichier pour {selectedDeliverable.nom}
+                </h3>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!selectedFile || !selectedDeliverable) return;
+
+                  try {
+                    // Log des valeurs pour débogage
+                    console.log('Valeurs actuelles:', {
+                      selectedDeliverable,
+                      submissionProgram,
+                      currentSubmission,
+                      activePhase,
+                      selectedFile
+                    });
+
+                    // Vérification des champs requis avec plus de détails
+                    if (!selectedDeliverable.id) {
+                      throw new Error('ID du livrable manquant');
+                    }
+                    
+                    if (!submissionProgram?.id) {
+                      throw new Error('ID du programme manquant');
+                    }
+                    
+                    if (!activePhase || activePhase === 0) {
+                      throw new Error('Phase active non sélectionnée');
+                    }
+
+                    const formData = new FormData();
+                    formData.append('fichier', selectedFile);
+                    formData.append('livrable_id', selectedDeliverable.id.toString());
+                    formData.append('candidature_id', '26'); // ID statique
+                    formData.append('programme_id', submissionProgram.id.toString());
+                    formData.append('phase_id', activePhase.toString());
+                    // Ajouter les types de fichiers autorisés
+                    if (selectedDeliverable.types_fichiers && selectedDeliverable.types_fichiers.length > 0) {
+                      formData.append('types_fichiers', selectedDeliverable.types_fichiers.join(','));
+                    }
+
+                    console.log('Données envoyées:', {
+                      livrable_id: selectedDeliverable.id,
+                      candidature_id: 26,
+                      programme_id: submissionProgram.id,
+                      phase_id: activePhase,
+                      types_fichiers: selectedDeliverable.types_fichiers
+                    });
+
+                    const response = await fetch('/api/livrable-soumissions/soumettre', {
+                      method: 'POST',
+                      body: formData,
+                      credentials: 'include'
+                    });
+
+                    if (!response.ok) {
+                      const errorData = await response.json();
+                      throw new Error(errorData.error || 'Erreur lors de l\'upload du fichier');
+                    }
+
+                    // Fermer le modal et réinitialiser
+                    setShowUploadModal(false);
+                    setSelectedFile(null);
+                    setSelectedDeliverable(null);
+                    
+                    // Recharger les livrables
+                    const deliverables = await getLivrables(String(activePhase));
+                    setRawDeliverables(deliverables);
+
+                    // Afficher un message de succès
+                    alert('Livrable soumis avec succès');
+                  } catch (error) {
+                    console.error('Error submitting file:', error);
+                    alert(error instanceof Error ? error.message : 'Une erreur est survenue lors de la soumission du fichier');
+                  }
+                }}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sélectionner un fichier
+                    </label>
+                    <input
+                      type="file"
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      className="w-full p-2 border rounded"
+                      accept={selectedDeliverable.types_fichiers.join(',')}
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      Types acceptés: {selectedDeliverable.types_fichiers.join(', ')}
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowUploadModal(false)}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!selectedFile}
+                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Soumettre
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* DeliverablesWidget en haut */}
+     
 
         {/* Phases Navigation */}
+<<<<<<< Updated upstream
         <section className="phases-section">
           <ProgramPhaseTimeline
             phases={selectedProgram?.phases?.map(phase => ({
@@ -276,6 +667,33 @@ const Deliverables: React.FC = () => {
               : getPhaseDescription(activePhase)}
           />
         </section>
+=======
+      
+
+        {/* DeliverablesWidget en bas de la chronologie */}
+    
+
+        {/* Active Phase Filter */}
+        {activePhase && (
+          <div className="mb-6 px-4 py-3 bg-blue-50 rounded-lg flex justify-between items-center">
+            <div className="flex items-center">
+              <div
+                className="w-4 h-4 rounded-full mr-2"
+                style={{ backgroundColor: phases.find(p => Number(p.id) === activePhase)?.color }}
+              ></div>
+              <span className="font-medium">
+                Filtré par phase : {phases.find(p => Number(p.id) === activePhase)?.name}
+              </span>
+            </div>
+            <button
+              onClick={() => handlePhaseChange(1)}
+              className="text-primary hover:text-primary/80"
+            >
+              Effacer
+            </button>
+          </div>
+        )}
+>>>>>>> Stashed changes
 
         {/* Status Tabs Section */}
         <section className="tabs-section">
@@ -311,155 +729,133 @@ const Deliverables: React.FC = () => {
         <section className="deliverables-list">
           <AnimatePresence>
             {phaseDeliverables.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <FaFileUpload className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-lg font-medium text-gray-900">Aucun livrable</h3>
-                <p className="mt-1 text-sm text-gray-500">
+              <div className="empty-state">
+                <FaFileUpload className="empty-icon" />
+                <h3 className="empty-title">Aucun livrable</h3>
+                <p className="empty-text">
                   Aucun livrable disponible pour la phase {activePhase}.
                 </p>
               </div>
             ) : (
-              phaseDeliverables
-                .filter(d => activeTab === 'all' || d.status === activeTab)
-                .map(deliverable => (
-                  <motion.div
-                    key={deliverable.id}
-                    className={`deliverable-card ${deliverable.required ? 'required' : ''}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    whileHover={{ y: -5 }}
-                  >
-                    <div className="card-header">
-                      <div className="file-info">
-                        {getSubmissionTypeIcon(deliverable.submissionType)}
-                        <div>
-                          <h3 className="file-name">{deliverable.name}</h3>
-                          <p className="file-meta">
-                            {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="file-status">
-                        <span className={`status-text ${deliverable.status}`}>
-                          {getStatusText(deliverable.status, deliverable.dueDate)}
-                        </span>
-                      </div>
-                    </div>
+              <>
+                {/* En attente */}
+                <div className="status-section">
+                  <h3 className="status-title">
+                    <FaSpinner className="status-icon pending" /> En attente
+                  </h3>
+                  <div className="deliverables-grid">
+                    {phaseDeliverables
+                      .filter(d => d.status === 'pending')
+                      .map(deliverable => (
+                        <motion.div
+                          key={deliverable.id}
+                          className="deliverable-card pending"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          whileHover={{ y: -5 }}
+                        >
+                          <div className="card-header">
+                            <div className="file-info">
+                              {getSubmissionTypeIcon(deliverable.submissionType)}
+                              <div>
+                                <h3 className="file-name">{deliverable.name}</h3>
+                                <p className="file-meta">
+                                  {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="card-actions">
+                            <button className="action-btn submit">
+                              <FaFileUpload /> Soumettre
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
 
-                    <div className="card-actions">
-                      {deliverable.status === 'pending' && (
-                        <button className="action-btn delete">
-                          <FaTrash /> Supprimer
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
+                {/* Validés */}
+                <div className="status-section">
+                  <h3 className="status-title">
+                    <FaCheckCircle className="status-icon approved" /> Validés
+                  </h3>
+                  <div className="deliverables-grid">
+                    {phaseDeliverables
+                      .filter(d => d.status === 'approved')
+                      .map(deliverable => (
+                        <motion.div
+                          key={deliverable.id}
+                          className="deliverable-card approved"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          whileHover={{ y: -5 }}
+                        >
+                          <div className="card-header">
+                            <div className="file-info">
+                              {getSubmissionTypeIcon(deliverable.submissionType)}
+                              <div>
+                                <h3 className="file-name">{deliverable.name}</h3>
+                                <p className="file-meta">
+                                  {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="card-actions">
+                            <button className="action-btn view">
+                              <FaFilePdf /> Voir
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Rejetés */}
+                <div className="status-section">
+                  <h3 className="status-title">
+                    <FaTimesCircle className="status-icon rejected" /> Rejetés
+                  </h3>
+                  <div className="deliverables-grid">
+                    {phaseDeliverables
+                      .filter(d => d.status === 'rejected')
+                      .map(deliverable => (
+                        <motion.div
+                          key={deliverable.id}
+                          className="deliverable-card rejected"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          whileHover={{ y: -5 }}
+                        >
+                          <div className="card-header">
+                            <div className="file-info">
+                              {getSubmissionTypeIcon(deliverable.submissionType)}
+                              <div>
+                                <h3 className="file-name">{deliverable.name}</h3>
+                                <p className="file-meta">
+                                  {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="card-actions">
+                            <button className="action-btn resubmit">
+                              <FaFileUpload /> Resoumettre
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
+              </>
             )}
           </AnimatePresence>
         </section>
       </main>
-
-      {/* Upload Modal */}
-      <AnimatePresence>
-        {showForm && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowForm(false)}
-          >
-            <motion.div
-              className="modal-content"
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="close-btn"
-                onClick={() => setShowForm(false)}
-              >
-                &times;
-              </button>
-
-              <h2>Ajouter un livrable</h2>
-              <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label>Nom</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.nom}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea
-                    required
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Date d'échéance</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.date_echeance}
-                    onChange={(e) => setFormData(prev => ({ ...prev, date_echeance: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Types de fichiers</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.types_fichiers}
-                    onChange={(e) => setFormData(prev => ({ ...prev, types_fichiers: e.target.value }))}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Fichier</label>
-                  <input
-                    type="file"
-                    required
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  />
-                </div>
-
-                <div className="form-actions">
-                  <motion.button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => setShowForm(false)}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    Annuler
-                  </motion.button>
-                  <motion.button
-                    type="submit"
-                    className="primary-btn"
-                    whileHover={{ scale: 1.03, boxShadow: "0 2px 10px rgba(228, 62, 50, 0.3)" }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    Soumettre
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* CSS Styles */}
       <style jsx>{`
@@ -907,6 +1303,95 @@ const Deliverables: React.FC = () => {
 
           .primary-btn, .secondary-btn {
             width: 100%;
+          }
+        }
+
+        .status-section {
+          margin-bottom: 2rem;
+        }
+
+        .status-title {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 1.25rem;
+          color: #111827;
+          margin-bottom: 1rem;
+          padding-bottom: 0.5rem;
+          border-bottom: 2px solid #e5e7eb;
+        }
+
+        .status-icon {
+          font-size: 1.2rem;
+        }
+
+        .status-icon.pending {
+          color: #f59e0b;
+          animation: spin 2s linear infinite;
+        }
+
+        .status-icon.approved {
+          color: #10b981;
+        }
+
+        .status-icon.rejected {
+          color: #ef4444;
+        }
+
+        .deliverables-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 1rem;
+        }
+
+        .deliverable-card {
+          background: white;
+          border-radius: 8px;
+          padding: 1.25rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          transition: all 0.3s ease;
+        }
+
+        .deliverable-card.pending {
+          border-left: 4px solid #f59e0b;
+        }
+
+        .deliverable-card.approved {
+          border-left: 4px solid #10b981;
+        }
+
+        .deliverable-card.rejected {
+          border-left: 4px solid #ef4444;
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: 3rem 2rem;
+          background: #f9fafb;
+          border-radius: 8px;
+          margin: 2rem 0;
+        }
+
+        .empty-icon {
+          font-size: 3rem;
+          color: #9ca3af;
+          margin-bottom: 1rem;
+        }
+
+        .empty-title {
+          font-size: 1.25rem;
+          color: #111827;
+          margin-bottom: 0.5rem;
+        }
+
+        .empty-text {
+          color: #6b7280;
+          font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+          .deliverables-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

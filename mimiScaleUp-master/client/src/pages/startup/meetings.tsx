@@ -55,13 +55,23 @@ const StartupMeetingsPage = () => {
     formatTime,
     formatAttendees
   } = useMeetings();
-  const [activePhase, setActivePhase] = useState<string>(selectedPhaseId ? String(selectedPhaseId) : '1');
+  const [activePhase, setActivePhase] = useState<string>('all');
   const [activeView, setActiveView] = useState<"list" | "calendar">("list");
   const [viewTab, setViewTab] = useState<"upcoming" | "past">("upcoming");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+<<<<<<< Updated upstream
   const [formattedProgram, setFormattedProgram] = useState<any>(null);
+=======
+  const [phases, setPhases] = useState<any[]>([]);
+
+  // Add debugging for phases
+  useEffect(() => {
+    console.log('Active Phase:', activePhase);
+    console.log('Phases:', phases);
+  }, [activePhase, phases]);
+>>>>>>> Stashed changes
 
   // Fetch submission program info and details
   useEffect(() => {
@@ -83,16 +93,18 @@ const StartupMeetingsPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        console.log('Récupération du dernier programme...');
+        console.log('Récupération des programmes...');
         const programs = await getAllPrograms();
         console.log('Programmes récupérés:', programs);
 
         if (!programs || programs.length === 0) {
           console.log('Aucun programme trouvé');
           setError('Aucun programme disponible');
+          setIsLoading(false);
           return;
         }
 
+<<<<<<< Updated upstream
         const lastProgram = programs[0];
         console.log('Dernier programme:', lastProgram);
 
@@ -210,12 +222,145 @@ const StartupMeetingsPage = () => {
                 setActivePhase(firstPhaseId);
                 setSelectedPhaseId(Number(firstPhaseId));
               }
+=======
+        // Cherche le dernier programme où la soumission de l'utilisateur est acceptée
+        let lastAcceptedProgram = null;
+        for (const prog of programs) {
+          console.log(`Vérification du programme ${prog.id}...`);
+          const result = await getSubmissionsByProgram(prog.id);
+          if (result.submissions && result.submissions.length > 0) {
+            const userSubmission = result.submissions[0];
+            console.log(`Soumission trouvée pour le programme ${prog.id}:`, userSubmission);
+            const acceptanceResult = await checkSubmissionAccepted(userSubmission.id, prog.id);
+            console.log(`Résultat de l'acceptation pour le programme ${prog.id}:`, acceptanceResult);
+            if (acceptanceResult.accepted) {
+              lastAcceptedProgram = { program: prog, submission: userSubmission };
+              console.log(`Programme ${prog.id} accepté, on l'utilise.`);
+              break;
+>>>>>>> Stashed changes
             }
-          } else {
-            setError('Votre soumission est en cours d\'examen');
           }
-        } else {
-          setError('Aucune soumission trouvée pour ce programme');
+        }
+
+        if (!lastAcceptedProgram) {
+          console.log('Aucun programme accepté trouvé');
+          setError('Aucun programme accepté trouvé');
+          setIsLoading(false);
+          return;
+        }
+
+        const programDetails = await getProgram(lastAcceptedProgram.program.id);
+        console.log('Détails du programme récupérés:', programDetails);
+
+        if (!programDetails) {
+          console.log('Aucun détail de programme trouvé');
+          setError('Impossible de récupérer les détails du programme');
+          setIsLoading(false);
+          return;
+        }
+
+        // Fetch phases for this program
+        console.log(`Fetching phases for program ${programDetails.id}...`);
+        const phases = await getPhases(programDetails.id);
+        console.log(`Fetched ${phases ? phases.length : 0} phases for program ${programDetails.id}:`, phases);
+
+        if (!phases || phases.length === 0) {
+          console.log('Aucune phase trouvée pour ce programme');
+          setError('Aucune phase trouvée pour ce programme');
+          setIsLoading(false);
+          return;
+        }
+
+        // Format date function to get only the date part
+        const formatDateString = (dateStr: string) => {
+          if (!dateStr) return new Date().toISOString().split('T')[0];
+          // If it's already just a date (YYYY-MM-DD), return it
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+          // Otherwise, extract the date part from the timestamp
+          return dateStr.split('T')[0];
+        };
+
+        // Fetch meetings for all phases
+        const allMeetings: Meeting[] = [];
+        const phasesWithDetails = await Promise.all(
+          phases.map(async (phase) => {
+            try {
+              // Update program status to active
+              await updateProgramStatus(programDetails.id, 'active' as FrontendStatus);
+
+              // Fetch meetings (reunions) for this phase
+              console.log(`Fetching meetings for phase ${phase.id}...`);
+              const meetings = await getReunions(phase.id);
+              console.log(`Fetched ${meetings ? meetings.length : 0} meetings for phase ${phase.id}:`, meetings);
+
+              // Format meetings for this phase
+              const formattedMeetings = (meetings || []).map(meeting => ({
+                id: String(meeting.id),
+                title: meeting.nom_reunion || meeting.title || 'Réunion sans titre',
+                date: meeting.date || new Date().toISOString(),
+                time: meeting.heure || '09:00',
+                duration: meeting.duration || 60,
+                type: meeting.type || 'group',
+                location: meeting.lieu || meeting.location || 'À déterminer',
+                attendees: meeting.attendees || [],
+                phaseId: String(phase.id),
+                description: meeting.description || '',
+                isCompleted: new Date(meeting.date) < new Date(),
+                hasNotes: false,
+                isOnline: (meeting.lieu?.toLowerCase().includes('online') || meeting.lieu?.toLowerCase().includes('zoom')) || false,
+                programId: String(programDetails.id)
+              }));
+
+              // Add to all meetings
+              allMeetings.push(...formattedMeetings);
+
+              // Determine phase status based on dates
+              const now = new Date();
+              const startDate = new Date(phase.date_debut);
+              const endDate = new Date(phase.date_fin);
+
+              let phaseStatus: "not_started" | "in_progress" | "completed" = "not_started";
+              if (now > endDate) {
+                phaseStatus = "completed";
+              } else if (now >= startDate && now <= endDate) {
+                phaseStatus = "in_progress";
+              }
+
+              return {
+                ...phase,
+                id: String(phase.id),
+                name: phase.nom || phase.name || `Phase ${phase.id}`,
+                description: phase.description || '',
+                startDate: formatDateString(phase.date_debut),
+                endDate: formatDateString(phase.date_fin),
+                status: phaseStatus,
+                color: phase.color || '#818cf8',
+                meetings: formattedMeetings
+              };
+            } catch (error) {
+              console.error(`Error fetching details for phase ${phase.id}:`, error);
+              return {
+                ...phase,
+                id: String(phase.id),
+                name: phase.nom || phase.name || `Phase ${phase.id}`,
+                description: phase.description || '',
+                startDate: formatDateString(phase.date_debut),
+                endDate: formatDateString(phase.date_fin),
+                status: 'not_started',
+                color: '#818cf8',
+                meetings: []
+              };
+            }
+          })
+        );
+
+        console.log('All meetings:', allMeetings);
+        setMeetings(allMeetings);
+        setPhases(phasesWithDetails);
+
+        // Set the first phase as active by default if not already set
+        if (phasesWithDetails.length > 0 && activePhase === 'all') {
+          setActivePhase(phasesWithDetails[0].id);
         }
       } catch (error) {
         console.error('Erreur lors de la récupération des informations du programme:', error);
@@ -226,7 +371,7 @@ const StartupMeetingsPage = () => {
     };
 
     fetchSubmissionProgramInfo();
-  }, [user?.id, user?.role, setSelectedProgram, selectedPhaseId, setSelectedPhaseId]);
+  }, [user?.id, user?.role, activePhase]);
 
   // Filter meetings by active phase and search query
   const filterMeetings = (meetingsList: Meeting[]) => {
@@ -246,24 +391,16 @@ const StartupMeetingsPage = () => {
   const availableMeetings = allFilteredMeetings.filter(m => new Date(m.date) >= now);
   const allPastMeetings = allFilteredMeetings.filter(m => new Date(m.date) < now);
 
-  // Update active phase when selectedPhaseId changes
-  useEffect(() => {
-    if (selectedPhaseId) {
-      setActivePhase(String(selectedPhaseId));
-    }
-  }, [selectedPhaseId]);
-
-  const handlePhaseChange = (phase: number | string | null) => {
+  const handlePhaseChange = (phase: string | null) => {
     if (phase === null) {
       setActivePhase('all');
-      setSelectedPhaseId(null);
     } else {
-      setActivePhase(String(phase));
-      setSelectedPhaseId(Number(phase));
+      setActivePhase(phase);
     }
   };
 
   // Get phase description
+<<<<<<< Updated upstream
   const getPhaseDescription = (phaseId: number | string) => {
     if (selectedProgram && selectedProgram.phases) {
       const phase = selectedProgram.phases.find((p: any) => String(p.id) === String(phaseId));
@@ -276,15 +413,21 @@ const StartupMeetingsPage = () => {
         // If no description, return phase name
         return `Phase: ${phase.nom || phase.name || `Phase ${phase.id}`}`;
       }
+=======
+  const getPhaseDescription = (phaseId: string) => {
+    const phase = phases.find(p => String(p.id) === String(phaseId));
+    if (phase && phase.description && phase.description.trim() !== '') {
+      return phase.description;
+>>>>>>> Stashed changes
     }
     return "Description non disponible";
   };
 
   // Format date helper
-  const formatMeetingDate = (dateString: string) => {
+  const formatMeetingDate = (dateString: string | Date) => {
     try {
       if (!dateString) return 'Date non définie';
-      const date = new Date(dateString);
+      const date = dateString instanceof Date ? dateString : new Date(dateString);
       if (isNaN(date.getTime())) return 'Date non définie';
 
       return date.toLocaleDateString('fr-FR', {
@@ -304,6 +447,7 @@ const StartupMeetingsPage = () => {
     return timeString.substring(0, 5); // Just get HH:MM
   };
 
+<<<<<<< Updated upstream
   // Add debugging useEffect
   useEffect(() => {
     console.log('Selected Program:', selectedProgram);
@@ -314,6 +458,14 @@ const StartupMeetingsPage = () => {
       console.warn('No phases found in selected program. This will cause the phase timeline to use fallback phases.');
     }
   }, [selectedProgram]);
+=======
+  const getPhaseById = (phaseId: string) => {
+    return phases.find(phase => String(phase.id) === String(phaseId));
+  };
+
+  // Add loading state for phases
+  const isLoadingPhases = !phases || phases.length === 0;
+>>>>>>> Stashed changes
 
   return (
     <div className="meetings-container">
@@ -324,8 +476,11 @@ const StartupMeetingsPage = () => {
         {/* Header */}
         <header className="meetings-header">
           <div>
-            <h1>Réunions - {selectedProgram?.name || 'Programme'}</h1>
+            <h1>Réunions</h1>
             <p className="subtitle">Vos sessions de collaboration par phase</p>
+            <p className="text-xs text-gray-400">
+              Total des réunions: {meetings.length} (À venir: {availableMeetings.length}, Passées: {allPastMeetings.length})
+            </p>
           </div>
           <div className="flex space-x-2">
             <div className="flex bg-muted rounded-md p-1">
@@ -353,6 +508,7 @@ const StartupMeetingsPage = () => {
 
         {/* Phases Navigation */}
         <section className="phases-section">
+<<<<<<< Updated upstream
           {/* Debug output */}
           {console.log('Before mapping phases:', selectedProgram?.phases)}
           {console.log('Is phases array?', Array.isArray(selectedProgram?.phases))}
@@ -402,6 +558,66 @@ const StartupMeetingsPage = () => {
               ? "Toutes les phases du programme"
               : getPhaseDescription(activePhase)}
           />
+=======
+          {isLoadingPhases ? (
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-gray-600">Chargement des phases...</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">Chronologie des phases du programme</h2>
+                <p className="text-sm text-gray-500">Cliquez sur une phase pour filtrer les réunions</p>
+              </div>
+              <div className="flex flex-col space-y-2">
+                {/* Phase Timeline Bar */}
+                <div className="relative h-12 bg-gray-100 rounded-md overflow-hidden flex">
+                  {phases.map((phase, i) => {
+                    const width = `${100 / phases.length}%`;
+                    return (
+                      <div
+                        key={phase.id}
+                        className={`h-full cursor-pointer hover:opacity-90 flex items-center justify-center
+                          ${activePhase === phase.id ? 'ring-2 ring-offset-2 ring-offset-white ring-blue-500 z-10' : ''}
+                        `}
+                        style={{
+                          width,
+                          backgroundColor: phase.color,
+                          opacity: phase.status === 'not_started' ? 0.5 : 1,
+                          zIndex: phases.length - i
+                        }}
+                        onClick={() => handlePhaseChange(phase.id)}
+                      >
+                        <span className="text-white font-medium text-xs md:text-sm truncate px-2">
+                          {phase.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Phase Details */}
+                <div className="grid grid-cols-5 gap-2">
+                  {phases.map((phase) => (
+                    <div
+                      key={`details-${phase.id}`}
+                      className={`text-xs p-2 rounded ${activePhase === phase.id ? 'bg-gray-100' : ''}`}
+                    >
+                      <div className="font-medium">{phase.name}</div>
+                      <div className="text-gray-500">
+                        {formatMeetingDate(phase.startDate)} - {formatMeetingDate(phase.endDate)}
+                      </div>
+                      <div className="mt-1 flex items-center">
+                        <CalendarDays className="h-3 w-3 mr-1 text-gray-500" />
+                        <span>{phase.meetings?.length || 0} Réunions</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+>>>>>>> Stashed changes
         </section>
 
         {/* Search Bar */}
@@ -424,6 +640,26 @@ const StartupMeetingsPage = () => {
             </button>
           </div>
         </div>
+
+        {activePhase !== 'all' && (
+          <div className="mb-6 px-4 py-3 bg-blue-50 rounded-lg flex justify-between items-center">
+            <div className="flex items-center">
+              <div
+                className="w-4 h-4 rounded-full mr-2"
+                style={{ backgroundColor: getPhaseById(activePhase)?.color }}
+              ></div>
+              <span className="font-medium">
+                Filtré par phase : {getPhaseById(activePhase)?.name}
+              </span>
+            </div>
+            <button
+              onClick={() => handlePhaseChange(null)}
+              className="text-primary hover:text-primary/80"
+            >
+              Effacer
+            </button>
+          </div>
+        )}
 
         {/* Loading State */}
         {isLoading && (
@@ -450,7 +686,7 @@ const StartupMeetingsPage = () => {
           activeView === "calendar" ? (
             <CalendarView
               meetings={meetings}
-              getPhaseById={(phaseId) => selectedProgram?.phases?.find(p => String(p.id) === String(phaseId))}
+              getPhaseById={getPhaseById}
             />
           ) : (
             <Tabs defaultValue="upcoming" onValueChange={(value) => setViewTab(value as "upcoming" | "past")}>
@@ -528,13 +764,6 @@ const StartupMeetingsPage = () => {
                     ) : (
                       <div className="empty-state">
                         <p>Aucune réunion à venir {activePhase !== 'all' && `pour la phase ${activePhase}`}</p>
-                        <motion.button
-                          className="primary-btn"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <FaPlus /> Planifier une réunion
-                        </motion.button>
                       </div>
                     )}
                   </AnimatePresence>
