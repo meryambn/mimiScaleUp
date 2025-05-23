@@ -219,10 +219,33 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
       documents: translatedData.documents_requis
     });
 
-    // Only include phases_requises if they are explicitly set
-    if (translatedData.phases_requises && translatedData.phases_requises.length > 0) {
+    // Helper function to parse PostgreSQL array format
+    const parsePostgresArray = (value: any): string[] => {
+      if (Array.isArray(value)) {
+        return value;
+      }
+
+      if (typeof value === 'string') {
+        // Handle PostgreSQL array format like "{item1,item2}" or '{"item1","item2"}'
+        if (value.startsWith('{') && value.endsWith('}')) {
+          return value
+            .replace(/^\{|\}$/g, '') // Remove { and }
+            .split(',')
+            .filter(Boolean)
+            .map(item => item.trim().replace(/^"|"$/g, '')); // Remove quotes
+        }
+      }
+
+      return [];
+    };
+
+    // Parse and process phases_requises
+    const parsedPhases = parsePostgresArray(translatedData.phases_requises);
+    console.log("Parsed phases:", parsedPhases);
+
+    if (parsedPhases.length > 0) {
       // Translate phases from French to English and ensure they are valid
-      const translatedPhases = translatedData.phases_requises.map(phase =>
+      const translatedPhases = parsedPhases.map(phase =>
         phaseTranslations[phase] || phase // Keep original if no translation found
       );
 
@@ -235,10 +258,13 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
       translatedData.phases_requises = [];
     }
 
-    // Only include industries_requises if they are explicitly set
-    if (translatedData.industries_requises && translatedData.industries_requises.length > 0) {
+    // Parse and process industries_requises
+    const parsedIndustries = parsePostgresArray(translatedData.industries_requises);
+    console.log("Parsed industries:", parsedIndustries);
+
+    if (parsedIndustries.length > 0) {
       // Translate industries from French to English
-      const translatedIndustries = translatedData.industries_requises.map(industry =>
+      const translatedIndustries = parsedIndustries.map(industry =>
         industryTranslations[industry] || industry // Keep original if no translation found
       );
 
@@ -251,10 +277,13 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
       translatedData.industries_requises = [];
     }
 
-    // Only include documents_requis if they are explicitly set
-    if (translatedData.documents_requis && translatedData.documents_requis.length > 0) {
+    // Parse and process documents_requis
+    const parsedDocuments = parsePostgresArray(translatedData.documents_requis);
+    console.log("Parsed documents:", parsedDocuments);
+
+    if (parsedDocuments.length > 0) {
       // Translate documents from French to English
-      const translatedDocuments = translatedData.documents_requis.map(document =>
+      const translatedDocuments = parsedDocuments.map(document =>
         documentTranslations[document] || document // Keep original if no translation found
       );
 
@@ -274,9 +303,11 @@ export async function createProgram(programData: CreateProgramRequest): Promise<
       documents: translatedData.documents_requis
     });
 
-    // IMPORTANT: Ensure admin_id is explicitly set to 1
-    // The backend needs this value even though it's not used in the SQL query
-    translatedData.admin_id = 1;
+    // IMPORTANT: Ensure admin_id is set to the current logged-in admin
+    // Get the current admin ID from localStorage
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const adminId = user?.id || 1; // Fallback to 1 if no user found
+    translatedData.admin_id = adminId;
 
     // Double-check that admin_id is set correctly
     console.log("Final admin_id value:", translatedData.admin_id);
@@ -412,10 +443,15 @@ export async function getAllPrograms(): Promise<any[]> {
   try {
     console.log("Getting all programs");
 
+    // Get the current admin ID from localStorage
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const adminId = user?.id || 1;
+
     const response = await fetch(`${API_BASE_URL}/programmes/all`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'X-Admin-ID': adminId.toString()
       },
       credentials: 'include'
     });

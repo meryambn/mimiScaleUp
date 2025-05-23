@@ -1,0 +1,47 @@
+{
+  "name": "accelera",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon app.js",
+    "start": "node app.js",
+    "migrate:livrable-soumissions": "node scripts/run_livrable_soumissions_migration.js",
+    "test:livrable-soumissions": "node tests/livrable_soumission_test.js",
+    "test:livrable-notifications": "node tests/livrable_notification_test.js",
+    "test:livrable-soumissions-get": "node tests/livrable_soumission_get_test.js",
+    "test:livrable-soumissions-get-advanced": "node tests/livrable_soumission_get_advanced_test.js",
+    "test:livrable-soumissions-get-performance": "node tests/livrable_soumission_get_performance_test.js",
+    "test:livrable-soumissions-all": "npm run test:livrable-soumissions && npm run test:livrable-soumissions-get && npm run test:livrable-soumissions-get-advanced",
+    "add-deliverables": "node tests/add_deliverables_test.js",
+    "test:candidature-suppression": "node tests/candidature_suppression_test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rawanerr/accelera.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rawanerr/accelera/issues"
+  },
+  "homepage": "https://github.com/rawanerr/accelera#readme",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.2",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.9",
+    "pg": "^8.14.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "description": ""
+}

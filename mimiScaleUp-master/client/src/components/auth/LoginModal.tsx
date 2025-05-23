@@ -94,9 +94,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ show, onClose, switchToRegister
       if (isAdminLogin) {
         console.log('Admin login detected from response');
 
-        // Default admin user with ID 1 (based on your logs)
+        // Use the actual admin ID from the response
         let adminUser = {
-          id: 1, // Default to admin ID 1 based on your logs
+          id: data.adminId || 1, // Use actual admin ID from response, fallback to 1
           name: data.email,
           email: data.email,
           role: 'admin' as const,

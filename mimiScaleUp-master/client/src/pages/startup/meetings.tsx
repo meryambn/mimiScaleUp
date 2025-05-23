@@ -34,6 +34,7 @@ import { getAllPrograms, getProgram, getPhases, getReunions, updateProgramStatus
 import { getSubmissionsByProgram } from '@/services/formService';
 import { checkSubmissionAccepted } from '@/services/teamService';
 import { FrontendStatus } from '@/utils/statusMapping';
+import ProgramAccessGuard from '@/components/guards/ProgramAccessGuard';
 
 // Interface spécifique pour les phases de la timeline
 interface TimelinePhase {
@@ -61,9 +62,6 @@ const StartupMeetingsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-<<<<<<< Updated upstream
-  const [formattedProgram, setFormattedProgram] = useState<any>(null);
-=======
   const [phases, setPhases] = useState<any[]>([]);
 
   // Add debugging for phases
@@ -71,7 +69,6 @@ const StartupMeetingsPage = () => {
     console.log('Active Phase:', activePhase);
     console.log('Phases:', phases);
   }, [activePhase, phases]);
->>>>>>> Stashed changes
 
   // Fetch submission program info and details
   useEffect(() => {
@@ -104,125 +101,6 @@ const StartupMeetingsPage = () => {
           return;
         }
 
-<<<<<<< Updated upstream
-        const lastProgram = programs[0];
-        console.log('Dernier programme:', lastProgram);
-
-        const result = await getSubmissionsByProgram(lastProgram.id);
-        console.log('Résultat complet des soumissions:', result);
-
-        if (result.submissions && result.submissions.length > 0) {
-          const userSubmission = result.submissions[0];
-          console.log('Soumission trouvée:', userSubmission);
-
-          const submissionId = userSubmission.id;
-          const acceptanceResult = await checkSubmissionAccepted(submissionId, lastProgram.id);
-          console.log('Résultat de la vérification d\'acceptation:', acceptanceResult);
-
-          if (acceptanceResult.accepted) {
-            const programDetails = await getProgram(lastProgram.id);
-            console.log('Détails du programme récupérés:', programDetails);
-
-            if (programDetails) {
-              // Fetch phases for this program
-              console.log(`Fetching phases for program ${programDetails.id}...`);
-              const phases = await getPhases(programDetails.id);
-              console.log(`Fetched ${phases ? phases.length : 0} phases for program ${programDetails.id}:`, phases);
-
-              // Fetch meetings for all phases
-              const allMeetings: Meeting[] = [];
-              const phasesWithDetails = await Promise.all(
-                (phases || []).map(async (phase) => {
-                  try {
-                    // Update program status to active
-                    await updateProgramStatus(programDetails.id, 'active' as FrontendStatus);
-
-                    // Fetch meetings (reunions) for this phase
-                    console.log(`Fetching meetings for phase ${phase.id}...`);
-                    const meetings = await getReunions(phase.id);
-                    console.log(`Fetched ${meetings ? meetings.length : 0} meetings for phase ${phase.id}:`, meetings);
-
-                    // Format meetings for this phase
-                    const formattedMeetings = (meetings || []).map(meeting => ({
-                      id: String(meeting.id),
-                      title: meeting.nom_reunion || meeting.title || 'Réunion sans titre',
-                      date: meeting.date || new Date().toISOString(),
-                      time: meeting.heure || '09:00',
-                      duration: meeting.duration || 60,
-                      type: meeting.type || 'group',
-                      location: meeting.lieu || meeting.location || 'À déterminer',
-                      attendees: meeting.attendees || [],
-                      phaseId: String(phase.id),
-                      description: meeting.description || '',
-                      isCompleted: new Date(meeting.date) < new Date(),
-                      hasNotes: false,
-                      isOnline: (meeting.lieu?.toLowerCase().includes('online') || meeting.lieu?.toLowerCase().includes('zoom')) || false,
-                      programId: String(programDetails.id)
-                    }));
-
-                    // Add to all meetings
-                    allMeetings.push(...formattedMeetings);
-
-                    return {
-                      ...phase,
-                      id: String(phase.id),
-                      name: phase.nom || phase.name || `Phase ${phase.id}`,
-                      description: phase.description || '',
-                      status: phase.status === 'completed' ? 'completed' :
-                             phase.status === 'in_progress' ? 'in-progress' :
-                             phase.status === 'not_started' ? 'not_started' : 'upcoming',
-                      color: phase.color || '#818cf8',
-                      meetings: formattedMeetings
-                    };
-                  } catch (error) {
-                    console.error(`Error fetching details for phase ${phase.id}:`, error);
-                    return {
-                      ...phase,
-                      id: String(phase.id),
-                      name: phase.nom || phase.name || `Phase ${phase.id}`,
-                      description: phase.description || '',
-                      status: 'active',
-                      color: '#818cf8',
-                      meetings: []
-                    };
-                  }
-                })
-              );
-
-              console.log('All meetings:', allMeetings);
-              setMeetings(allMeetings);
-
-              // Format the program with phases and meetings
-              const formattedProgram = {
-                ...programDetails,
-                id: String(programDetails.id),
-                name: programDetails.nom || programDetails.name || "Programme sans nom",
-                description: programDetails.description || "Aucune description disponible",
-                phases: phasesWithDetails
-              };
-
-              console.log('Programme formaté avec phases et réunions:', formattedProgram);
-
-              // Debug check for phases
-              if (!formattedProgram.phases || formattedProgram.phases.length === 0) {
-                console.warn('No phases found in formatted program. Adding debug info.');
-                console.log('Original phases from API:', phases);
-                console.log('Phases with details:', phasesWithDetails);
-              }
-
-              // Store the formatted program in local state for direct use in the component
-              setFormattedProgram(formattedProgram);
-
-              // Also update the context
-              setSelectedProgram(formattedProgram);
-
-              // Set the first phase as active by default if not already set
-              if (phasesWithDetails.length > 0 && !selectedPhaseId) {
-                const firstPhaseId = phasesWithDetails[0].id;
-                setActivePhase(firstPhaseId);
-                setSelectedPhaseId(Number(firstPhaseId));
-              }
-=======
         // Cherche le dernier programme où la soumission de l'utilisateur est acceptée
         let lastAcceptedProgram = null;
         for (const prog of programs) {
@@ -237,7 +115,6 @@ const StartupMeetingsPage = () => {
               lastAcceptedProgram = { program: prog, submission: userSubmission };
               console.log(`Programme ${prog.id} accepté, on l'utilise.`);
               break;
->>>>>>> Stashed changes
             }
           }
         }
@@ -400,25 +277,10 @@ const StartupMeetingsPage = () => {
   };
 
   // Get phase description
-<<<<<<< Updated upstream
-  const getPhaseDescription = (phaseId: number | string) => {
-    if (selectedProgram && selectedProgram.phases) {
-      const phase = selectedProgram.phases.find((p: any) => String(p.id) === String(phaseId));
-      if (phase) {
-        // Check for description
-        if (phase.description && phase.description.trim() !== '') {
-          return phase.description;
-        }
-
-        // If no description, return phase name
-        return `Phase: ${phase.nom || phase.name || `Phase ${phase.id}`}`;
-      }
-=======
   const getPhaseDescription = (phaseId: string) => {
     const phase = phases.find(p => String(p.id) === String(phaseId));
     if (phase && phase.description && phase.description.trim() !== '') {
       return phase.description;
->>>>>>> Stashed changes
     }
     return "Description non disponible";
   };
@@ -447,41 +309,29 @@ const StartupMeetingsPage = () => {
     return timeString.substring(0, 5); // Just get HH:MM
   };
 
-<<<<<<< Updated upstream
-  // Add debugging useEffect
-  useEffect(() => {
-    console.log('Selected Program:', selectedProgram);
-    console.log('Program Phases:', selectedProgram?.phases);
-
-    // Check if we have valid phases data
-    if (selectedProgram && (!selectedProgram.phases || selectedProgram.phases.length === 0)) {
-      console.warn('No phases found in selected program. This will cause the phase timeline to use fallback phases.');
-    }
-  }, [selectedProgram]);
-=======
   const getPhaseById = (phaseId: string) => {
     return phases.find(phase => String(phase.id) === String(phaseId));
   };
 
   // Add loading state for phases
   const isLoadingPhases = !phases || phases.length === 0;
->>>>>>> Stashed changes
 
   return (
     <div className="meetings-container">
       <Sidebar />
 
       {/* Main Content */}
-      <main className="main-content">
-        {/* Header */}
-        <header className="meetings-header">
-          <div>
-            <h1>Réunions</h1>
-            <p className="subtitle">Vos sessions de collaboration par phase</p>
-            <p className="text-xs text-gray-400">
-              Total des réunions: {meetings.length} (À venir: {availableMeetings.length}, Passées: {allPastMeetings.length})
-            </p>
-          </div>
+      <ProgramAccessGuard programId={submissionProgram?.id || ''}>
+        <main className="main-content">
+          {/* Header */}
+          <header className="meetings-header">
+            <div>
+              <h1>Réunions</h1>
+              <p className="subtitle">Vos sessions de collaboration par phase</p>
+              <p className="text-xs text-gray-400">
+                Total des réunions: {meetings.length} (À venir: {availableMeetings.length}, Passées: {allPastMeetings.length})
+              </p>
+            </div>
           <div className="flex space-x-2">
             <div className="flex bg-muted rounded-md p-1">
               <button
@@ -508,57 +358,6 @@ const StartupMeetingsPage = () => {
 
         {/* Phases Navigation */}
         <section className="phases-section">
-<<<<<<< Updated upstream
-          {/* Debug output */}
-          {console.log('Before mapping phases:', selectedProgram?.phases)}
-          {console.log('Is phases array?', Array.isArray(selectedProgram?.phases))}
-          {console.log('Phases length:', selectedProgram?.phases?.length)}
-
-          <ProgramPhaseTimeline
-            phases={(() => {
-              // Create a debug function to trace the mapping process
-              if (!selectedProgram) {
-                console.log('No selected program');
-                return [];
-              }
-
-              if (!selectedProgram.phases) {
-                console.log('No phases in selected program');
-                return [];
-              }
-
-              console.log('Selected program phases:', selectedProgram.phases);
-
-              // Fix: Ensure we're working with an array
-              const phasesArray = Array.isArray(selectedProgram.phases) ? selectedProgram.phases : [];
-
-              const mappedPhases = phasesArray.map(phase => {
-                console.log('Mapping phase:', phase);
-                console.log('Phase ID:', phase.id);
-                console.log('Phase nom:', phase.nom);
-                console.log('Phase name:', phase.name);
-
-                return {
-                  id: Number(phase.id),
-                  name: phase.nom || phase.name || `Phase ${phase.id}`,
-                  color: phase.color || '#818cf8',
-                  status: phase.status === 'completed' ? 'completed' :
-                         phase.status === 'in_progress' ? 'in-progress' :
-                         phase.status === 'not_started' ? 'not_started' : 'upcoming'
-                };
-              });
-
-              console.log('Mapped phases result:', mappedPhases);
-              return mappedPhases;
-            })()}
-            selectedPhase={activePhase === 'all' ? null : Number(activePhase)}
-            onPhaseChange={handlePhaseChange}
-            title="Chronologie des phases"
-            description={activePhase === 'all'
-              ? "Toutes les phases du programme"
-              : getPhaseDescription(activePhase)}
-          />
-=======
           {isLoadingPhases ? (
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <p className="text-gray-600">Chargement des phases...</p>
@@ -617,7 +416,6 @@ const StartupMeetingsPage = () => {
               </div>
             </div>
           )}
->>>>>>> Stashed changes
         </section>
 
         {/* Search Bar */}
@@ -846,6 +644,7 @@ const StartupMeetingsPage = () => {
           )
         )}
       </main>
+      </ProgramAccessGuard>
 
       {/* CSS Styles */}
       <style jsx>{`

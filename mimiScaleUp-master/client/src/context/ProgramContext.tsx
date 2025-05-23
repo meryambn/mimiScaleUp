@@ -1563,7 +1563,11 @@ export const ProgramProvider: React.FC<ProgramProviderProps> = ({ children }) =>
         taille_equipe_max: newProgram.eligibilityCriteria?.maxTeamSize || 5,
         ca_min: newProgram.eligibilityCriteria?.minRevenue || 0,
         ca_max: newProgram.eligibilityCriteria?.maxRevenue || 100000,
-        admin_id: 1 // Required by the backend
+        admin_id: (() => {
+          // Get the current admin ID from localStorage
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          return user?.id || 1; // Fallback to 1 if no user found
+        })()
       };
 
       console.log('Creating program in backend:', backendProgram);

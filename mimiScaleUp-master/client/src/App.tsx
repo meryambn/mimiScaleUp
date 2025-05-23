@@ -52,6 +52,9 @@ import ParticulierTasksPage from './pages/particulier/tasks';
 import StartupAnalytics from './pages/startup/analytics';
 import FormulairePage from './pages/particulier/apply';
 import ApplyRedirect from './components/redirects/ApplyRedirect';
+import ProgramTerminationHandler from './components/notification/ProgramTerminationHandler';
+import AdminProfile from './components/AdminProfile';
+import AdminRegisterPage from './pages/admin/register';
 
 // Redirect components to fix hooks issues
 const DashboardRedirect = () => {
@@ -258,69 +261,105 @@ const TestCreateTeamRedirect = () => {
 
 const NotificationsRedirect = () => {
   const [, setLocation] = useLocation();
-  const { programs } = useProgramContext();
 
-  React.useEffect(() => {
-    // Trouver le premier programme actif
-    const activeProgram = programs.find(p => p.status === "active");
-    if (activeProgram) {
-      setLocation(`/particulier/notifications/${activeProgram.id}`);
-    } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+  try {
+    const { programs } = useProgramContext();
+
+    React.useEffect(() => {
+      // Trouver le premier programme actif
+      const activeProgram = programs.find(p => p.status === "active");
+      if (activeProgram) {
+        setLocation(`/particulier/notifications/${activeProgram.id}`);
+      } else {
+        // Si aucun programme actif n'est trouvé, rediriger vers le profil
+        setLocation('/particulier/profile');
+      }
+    }, [setLocation, programs]);
+  } catch (error) {
+    // If ProgramContext is not available, redirect to profile
+    React.useEffect(() => {
       setLocation('/particulier/profile');
-    }
-  }, [setLocation, programs]);
+    }, [setLocation]);
+  }
+
   return null;
 };
 
 const FormulaireRedirect = () => {
   const [, setLocation] = useLocation();
-  const { programs } = useProgramContext();
 
-  React.useEffect(() => {
-    // Trouver le premier programme actif
-    const activeProgram = programs.find(p => p.status === "active");
-    if (activeProgram) {
-      setLocation(`/particulier/apply/${activeProgram.id}`);
-    } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+  try {
+    const { programs } = useProgramContext();
+
+    React.useEffect(() => {
+      // Trouver le premier programme actif
+      const activeProgram = programs.find(p => p.status === "active");
+      if (activeProgram) {
+        setLocation(`/particulier/apply/${activeProgram.id}`);
+      } else {
+        // Si aucun programme actif n'est trouvé, rediriger vers le profil
+        setLocation('/particulier/profile');
+      }
+    }, [setLocation, programs]);
+  } catch (error) {
+    // If ProgramContext is not available, redirect to profile
+    React.useEffect(() => {
       setLocation('/particulier/profile');
-    }
-  }, [setLocation, programs]);
+    }, [setLocation]);
+  }
+
   return null;
 };
 
 const StartupNotificationsRedirect = () => {
   const [, setLocation] = useLocation();
-  const { programs } = useProgramContext();
 
-  React.useEffect(() => {
-    // Trouver le premier programme actif
-    const activeProgram = programs.find(p => p.status === "active");
-    if (activeProgram) {
-      setLocation(`/startup/notifications/${activeProgram.id}`);
-    } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+  try {
+    const { programs } = useProgramContext();
+
+    React.useEffect(() => {
+      // Trouver le premier programme actif
+      const activeProgram = programs.find(p => p.status === "active");
+      if (activeProgram) {
+        setLocation(`/startup/notifications/${activeProgram.id}`);
+      } else {
+        // Si aucun programme actif n'est trouvé, rediriger vers le profil
+        setLocation('/startup/profile');
+      }
+    }, [setLocation, programs]);
+  } catch (error) {
+    // If ProgramContext is not available, redirect to profile
+    React.useEffect(() => {
       setLocation('/startup/profile');
-    }
-  }, [setLocation, programs]);
+    }, [setLocation]);
+  }
+
   return null;
 };
 
 const StartupFormulaireRedirect = () => {
   const [, setLocation] = useLocation();
-  const { programs } = useProgramContext();
 
-  React.useEffect(() => {
-    // Trouver le premier programme actif
-    const activeProgram = programs.find(p => p.status === "active");
-    if (activeProgram) {
-      setLocation(`/startup/apply/${activeProgram.id}`);
-    } else {
-      // Si aucun programme actif n'est trouvé, rediriger vers le profil
+  try {
+    const { programs } = useProgramContext();
+
+    React.useEffect(() => {
+      // Trouver le premier programme actif
+      const activeProgram = programs.find(p => p.status === "active");
+      if (activeProgram) {
+        setLocation(`/startup/apply/${activeProgram.id}`);
+      } else {
+        // Si aucun programme actif n'est trouvé, rediriger vers le profil
+        setLocation('/startup/profile');
+      }
+    }, [setLocation, programs]);
+  } catch (error) {
+    // If ProgramContext is not available, redirect to profile
+    React.useEffect(() => {
       setLocation('/startup/profile');
-    }
-  }, [setLocation, programs]);
+    }, [setLocation]);
+  }
+
   return null;
 };
 
@@ -408,6 +447,11 @@ const App = () => {
                           <ParticulierResourcePage />
                         </ParticulierLayout>
                       )}
+                    </Route>
+
+                    {/* Admin Registration Route - Hidden page */}
+                    <Route path="/admin/register">
+                      {() => <AdminRegisterPage />}
                     </Route>
 
                     {/* Admin Routes */}
@@ -501,6 +545,9 @@ const App = () => {
                           <ResourcesPage />
                         </Layout>
                       )}
+                    </Route>
+                    <Route path="/admin/profile">
+                      {() => <AdminProfile />}
                     </Route>
 
                     {/* Mentor Routes */}
@@ -773,6 +820,7 @@ const App = () => {
                     </Route>
                       </Switch>
                       <Toaster />
+                      <ProgramTerminationHandler />
                     </ChatProvider>
                   </DeliverablesProvider>
                 </ResourcesProvider>

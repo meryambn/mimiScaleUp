@@ -25,6 +25,7 @@ import { getAllPrograms, getProgram, getPhases, getTasks, updateProgramStatus } 
 import { getSubmissionsByProgram } from '@/services/formService';
 import { checkSubmissionAccepted } from '@/services/teamService';
 import { FrontendStatus } from '@/utils/statusMapping';
+import ProgramAccessGuard from '@/components/guards/ProgramAccessGuard';
 
 // Define types
 interface Task {
@@ -321,7 +322,7 @@ const StartupTasksPage = () => {
       await fetch(`/api/tasks/${id}/toggle`, {
         method: 'POST'
       });
-      
+
       setTasks(prevTasks => ({
         ...prevTasks,
         [activePhase]: prevTasks[activePhase]?.map((task: Task) =>
@@ -409,7 +410,7 @@ const StartupTasksPage = () => {
     try {
       const date = dateString instanceof Date ? dateString : new Date(dateString);
       if (isNaN(date.getTime())) return "Date invalide";
-      
+
       const options: Intl.DateTimeFormatOptions = {
         weekday: 'short' as const,
         day: 'numeric' as const,
@@ -433,6 +434,9 @@ const StartupTasksPage = () => {
     return "Description non disponible";
   };
 
+  // Get the program ID from the phases
+  const programId = phases.length > 0 && phases[0].id ? phases[0].id : '';
+
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
@@ -440,14 +444,15 @@ const StartupTasksPage = () => {
         <div className="p-6">
           <div className="tasks-container">
             {/* Main Content */}
-            <main className="main-content">
-              {/* Header */}
-              <header className="tasks-header">
-                <div>
-                  <h1>Tâches - {selectedProgram?.name || 'Programme'}</h1>
-                  <p className="subtitle">Gérez vos actions et priorités par phase</p>
-                </div>
-              </header>
+            <ProgramAccessGuard programId={programId}>
+              <main className="main-content">
+                {/* Header */}
+                <header className="tasks-header">
+                  <div>
+                    <h1>Tâches - {selectedProgram?.name || 'Programme'}</h1>
+                    <p className="subtitle">Gérez vos actions et priorités par phase</p>
+                  </div>
+                </header>
 
               {/* Phases Navigation */}
               <section className="phases-section">
@@ -863,6 +868,7 @@ const StartupTasksPage = () => {
                 </TabsContent>
               </Tabs>
             </main>
+            </ProgramAccessGuard>
 
             {/* CSS Styles */}
             <style>{`

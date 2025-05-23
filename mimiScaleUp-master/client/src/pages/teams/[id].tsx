@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
-import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasPhase, checkIfTeamIsWinner } from '@/services/teamService';
+import { getTeamCurrentPhase, getTeamDetails, getTeamFromProgram, ensureTeamHasPhase, checkIfTeamIsWinner, deleteTeam } from '@/services/teamService';
 import { moveToPhase } from '@/services/phaseService';
 import { getPhases, getEvaluationCriteriaByPhaseName } from '@/services/programService';
 import { declareWinner } from '@/services/winnerService';
@@ -786,6 +786,45 @@ const StartupDetailPage = () => {
     }
   };
 
+  // Fonction pour supprimer l'équipe
+  const handleDeleteTeam = async () => {
+    if (!id) return;
+
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer cette équipe ? Cette action est irréversible.`)) {
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      console.log(`Deleting team ${id}`);
+
+      // Appeler l'API pour supprimer l'équipe
+      const result = await deleteTeam(id);
+      console.log('Team deletion result:', result);
+
+      // Afficher un message de succès
+      toast({
+        title: "Équipe supprimée",
+        description: `L'équipe a été supprimée avec succès.`,
+      });
+
+      // Rediriger vers la liste des équipes
+      setTimeout(() => {
+        setLocation('/teams');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'équipe. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // État local pour stocker les valeurs temporaires des critères en cours d'édition
   const [criteriaValues, setCriteriaValues] = useState<Record<number, any>>({});
 
@@ -1076,7 +1115,7 @@ const StartupDetailPage = () => {
           type: type,
           // Initialiser les valeurs spécifiques au type
           booleanValue: (type === 'yesno' || type === 'yes_no') ? false : undefined,
-          numericValue: type === 'numeric' ? 0 : undefined,
+          numericValue: type === 'numeric' ? Math.floor(Math.random() * 100) + 1 : undefined,
           textValue: type === 'liste_deroulante' ? '' : undefined,
           // Initialiser les champs de validation
           filledByTeam: criterion.rempli_par === 'equipes',
@@ -1119,7 +1158,7 @@ const StartupDetailPage = () => {
           type: type,
           // Initialiser les valeurs spécifiques au type si elles n'existent pas
           booleanValue: (type === 'yesno' || type === 'yes_no') ? (criterion.booleanValue !== undefined ? criterion.booleanValue : false) : undefined,
-          numericValue: type === 'numeric' ? (criterion.numericValue !== undefined ? criterion.numericValue : 0) : undefined,
+          numericValue: type === 'numeric' ? (criterion.numericValue !== undefined ? criterion.numericValue : Math.floor(Math.random() * 100) + 1) : undefined,
           textValue: type === 'liste_deroulante' ? (criterion.textValue !== undefined ? criterion.textValue : '') : undefined,
           // Initialiser les champs de validation
           filledByTeam: criterion.filledByTeam !== undefined ? criterion.filledByTeam : Math.random() > 0.5, // Simulation: certains critères sont remplis par l'équipe
@@ -1232,8 +1271,11 @@ const StartupDetailPage = () => {
               {!isMentor && (
                 <button
                   style={{ backgroundColor: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', border: 'none', fontSize: '0.875rem' }}
+                  onClick={handleDeleteTeam}
+                  disabled={isUpdating}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
                 </button>
               )}
             </div>
@@ -1690,31 +1732,27 @@ const StartupDetailPage = () => {
                               )}
                             </div>
                           ) : criterion.type === 'numeric' ? (
-                            // Affichage Numérique
-                            <div className="flex flex-col items-end space-y-2">
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={(criteriaValues[criterion.id]?.numericValue !== undefined ? criteriaValues[criterion.id].numericValue : criterion.numericValue) || 0}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value) || 0;
-                                    // Calculer le score sur une échelle de 0 à 5 en fonction de la valeur numérique
-                                    const score = Math.min(5, Math.max(0, Math.round(value / 20)));
-                                    // Mettre à jour le score et la valeur numérique dans l'état temporaire
-                                    updateCriterion(criterion.id, { score, numericValue: value });
-                                  }}
-                                  className="w-20 p-2 border rounded-md text-center focus:ring-1 focus:ring-blue-300 focus:border-blue-300"
-                                />
-                                <span className="text-sm font-medium text-gray-700">/ 100</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                <div
-                                  className="bg-blue-600 h-2.5 rounded-full"
-                                  style={{ width: `${(criteriaValues[criterion.id]?.numericValue !== undefined ? criteriaValues[criterion.id].numericValue : criterion.numericValue) || 0}%` }}
-                                ></div>
-                              </div>
+                            // Affichage Numérique - Affiche un nombre aléatoire au lieu d'une plage
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="number"
+                                value={(criteriaValues[criterion.id]?.numericValue !== undefined ?
+                                  criteriaValues[criterion.id].numericValue :
+                                  (criterion.numericValue !== undefined && criterion.numericValue !== 0) ?
+                                    criterion.numericValue :
+                                    Math.floor(Math.random() * 100) + 1)}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  // Calculer le score sur une échelle de 0 à 5 en fonction de la valeur numérique
+                                  const score = Math.min(5, Math.max(0, Math.round(value / 20)));
+                                  // Mettre à jour le score et la valeur numérique dans l'état temporaire
+                                  updateCriterion(criterion.id, { score, numericValue: value });
+                                }}
+                                className="w-20 p-2 border rounded-md text-center focus:ring-1 focus:ring-blue-300 focus:border-blue-300"
+                              />
+                              <span className="text-sm font-medium text-gray-700">
+                                {/* Pas d'indication de plage, juste la valeur */}
+                              </span>
                             </div>
                           ) : criterion.type === 'liste_deroulante' ? (
                             // Affichage Liste déroulante

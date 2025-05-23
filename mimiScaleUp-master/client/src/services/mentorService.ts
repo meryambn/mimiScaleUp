@@ -4,13 +4,18 @@ import { apiRequest as queryApiRequest } from '../lib/queryClient';
 // Helper function to make API requests with better error handling
 export async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
   try {
+    // Get the current admin ID from localStorage
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const adminId = user?.id || 1;
+
     // Set default options
     const defaultOptions: RequestInit = {
       credentials: 'include',
       mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'X-Admin-ID': adminId.toString()
       }
     };
 

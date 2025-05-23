@@ -326,7 +326,10 @@ const StartupEvaluationWidget: React.FC = () => {
   // Numeric Input Component
   const NumericInput = ({ criterion, readOnly = false }: { criterion: EvaluationCriterion, readOnly?: boolean }) => {
     // Generate a random number if no value is provided
-    const [value, setValue] = useState<number>(criterion.value as number || Math.floor(Math.random() * 1000));
+    const [value, setValue] = useState<number>(() => {
+      // Use the existing value if available, otherwise generate a random number between 1 and 100
+      return criterion.value as number || Math.floor(Math.random() * 100) + 1;
+    });
 
     return (
       <div className="flex items-center space-x-2">
@@ -338,6 +341,10 @@ const StartupEvaluationWidget: React.FC = () => {
           readOnly={readOnly}
           disabled={readOnly}
         />
+        <span className="text-sm text-gray-500">
+          {/* No range indicator, just the value */}
+          {value ? `${value}` : 'Non évalué'}
+        </span>
       </div>
     );
   };

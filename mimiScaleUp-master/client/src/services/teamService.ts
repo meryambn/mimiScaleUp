@@ -437,6 +437,42 @@ export async function getTeamDetails(teamId: string | number): Promise<TeamDetai
 }
 
 /**
+ * Deletes a team (candidature)
+ * @param teamId The ID of the team to delete
+ * @returns A promise that resolves to the success message
+ */
+export async function deleteTeam(teamId: string | number): Promise<{ message: string }> {
+  console.log('Deleting team:', teamId);
+
+  try {
+    // Call the backend API to delete the team
+    const response = await fetch(`${API_BASE_URL}/cand/${teamId}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json'
+      },
+      credentials: 'include'
+    });
+
+    console.log('Response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      console.error('Error deleting team:', errorData);
+      throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('Team deleted successfully:', result);
+
+    return result;
+  } catch (error) {
+    console.error('Exception during deleting team:', error);
+    throw error;
+  }
+}
+
+/**
  * Ensures a team has a phase assigned by checking current phase and assigning to first phase if needed
  * @param teamId The ID of the team/candidature
  * @param programId The ID of the program

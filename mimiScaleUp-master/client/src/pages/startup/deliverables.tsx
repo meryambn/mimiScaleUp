@@ -2,25 +2,23 @@ import React, { useState, useEffect } from 'react';
 import {
   FaFileUpload,
   FaFilePdf,
-  FaFileWord,
-  FaFileExcel,
-  FaFileImage,
-  FaTrash,
   FaCheckCircle,
   FaSpinner,
-  FaTimesCircle,
-  FaPlus
+  FaTimesCircle
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/sidebar';
 import { useProgramContext } from '@/context/ProgramContext';
-import { useDeliverables } from '@/context/DeliverablesContext';
+
 import { useAuth } from '@/context/AuthContext';
 import { getLivrables } from '@/services/programService';
 import { getAllPrograms, getProgram, getPhases } from '@/services/programService';
 import { getSubmissionsByProgram } from '@/services/formService';
 import { checkSubmissionAccepted } from '@/services/teamService';
-import DeliverablesWidget from '@/components/widgets/DeliverablesWidget';
+import { getCandidatureIdForUser } from '@/services/userTeamMappingService';
+import { getTeamDeliverableSubmissions } from '@/services/deliverableService';
+import ProgramAccessGuard from '@/components/guards/ProgramAccessGuard';
+
 
 interface ProgramPhase {
   id: number;
@@ -40,12 +38,12 @@ interface Deliverable {
   types_fichiers: string[];
   phase_id: number;
   candidature_id?: number;
+  submission?: any; // For deliverables with submission status
 }
 
 const Deliverables: React.FC = () => {
   const { user } = useAuth();
   const { selectedProgram } = useProgramContext();
-  const { deliverables, filteredDeliverables, getStatusText, getSubmissionTypeIcon } = useDeliverables();
 
   const [activePhase, setActivePhase] = useState<number>(1);
   const [activeTab, setActiveTab] = useState('pending');
@@ -58,6 +56,7 @@ const Deliverables: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [submissionProgram, setSubmissionProgram] = useState<any | null>(null);
   const [currentSubmission, setCurrentSubmission] = useState<any | null>(null);
+  const [teamSubmissions, setTeamSubmissions] = useState<any[]>([]);
 
   // Fetch submission program info and details
   useEffect(() => {
@@ -208,144 +207,44 @@ const Deliverables: React.FC = () => {
     fetchDeliverables();
   }, [activePhase]);
 
-<<<<<<< Updated upstream
-  // Log when component mounts to check if program data is loaded
+  // Fetch team submissions
   useEffect(() => {
-    console.log('Deliverables component mounted');
-    console.log('User:', user);
-    console.log('Selected Program ID:', selectedProgram?.id);
-    console.log('Selected Program Name:', selectedProgram?.name);
-    console.log('Selected Program Phases:', selectedProgram?.phases);
-  }, []);
-
-  useEffect(() => {
-    if (selectedPhaseId) {
-      setActivePhase(Number(selectedPhaseId));
-    }
-  }, [selectedPhaseId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate form data
-    if (!formData.nom || !formData.description || !formData.date_echeance) {
-      alert('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
-    if (!selectedFile) {
-      alert('Veuillez sélectionner un fichier');
-      return;
-    }
-
-    // Get file extension
-    const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
-    if (!fileExtension) {
-      alert('Extension de fichier invalide');
-      return;
-    }
-
-    try {
-      // First, create the deliverable
-      const deliverableData = {
-        nom: formData.nom,
-        description: formData.description,
-        date_echeance: formData.date_echeance,
-        types_fichiers: `.${fileExtension}`
-      };
-
-      console.log('Sending deliverable data:', deliverableData);
-
-      const response = await fetch(`/api/liverable/create/${activePhase}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(deliverableData),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la création du livrable');
-      }
-
-      const data = await response.json();
-      console.log('Livrable créé avec succès:', data);
-
-      // Now upload the file if deliverable was created successfully
-      if (data.id) {
-        const fileFormData = new FormData();
-        fileFormData.append('fichier', selectedFile);
-        fileFormData.append('livrable_id', data.id);
-
-        const fileResponse = await fetch(`/api/liverable/upload/${data.id}`, {
-          method: 'POST',
-          body: fileFormData,
-          credentials: 'include'
-        });
-
-        if (!fileResponse.ok) {
-          throw new Error('Erreur lors du téléchargement du fichier');
+    const fetchTeamSubmissions = async () => {
+      try {
+        if (!user?.id || !submissionProgram?.id) {
+          return;
         }
+
+        // Get the team ID for the current user
+        const teamId = await getCandidatureIdForUser(user.id, submissionProgram.id);
+        console.log('Fetching submissions for team ID:', teamId);
+
+        // Fetch submissions for this team
+        const submissions = await getTeamDeliverableSubmissions(teamId.toString());
+        console.log('Team submissions:', submissions);
+
+        setTeamSubmissions(submissions);
+      } catch (error) {
+        console.error('Error fetching team submissions:', error);
       }
+    };
 
-      // Fetch updated deliverables
-      const updatedDeliverables = await getPhaseDeliverables(String(activePhase));
-      console.log('Updated deliverables:', updatedDeliverables);
+    fetchTeamSubmissions();
+  }, [user?.id, submissionProgram?.id]);
 
-      // Réinitialiser le formulaire
-      setFormData({
-        nom: '',
-        description: '',
-        date_echeance: '',
-        types_fichiers: ''
-      });
-      setSelectedFile(null);
-      setShowForm(false);
-    } catch (error) {
-      console.error('Erreur lors de la création du livrable:', error);
-      alert(error instanceof Error ? error.message : 'Une erreur est survenue lors de la création du livrable');
-    }
-  };
-
-  const handlePhaseChange = (phase: number | string | null) => {
-    if (phase === null) {
-      setActivePhase(0); // Use 0 to represent "all phases"
-      setSelectedPhaseId(null);
-    } else {
-      setActivePhase(Number(phase));
-      setSelectedPhaseId(Number(phase));
-    }
-=======
   const handlePhaseChange = (phase: number) => {
     setActivePhase(phase);
->>>>>>> Stashed changes
     setActiveTab('pending');
   };
 
-  const getFileIcon = (type: string) => {
-    switch(type) {
-      case 'pdf': return <FaFilePdf className="file-icon pdf" />;
-      case 'doc':
-      case 'docx': return <FaFileWord className="file-icon word" />;
-      case 'xls':
-      case 'xlsx': return <FaFileExcel className="file-icon excel" />;
-      case 'ppt':
-      case 'pptx': return <FaFileImage className="file-icon ppt" />;
-      default: return <FaFileImage className="file-icon generic" />;
+  // Check if a deliverable has been submitted and get its status
+  const getDeliverableSubmissionStatus = (deliverableId: number) => {
+    if (!teamSubmissions || teamSubmissions.length === 0) {
+      return null;
     }
-  };
 
-  const getStatusIcon = (status: string) => {
-    switch(status) {
-      case 'approved': return <FaCheckCircle className="status-icon approved" />;
-      case 'pending': return <FaSpinner className="status-icon pending" />;
-      case 'rejected': return <FaTimesCircle className="status-icon rejected" />;
-      case 'not-submitted': return <FaTimesCircle className="status-icon not-submitted" />;
-      default: return null;
-    }
+    const submission = teamSubmissions.find(s => s.livrable_id === deliverableId);
+    return submission || null;
   };
 
   const formatDate = (dateString: string) => {
@@ -356,17 +255,6 @@ const Deliverables: React.FC = () => {
       year: 'numeric'
     };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
-  };
-
-  // Get phase description
-  const getPhaseDescription = (phaseId: number) => {
-    if (selectedProgram && selectedProgram.phases) {
-      const phase = selectedProgram.phases.find(p => Number(p.id) === phaseId);
-      if (phase) {
-        return phase.description;
-      }
-    }
-    return "Description non disponible";
   };
 
   // Add debugging useEffect
@@ -385,27 +273,60 @@ const Deliverables: React.FC = () => {
     })));
   }, [selectedProgram]);
 
-  // Filter deliverables by active phase and tab
-  const phaseDeliverables = filteredDeliverables.filter(d =>
-    Number(d.phaseId) === activePhase
+  // Filter deliverables by active phase
+  const phaseDeliverables = rawDeliverables.filter(d =>
+    Number(d.phase_id) === activePhase
   );
 
-  const requiredDeliverables = phaseDeliverables.filter(d => d.required);
-  const optionalDeliverables = phaseDeliverables.filter(d => !d.required);
+  // Categorize deliverables based on their submission status
+  const pendingDeliverables = [];
+  const validatedDeliverables = [];
+  const rejectedDeliverables = [];
+
+  // Process each deliverable to determine its status
+  for (const deliverable of phaseDeliverables) {
+    const submission = getDeliverableSubmissionStatus(deliverable.id);
+
+    if (!submission) {
+      // No submission found, it's pending
+      pendingDeliverables.push(deliverable);
+    } else if (submission.statut === 'valide') {
+      // Submission is validated
+      validatedDeliverables.push({
+        ...deliverable,
+        submission
+      });
+    } else if (submission.statut === 'rejete') {
+      // Submission is rejected
+      rejectedDeliverables.push({
+        ...deliverable,
+        submission
+      });
+    } else {
+      // Submission is pending review (en attente)
+      pendingDeliverables.push({
+        ...deliverable,
+        submission
+      });
+    }
+  }
+
+  // Categories are filtered directly in the UI based on activeTab
 
   return (
     <div className="deliverables-container">
       <Sidebar />
 
       {/* Main Content */}
-      <main className="main-content">
-        {/* Header */}
-        <header className="deliverables-header">
-          <div>
-            <h1>Livrables - {selectedProgram?.name || 'Programme'}</h1>
-            <p className="subtitle">Documents à soumettre pour votre startup</p>
-          </div>
-        </header>
+      <ProgramAccessGuard programId={submissionProgram?.id || ''}>
+        <main className="main-content">
+          {/* Header */}
+          <header className="deliverables-header">
+            <div>
+              <h1>Livrables - {selectedProgram?.name || 'Programme'}</h1>
+              <p className="subtitle">Documents à soumettre pour votre startup</p>
+            </div>
+          </header>
   <section className="phases-section">
           {isLoading ? (
             <div className="text-center p-4 bg-gray-50 rounded-lg">
@@ -457,7 +378,7 @@ const Deliverables: React.FC = () => {
                       </div>
                       <div className="mt-1 flex items-center">
                         <FaFileUpload className="h-3 w-3 mr-1 text-gray-500" />
-                        <span>{phaseDeliverables.filter(d => Number(d.phaseId) === Number(phase.id)).length} Livrables</span>
+                        <span>{phaseDeliverables.filter(d => Number(d.phase_id) === Number(phase.id)).length} Livrables</span>
                       </div>
                     </div>
                   ))}
@@ -474,6 +395,11 @@ const Deliverables: React.FC = () => {
               <div className="flex items-center justify-center p-4">
                 <FaSpinner className="animate-spin text-gray-500" />
                 <span className="ml-2 text-gray-500">Chargement des livrables...</span>
+              </div>
+            ) : error ? (
+              <div className="p-4 bg-red-50 rounded-lg text-red-700 flex items-center">
+                <span className="mr-2">⚠️</span>
+                <span>{error}</span>
               </div>
             ) : rawDeliverables.length === 0 ? (
               <p className="text-gray-500">Aucun livrable pour cette phase.</p>
@@ -497,16 +423,56 @@ const Deliverables: React.FC = () => {
                       </div>
                     )}
                     <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => {
-                          setSelectedDeliverable(deliverable);
-                          setShowUploadModal(true);
-                        }}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
-                      >
-                        <FaFileUpload />
-                        Soumettre
-                      </button>
+                      {(() => {
+                        // Check if this deliverable has been submitted
+                        const submission = getDeliverableSubmissionStatus(deliverable.id);
+
+                        if (submission) {
+                          // Deliverable has been submitted, show status
+                          return (
+                            <div className="flex items-center gap-2">
+                              {submission.statut === 'en attente' && (
+                                <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-md flex items-center gap-1">
+                                  <FaSpinner className="animate-spin" />
+                                  En attente
+                                </span>
+                              )}
+                              {submission.statut === 'valide' && (
+                                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-md flex items-center gap-1">
+                                  <FaCheckCircle />
+                                  Validé
+                                </span>
+                              )}
+                              {submission.statut === 'rejete' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedDeliverable(deliverable);
+                                    setShowUploadModal(true);
+                                  }}
+                                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors flex items-center gap-2"
+                                >
+                                  <FaFileUpload />
+                                  Resoumettre
+                                </button>
+                              )}
+                            </div>
+                          );
+                        } else {
+                          // Deliverable has not been submitted, show submit button
+                          return (
+                            <button
+                              onClick={() => {
+                                setSelectedDeliverable(deliverable);
+                                setShowUploadModal(true);
+                              }}
+                              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
+                            >
+                              <FaFileUpload />
+                              Soumettre
+                            </button>
+                          );
+                        }
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -553,19 +519,42 @@ const Deliverables: React.FC = () => {
                     if (!selectedDeliverable.id) {
                       throw new Error('ID du livrable manquant');
                     }
-                    
+
                     if (!submissionProgram?.id) {
                       throw new Error('ID du programme manquant');
                     }
-                    
+
                     if (!activePhase || activePhase === 0) {
                       throw new Error('Phase active non sélectionnée');
+                    }
+
+                    // Get the team ID dynamically for the current user and program
+                    let teamId;
+
+                    try {
+                      if (user?.id) {
+                        console.log('Fetching team ID for user:', user.id);
+
+                        // Use our service to get the candidature ID (team ID) for the user
+                        teamId = await getCandidatureIdForUser(user.id, submissionProgram.id);
+
+                        console.log(`Using team ID: ${teamId} for user ${user.id} in program ${submissionProgram.id}`);
+                      } else {
+                        throw new Error('Utilisateur non identifié. Veuillez vous reconnecter.');
+                      }
+                    } catch (error) {
+                      console.error('Error fetching team ID:', error);
+                      throw new Error('Impossible de déterminer votre équipe. Veuillez contacter l\'administrateur.');
+                    }
+
+                    if (!teamId) {
+                      throw new Error('Vous n\'êtes pas associé à une équipe. Veuillez contacter l\'administrateur.');
                     }
 
                     const formData = new FormData();
                     formData.append('fichier', selectedFile);
                     formData.append('livrable_id', selectedDeliverable.id.toString());
-                    formData.append('candidature_id', '26'); // ID statique
+                    formData.append('candidature_id', teamId.toString()); // Use actual team ID instead of hardcoded value
                     formData.append('programme_id', submissionProgram.id.toString());
                     formData.append('phase_id', activePhase.toString());
                     // Ajouter les types de fichiers autorisés
@@ -575,7 +564,7 @@ const Deliverables: React.FC = () => {
 
                     console.log('Données envoyées:', {
                       livrable_id: selectedDeliverable.id,
-                      candidature_id: 26,
+                      candidature_id: teamId,
                       programme_id: submissionProgram.id,
                       phase_id: activePhase,
                       types_fichiers: selectedDeliverable.types_fichiers
@@ -596,10 +585,17 @@ const Deliverables: React.FC = () => {
                     setShowUploadModal(false);
                     setSelectedFile(null);
                     setSelectedDeliverable(null);
-                    
+
                     // Recharger les livrables
                     const deliverables = await getLivrables(String(activePhase));
                     setRawDeliverables(deliverables);
+
+                    // Recharger les soumissions
+                    if (user?.id && submissionProgram?.id) {
+                      const teamId = await getCandidatureIdForUser(user.id, submissionProgram.id);
+                      const submissions = await getTeamDeliverableSubmissions(teamId.toString());
+                      setTeamSubmissions(submissions);
+                    }
 
                     // Afficher un message de succès
                     alert('Livrable soumis avec succès');
@@ -645,33 +641,13 @@ const Deliverables: React.FC = () => {
         </AnimatePresence>
 
         {/* DeliverablesWidget en haut */}
-     
+
 
         {/* Phases Navigation */}
-<<<<<<< Updated upstream
-        <section className="phases-section">
-          <ProgramPhaseTimeline
-            phases={selectedProgram?.phases?.map(phase => ({
-              id: Number(phase.id),
-              name: phase.name || `Phase ${phase.id}`,
-              color: phase.color || '#818cf8',
-              status: phase.status === 'completed' ? 'completed' :
-                     phase.status === 'in_progress' ? 'in-progress' :
-                     phase.status === 'not_started' ? 'not_started' : 'upcoming'
-            })) || []}
-            selectedPhase={activePhase === 0 ? null : Number(activePhase)}
-            onPhaseChange={handlePhaseChange}
-            title="Chronologie des phases"
-            description={activePhase === 0
-              ? "Toutes les phases du programme"
-              : getPhaseDescription(activePhase)}
-          />
-        </section>
-=======
-      
+
 
         {/* DeliverablesWidget en bas de la chronologie */}
-    
+
 
         {/* Active Phase Filter */}
         {activePhase && (
@@ -693,7 +669,6 @@ const Deliverables: React.FC = () => {
             </button>
           </div>
         )}
->>>>>>> Stashed changes
 
         {/* Status Tabs Section */}
         <section className="tabs-section">
@@ -739,14 +714,14 @@ const Deliverables: React.FC = () => {
             ) : (
               <>
                 {/* En attente */}
-                <div className="status-section">
-                  <h3 className="status-title">
-                    <FaSpinner className="status-icon pending" /> En attente
-                  </h3>
-                  <div className="deliverables-grid">
-                    {phaseDeliverables
-                      .filter(d => d.status === 'pending')
-                      .map(deliverable => (
+                {/* En attente */}
+                {activeTab === 'pending' && (
+                  <div className="status-section">
+                    <h3 className="status-title">
+                      <FaSpinner className="status-icon pending" /> En attente
+                    </h3>
+                    <div className="deliverables-grid">
+                      {pendingDeliverables.map(deliverable => (
                         <motion.div
                           key={deliverable.id}
                           className="deliverable-card pending"
@@ -757,34 +732,56 @@ const Deliverables: React.FC = () => {
                         >
                           <div className="card-header">
                             <div className="file-info">
-                              {getSubmissionTypeIcon(deliverable.submissionType)}
+                              <FaFilePdf className="file-icon pdf" />
                               <div>
-                                <h3 className="file-name">{deliverable.name}</h3>
+                                <h3 className="file-name">{deliverable.nom}</h3>
                                 <p className="file-meta">
-                                  {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                                  {formatDate(deliverable.date_echeance)} • {deliverable.types_fichiers?.join(', ')}
                                 </p>
                               </div>
                             </div>
                           </div>
                           <div className="card-actions">
-                            <button className="action-btn submit">
-                              <FaFileUpload /> Soumettre
-                            </button>
+                            {deliverable.submission ? (
+                              <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-md flex items-center gap-1">
+                                <FaSpinner className="animate-spin" />
+                                En attente de validation
+                              </span>
+                            ) : (
+                              <button
+                                className="action-btn submit"
+                                onClick={() => {
+                                  setSelectedDeliverable(deliverable);
+                                  setShowUploadModal(true);
+                                }}
+                              >
+                                <FaFileUpload /> Soumettre
+                              </button>
+                            )}
                           </div>
                         </motion.div>
                       ))}
+                      {pendingDeliverables.length === 0 && (
+                        <div className="empty-state">
+                          <FaFileUpload className="empty-icon" />
+                          <h3 className="empty-title">Aucun livrable en attente</h3>
+                          <p className="empty-text">
+                            Tous les livrables ont été soumis ou il n'y a pas de livrables pour cette phase.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Validés */}
-                <div className="status-section">
-                  <h3 className="status-title">
-                    <FaCheckCircle className="status-icon approved" /> Validés
-                  </h3>
-                  <div className="deliverables-grid">
-                    {phaseDeliverables
-                      .filter(d => d.status === 'approved')
-                      .map(deliverable => (
+                {activeTab === 'approved' && (
+                  <div className="status-section">
+                    <h3 className="status-title">
+                      <FaCheckCircle className="status-icon approved" /> Validés
+                    </h3>
+                    <div className="deliverables-grid">
+                      {validatedDeliverables.map(deliverable => (
                         <motion.div
                           key={deliverable.id}
                           className="deliverable-card approved"
@@ -795,34 +792,44 @@ const Deliverables: React.FC = () => {
                         >
                           <div className="card-header">
                             <div className="file-info">
-                              {getSubmissionTypeIcon(deliverable.submissionType)}
+                              <FaFilePdf className="file-icon pdf" />
                               <div>
-                                <h3 className="file-name">{deliverable.name}</h3>
+                                <h3 className="file-name">{deliverable.nom}</h3>
                                 <p className="file-meta">
-                                  {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                                  {formatDate(deliverable.date_echeance)} • {deliverable.types_fichiers?.join(', ')}
                                 </p>
                               </div>
                             </div>
                           </div>
                           <div className="card-actions">
-                            <button className="action-btn view">
-                              <FaFilePdf /> Voir
-                            </button>
+                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-md flex items-center gap-1">
+                              <FaCheckCircle />
+                              Validé le {formatDate(deliverable.submission.date_soumission)}
+                            </span>
                           </div>
                         </motion.div>
                       ))}
+                      {validatedDeliverables.length === 0 && (
+                        <div className="empty-state">
+                          <FaCheckCircle className="empty-icon" />
+                          <h3 className="empty-title">Aucun livrable validé</h3>
+                          <p className="empty-text">
+                            Vous n'avez pas encore de livrables validés pour cette phase.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Rejetés */}
-                <div className="status-section">
-                  <h3 className="status-title">
-                    <FaTimesCircle className="status-icon rejected" /> Rejetés
-                  </h3>
-                  <div className="deliverables-grid">
-                    {phaseDeliverables
-                      .filter(d => d.status === 'rejected')
-                      .map(deliverable => (
+                {activeTab === 'rejected' && (
+                  <div className="status-section">
+                    <h3 className="status-title">
+                      <FaTimesCircle className="status-icon rejected" /> Rejetés
+                    </h3>
+                    <div className="deliverables-grid">
+                      {rejectedDeliverables.map(deliverable => (
                         <motion.div
                           key={deliverable.id}
                           className="deliverable-card rejected"
@@ -833,32 +840,49 @@ const Deliverables: React.FC = () => {
                         >
                           <div className="card-header">
                             <div className="file-info">
-                              {getSubmissionTypeIcon(deliverable.submissionType)}
+                              <FaFilePdf className="file-icon pdf" />
                               <div>
-                                <h3 className="file-name">{deliverable.name}</h3>
+                                <h3 className="file-name">{deliverable.nom}</h3>
                                 <p className="file-meta">
-                                  {formatDate(deliverable.dueDate)} • {deliverable.required ? 'Requis' : 'Optionnel'}
+                                  {formatDate(deliverable.date_echeance)} • {deliverable.types_fichiers?.join(', ')}
                                 </p>
                               </div>
                             </div>
                           </div>
                           <div className="card-actions">
-                            <button className="action-btn resubmit">
+                            <button
+                              className="action-btn resubmit"
+                              onClick={() => {
+                                setSelectedDeliverable(deliverable);
+                                setShowUploadModal(true);
+                              }}
+                            >
                               <FaFileUpload /> Resoumettre
                             </button>
                           </div>
                         </motion.div>
                       ))}
+                      {rejectedDeliverables.length === 0 && (
+                        <div className="empty-state">
+                          <FaTimesCircle className="empty-icon" />
+                          <h3 className="empty-title">Aucun livrable rejeté</h3>
+                          <p className="empty-text">
+                            Vous n'avez pas de livrables rejetés pour cette phase.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
           </AnimatePresence>
         </section>
       </main>
+      </ProgramAccessGuard>
 
       {/* CSS Styles */}
-      <style jsx>{`
+      <style>{`
         .deliverables-container {
           display: flex;
           min-height: 100vh;

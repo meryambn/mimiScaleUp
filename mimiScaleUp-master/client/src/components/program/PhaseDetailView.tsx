@@ -221,11 +221,9 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
       } catch (error) {
         console.error('Error creating reunion:', error);
         // We'll continue anyway since we've already updated the UI
-        alert('La réunion a été ajoutée localement, mais n\'a pas pu être enregistrée sur le serveur. Les modifications seront perdues lors de l\'actualisation de la page.');
       }
     } else {
       console.log('Skipping backend API call for temporary phase');
-      alert('Cette phase n\'a pas encore été enregistrée sur le serveur. La réunion a été ajoutée localement, mais sera perdue lors de l\'actualisation de la page.');
     }
 
     // Reset the form
@@ -314,11 +312,9 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
       } catch (error) {
         console.error('Error creating critere:', error);
         // We'll continue anyway since we've already updated the UI
-        alert('Le critère a été ajouté localement, mais n\'a pas pu être enregistré sur le serveur. Les modifications seront perdues lors de l\'actualisation de la page.');
       }
     } else {
       console.log('Skipping backend API call for temporary phase');
-      alert('Cette phase n\'a pas encore été enregistrée sur le serveur. Le critère a été ajouté localement, mais sera perdu lors de l\'actualisation de la page.');
     }
 
     // Reset the form
@@ -402,11 +398,9 @@ const PhaseDetailView: React.FC<PhaseDetailViewProps> = ({ phase, onUpdate, isLa
       } catch (error) {
         console.error('Error creating livrable:', error);
         // We'll continue anyway since we've already updated the UI
-        alert('Le livrable a été ajouté localement, mais n\'a pas pu être enregistré sur le serveur. Les modifications seront perdues lors de l\'actualisation de la page.');
       }
     } else {
       console.log('Skipping backend API call for temporary phase');
-      alert('Cette phase n\'a pas encore été enregistrée sur le serveur. Le livrable a été ajouté localement, mais sera perdu lors de l\'actualisation de la page.');
     }
 
     // Reset the form

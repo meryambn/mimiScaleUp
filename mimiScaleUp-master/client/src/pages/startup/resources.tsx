@@ -21,6 +21,7 @@ import { getSubmissionsByProgram } from '@/services/formService';
 import { checkSubmissionAccepted } from '@/services/teamService';
 import { FrontendStatus } from '@/utils/statusMapping';
 import { Resource, Program } from '@/types/program';
+import ProgramAccessGuard from '@/components/guards/ProgramAccessGuard';
 
 interface ExternalResource {
   id: string;
@@ -206,14 +207,15 @@ const StartupResourcePage = () => {
       <Sidebar />
 
       {/* Main Content */}
-      <main className="main-content">
-        {/* Header */}
-        <header className="resources-header">
-          <div>
-            <h1>Ressources - {selectedProgram?.name || 'Programme'}</h1>
-            <p className="subtitle">Documents et templates pour votre startup</p>
-          </div>
-        </header>
+      <ProgramAccessGuard programId={selectedProgram?.id || ''}>
+        <main className="main-content">
+          {/* Header */}
+          <header className="resources-header">
+            <div>
+              <h1>Ressources - {selectedProgram?.name || 'Programme'}</h1>
+              <p className="subtitle">Documents et templates pour votre startup</p>
+            </div>
+          </header>
 
         {/* Search and Filters */}
         <div className="search-filters">
@@ -385,6 +387,7 @@ const StartupResourcePage = () => {
           </>
         )}
       </main>
+      </ProgramAccessGuard>
 
       {/* CSS Styles */}
       <style jsx>{`
