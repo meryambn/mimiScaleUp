@@ -63,6 +63,7 @@ const StartupMeetingsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [phases, setPhases] = useState<any[]>([]);
+  const [submissionProgram, setSubmissionProgram] = useState<any>(null);
 
   // Add debugging for phases
   useEffect(() => {
@@ -135,6 +136,9 @@ const StartupMeetingsPage = () => {
           setIsLoading(false);
           return;
         }
+
+        // Set the submission program for ProgramAccessGuard
+        setSubmissionProgram(programDetails);
 
         // Fetch phases for this program
         console.log(`Fetching phases for program ${programDetails.id}...`);
@@ -274,15 +278,6 @@ const StartupMeetingsPage = () => {
     } else {
       setActivePhase(phase);
     }
-  };
-
-  // Get phase description
-  const getPhaseDescription = (phaseId: string) => {
-    const phase = phases.find(p => String(p.id) === String(phaseId));
-    if (phase && phase.description && phase.description.trim() !== '') {
-      return phase.description;
-    }
-    return "Description non disponible";
   };
 
   // Format date helper
@@ -647,7 +642,7 @@ const StartupMeetingsPage = () => {
       </ProgramAccessGuard>
 
       {/* CSS Styles */}
-      <style jsx>{`
+      <style>{`
         .meetings-container {
           display: flex;
           min-height: 100vh;
